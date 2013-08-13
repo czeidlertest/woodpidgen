@@ -5,34 +5,22 @@
 
 #include <gitinterface.h>
 #include <mainwindow.h>
-
-
-class MessageReceiver : public QObject
-{
-    Q_OBJECT
-public:
-
-    virtual ~MessageReceiver() {}
-    Q_INVOKABLE void messageDataReceived(void* data, size_t length) {
-        printf("Data: %s\n", (char*)data);
-    }
-};
-
+#include <messagereceiver.h>
 
 
 int main(int argc, char *argv[])
 {
     GitInterface gitInterface;
 
-    gitInterface.setTo(QString(".gitTest"));
-    gitInterface.AddMessage("test message");
+    gitInterface.setTo(QString(".git"));
+    //gitInterface.AddMessage("test message");
 
     QGuiApplication app(argc, argv);
 
     //QApplication app(argc, argv);
     //MainWindow window;
     //window.show();
-    MessageReceiver receiver;
+    MessageReceiver receiver(&gitInterface);
 
     QtQuick2ApplicationViewer viewer;
     viewer.rootContext()->setContextProperty("messageReceiver", &receiver);

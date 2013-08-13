@@ -16,6 +16,9 @@ public:
     void    unSet();
 
     int     AddMessage(const char* data);
+    int     WriteObject(const char *data, int size);
+    int     WriteFile(const QString& hash, const char *data, int size);
+
 private:
     QString         fRepositoryPath;
     git_repository* fRepository;

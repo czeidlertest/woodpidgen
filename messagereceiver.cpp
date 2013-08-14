@@ -60,6 +60,9 @@ public:
 
     void handleIqResultQuery() {
         QByteArray packedData;
+        QString branch;
+        QString first;
+        QString last;
         while (!fXML.atEnd()) {
             switch (fXML.readNext()) {
             case QXmlStreamReader::EndElement:
@@ -67,12 +70,19 @@ public:
                 break;
             case QXmlStreamReader::StartElement:
                 if (fXML.name().compare("pack", Qt::CaseInsensitive) == 0) {
+                    QXmlStreamAttributes attributes = fXML.attributes();
+                    if (attributes.hasAttribute("branch"))
+                        branch = attributes.value("branch").toString();
+                    if (attributes.hasAttribute("first"))
+                        first = attributes.value("first").toString();
+                    if (attributes.hasAttribute("last"))
+                        last = attributes.value("last").toString();
                     //TODO handle different package formats...
                 }
                 break;
             case QXmlStreamReader::Characters:
                 packedData = fXML.text().toLocal8Bit();
-                fMessageReceiver->commitPackReceived(packedData);
+                fMessageReceiver->commitPackReceived(packedData, branch, first, last);
                 break;
             default:
                 break;
@@ -97,37 +107,16 @@ void MessageReceiver::messageDataReceived(const QByteArray& data)
 {
     XMLHandler xmlHandler(data, this);
     xmlHandler.handle();
-
-/*      QString type;
-        QString size;
-        int objectEnd = objectStart;
-        objectEnd = _ReadTill(text, type, objectEnd, ' ');
-        printf("type %s\n", type.toStdString().c_str());
-        objectEnd = _ReadTill(text, size, objectEnd, '\0');
-        //int dataStart = pos;
-        printf("size %i\n", size.toInt());
-        objectEnd += size.toInt();
-
-        const char* dataPointer = text.data() + objectStart;
-        fGitInterface->WriteObject(dataPointer, objectEnd - objectStart);
-
-        objectStart = objectEnd;
-*/
-/*printf("%s \n", dataPointer - 2);
-        QByteArray cdata;
-        //cdata = QByteArray::fromBase64(QByteArray::fromRawData(dataPointer, start - blobStart));
-        cdata = QByteArray::fromRawData(dataPointer, start - blobStart);
-        printf("compresed %i: %s\n", cdata.length(), cdata.data());
-        QByteArray uncomp = qUncompress(cdata);
-        printf("uncompresed: %s\n", uncomp.data());   */
 }
 
 QString MessageReceiver::getMessagesRequest()
 {
-    return _CreateXMLMessageRequest("", "");
+    QString branch("master");
+    QString first = fGitInterface->getTip(branch);
+    return _CreateXMLMessageRequest(branch, first, "");
 }
 
-void MessageReceiver::commitPackReceived(const QByteArray& data)
+void MessageReceiver::commitPackReceived(const QByteArray& data, const QString& branch, const QString& first, const QString& last)
 {
     QByteArray text = QByteArray::fromBase64(data);
 
@@ -144,10 +133,13 @@ void MessageReceiver::commitPackReceived(const QByteArray& data)
         objectEnd += size.toInt();
 
         const char* dataPointer = text.data() + blobStart;
-        fGitInterface->WriteFile(hash, dataPointer, objectEnd - blobStart);
+        fGitInterface->writeFile(hash, dataPointer, objectEnd - blobStart);
 
         objectStart = objectEnd;
     }
+
+    // update tip
+    fGitInterface->updateTip(branch, last);
 }
 
 
@@ -162,7 +154,7 @@ int MessageReceiver::_ReadTill(QByteArray& in, QString &out, int start, char sto
     return pos;
 }
 
-QString MessageReceiver::_CreateXMLMessageRequest(const QString &fromCommit, const QString &toCommit)
+QString MessageReceiver::_CreateXMLMessageRequest(const QString& branch, const QString &fromCommit, const QString &toCommit)
 {
     QString output;
     QXmlStreamWriter xmlWriter(&output);
@@ -173,7 +165,7 @@ QString MessageReceiver::_CreateXMLMessageRequest(const QString &fromCommit, con
     xmlWriter.writeStartElement("query");
     xmlWriter.writeAttribute("xmlns", "git:transfer");
     xmlWriter.writeStartElement("commits");
-    xmlWriter.writeAttribute("branch", "master");
+    xmlWriter.writeAttribute("branch", branch);
     xmlWriter.writeAttribute("first", fromCommit);
     xmlWriter.writeAttribute("last", toCommit);
     xmlWriter.writeEndElement();

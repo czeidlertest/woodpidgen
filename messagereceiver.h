@@ -14,14 +14,14 @@ public:
     Q_INVOKABLE void messageDataReceived(const QByteArray &data);
     Q_INVOKABLE QString getMessagesRequest();
 
-    void    commitPackReceived(const QByteArray& data);
+    void    commitPackReceived(const QByteArray& data, const QString &branch, const QString &first, const QString &last);
 signals:
     
 public slots:
 
 private:
     int _ReadTill(QByteArray &in, QString& out, int start, char stopChar);
-    QString _CreateXMLMessageRequest(const QString& fromCommit, const QString& toCommit);
+    QString _CreateXMLMessageRequest(const QString& branch, const QString& fromCommit, const QString& toCommit);
 
 
     GitInterface*   fGitInterface;

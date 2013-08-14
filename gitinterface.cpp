@@ -3,6 +3,9 @@
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
+#include <QTextStream>
+
+#include <git2/refs.h>
 
 
 GitInterface::GitInterface()
@@ -40,14 +43,14 @@ void GitInterface::unSet()
     git_odb_free(fObjectDatabase);
 }
 
-int GitInterface::AddMessage(const char *data)
+int GitInterface::addMessage(const char *data)
 {
     git_oid oid;
     int error = git_odb_write(&oid, fObjectDatabase, data, strlen(data), GIT_OBJ_BLOB);
     return error;
 }
 
-int GitInterface::WriteObject(const char *data, int size)
+int GitInterface::writeObject(const char *data, int size)
 {
     QCryptographicHash hash(QCryptographicHash::Sha1);
     hash.addData(data, size);
@@ -75,7 +78,7 @@ int GitInterface::WriteObject(const char *data, int size)
     return 0;
 }
 
-int GitInterface::WriteFile(const QString &hash, const char *data, int size)
+int GitInterface::writeFile(const QString &hash, const char *data, int size)
 {
     std::string hashHex = hash.toStdString();
     QString path;
@@ -93,4 +96,52 @@ int GitInterface::WriteFile(const QString &hash, const char *data, int size)
     file.open(QIODevice::WriteOnly | QIODevice::Truncate);
     file.write(data, size);
     return 0;
+}
+
+QString GitInterface::getTip(const QString &branch)
+{
+    QString refPath = fRepositoryPath;
+    refPath += "/refs/heads/";
+    refPath += branch;
+
+    QFile file(refPath);
+    if (!file.open(QIODevice::ReadOnly))
+        return "";
+    QString oid;
+    QTextStream outstream(&file);
+    outstream >> oid;
+    return oid;
+
+    /*
+    git_reference* out;
+    if (git_repository_head(&out, fRepository) == 0) {
+        const git_oid* id = git_reference_oid(out);
+        const char* name = git_reference_target(out);
+
+        git_reference_free(out);
+    }
+
+    QString refName = "refs/heads/";
+    refName += branch;
+    git_oid oid;
+    int status = git_reference_name_to_oid(&oid, fRepository, refName.toStdString().c_str());
+    if (status != 0)
+        return "";
+    return (const char*)oid.id;*/
+}
+
+bool GitInterface::updateTip(const QString &branch, const QString &last)
+{
+    QString refPath = fRepositoryPath;
+    refPath += "/refs/heads/";
+    refPath += branch;
+
+    QFile file(refPath);
+    if (!file.open(QIODevice::WriteOnly))
+        return false;
+    file.resize(0);
+    QTextStream outstream(&file);
+    outstream << last;
+
+    return true;
 }

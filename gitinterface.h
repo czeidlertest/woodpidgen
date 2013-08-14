@@ -15,10 +15,12 @@ public:
     int setTo(const QString &path, bool create = true);
     void    unSet();
 
-    int     AddMessage(const char* data);
-    int     WriteObject(const char *data, int size);
-    int     WriteFile(const QString& hash, const char *data, int size);
+    int     addMessage(const char* data);
+    int     writeObject(const char *data, int size);
+    int     writeFile(const QString& hash, const char *data, int size);
 
+    QString getTip(const QString& branch);
+    bool    updateTip(const QString& branch, const QString& last);
 private:
     QString         fRepositoryPath;
     git_repository* fRepository;

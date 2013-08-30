@@ -1,7 +1,11 @@
 #include <QApplication>
-#include <QQmlContext>
+#if QT_VERSION < 0x050000
+#include <QtDeclarative/QDeclarativeContext>
+#include <QtDeclarative/QDeclarativeView>
+#else
 #include <QtGui/QGuiApplication>
-#include "qtquick2applicationviewer.h"
+#include <QQmlContext>
+#endif
 
 #include <gitinterface.h>
 #include <mainwindow.h>
@@ -13,19 +17,25 @@ int main(int argc, char *argv[])
     GitInterface gitInterface;
 
     gitInterface.setTo(QString(".git"));
+
+    QByteArray data;
+    data.setRawData("fake", 4);
+    gitInterface.add("//base/dir/dir3/test2", data);
+    gitInterface.commit();
     //gitInterface.AddMessage("test message");
 
-    QGuiApplication app(argc, argv);
+    QApplication app(argc, argv);
+    MainWindow window;
+    window.show();
 
-    //QApplication app(argc, argv);
-    //MainWindow window;
-    //window.show();
+    /*
     MessageReceiver receiver(&gitInterface);
+    QDeclarativeView view;
+    view.rootContext()->setContextProperty("messageReceiver", &receiver);
+    view.setSource(QUrl::fromLocalFile("qml/woodpidgin/main.qml"));
+    view.show();
+*/
 
-    QtQuick2ApplicationViewer viewer;
-    viewer.rootContext()->setContextProperty("messageReceiver", &receiver);
-    viewer.setMainQmlFile(QStringLiteral("qml/woodpidgin/main.qml"));
-    viewer.showExpanded();
 
     return app.exec();
 }

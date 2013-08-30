@@ -12,7 +12,7 @@ public:
     CryptoLib();
     ~CryptoLib();
 
-    void AddKey(const char* keyFile, const char* keyName, const char *keyPassword);
+    void generateKeyPair(const char* publicKeyFile, const char* privateKeyFile, const char* keyName, const char *keyPassword);
     int GetPublicKey(const char* keyFile, const char* keyName, CRYPT_HANDLE &publicKey);
 
     int PGPEncrypte(CRYPT_HANDLE key, const void* bufferIn, int inLength, void *bufferOut, int outLength);

@@ -22,21 +22,27 @@ CryptoLib::~CryptoLib()
 }
 
 
-void CryptoLib::AddKey(const char *keyFile, const char *keyName, const char* keyPassword)
+void CryptoLib::generateKeyPair(const char* publicKeyFile, const char* privateKeyFile, const char* keyName, const char *keyPassword)
 {
+    // private
     CRYPT_CONTEXT privKeyContext;
     cryptCreateContext(&privKeyContext, CRYPT_UNUSED, CRYPT_ALGO_RSA);
     cryptSetAttributeString(privKeyContext, CRYPT_CTXINFO_LABEL, keyName, strlen(keyName));
     cryptGenerateKey(privKeyContext);
 
     CRYPT_KEYSET cryptKeyset;
-    C_RET error = cryptKeysetOpen(&cryptKeyset, CRYPT_UNUSED, CRYPT_KEYSET_FILE, keyFile, CRYPT_KEYOPT_CREATE);
+    C_RET error = cryptKeysetOpen(&cryptKeyset, CRYPT_UNUSED, CRYPT_KEYSET_FILE, privateKeyFile, CRYPT_KEYOPT_CREATE);
     if (error != CRYPT_OK)
-        printf("cryptKeysetOpen failed: %i\n", error);
+        printf("cryptKeysetOpen failed publicKeyFile: %i\n", error);
     /* Load/store keys */
     cryptAddPrivateKey(cryptKeyset, privKeyContext, keyPassword);
 
 
+    // public
+    CRYPT_KEYSET pubCryptKeyset;
+    error = cryptKeysetOpen(&pubCryptKeyset, CRYPT_UNUSED, CRYPT_KEYSET_FILE, publicKeyFile, CRYPT_KEYOPT_CREATE);
+    if (error != CRYPT_OK)
+        printf("cryptKeysetOpen failed publicKeyFile: %i\n", error);
 
     CRYPT_CERTIFICATE cryptCertificate;
     // Create a self-signed CA certificate
@@ -50,8 +56,11 @@ void CryptoLib::AddKey(const char *keyFile, const char *keyName, const char* key
 
     // Sign the certificate with the private key and update the still-open keyset with it
     cryptSignCert(cryptCertificate, privKeyContext );
-    cryptAddPublicKey(cryptKeyset, cryptCertificate);
+    cryptAddPublicKey(pubCryptKeyset, cryptCertificate);
 
+
+    // cleanup
+    cryptKeysetClose(pubCryptKeyset);
     cryptKeysetClose(cryptKeyset);
     cryptDestroyObject(cryptCertificate);
     cryptDestroyContext(privKeyContext);
@@ -177,21 +186,24 @@ void CryptoLib::EncrypteData()
 {
     C_RET error;
 
-    const char* kKeyFileName = "keyset.p15";
+    //const char* kKeyFileName = "keyset.p15";
+
     const char* kKeyName = "test_label";
     const char* kKeyPassword = "test1";
-    AddKey(kKeyFileName, kKeyName, kKeyPassword);
 
-    //const char* kKeyFileNamePublic = "pub_rsa.gpg";
-    //const char* kKeyFileNamePrivate = "sec_rsa.gpg";
+    //const char* kKeyFileNamePublic = "pubrsa1.gpg";
+    //const char* kKeyFileNamePrivate = "secrsa1.gpg";
 
-    const char* kKeyFileNamePublic = "keyset.p15";
-    const char* kKeyFileNamePrivate = "keyset.p15";
+    const char* kKeyFileNamePublic = "pubkeyset.p15";
+    const char* kKeyFileNamePrivate = "seckeyset.p15";
+
+    generateKeyPair(kKeyFileNamePublic, kKeyFileNamePrivate, kKeyName, kKeyPassword);
+
 
     CRYPT_KEYSET cryptKeyset;
     error = cryptKeysetOpen(&cryptKeyset, CRYPT_UNUSED, CRYPT_KEYSET_FILE, kKeyFileNamePublic, CRYPT_KEYOPT_READONLY);
     if (error != CRYPT_OK)
-        printf("cryptKeysetOpen failed: %i\n", error);
+        printf("EncrypteData: cryptKeysetOpen failed: %i\n", error);
 
     //CRYPT_HANDLE publicKey;
     //GetPublicKey(kKeyFileName, kKeyName, publicKey);

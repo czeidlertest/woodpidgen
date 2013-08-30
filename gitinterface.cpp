@@ -11,7 +11,8 @@
 GitInterface::GitInterface()
     :
     fRepository(NULL),
-    fObjectDatabase(NULL)
+    fObjectDatabase(NULL),
+    fCurrentBranch("master")
 {
 }
 
@@ -19,6 +20,162 @@ GitInterface::GitInterface()
 GitInterface::~GitInterface()
 {
     unSet();
+}
+
+int GitInterface::setBranch(const char *branch, bool createBranch)
+{
+    if (fRepository == NULL)
+        return DatabaseInterface::kNotInit;
+    fCurrentBranch = branch;
+    return 0;
+}
+
+
+int GitInterface::add(const QString& path, const QByteArray &data)
+{
+    QString treePath = path;
+    QString filename = removeFilename(treePath);
+
+    git_oid oid;
+    int error = git_odb_write(&oid, fObjectDatabase, data.data(), strlen(data.data()), GIT_OBJ_BLOB);
+    if (error != 0)
+        return error;
+    int fileMode = 100644;
+
+    git_tree *rootTree = NULL;
+    git_commit *commit = getTipCommit(fCurrentBranch);
+    if (commit != 0) {
+        error = git_commit_tree(&rootTree, commit);
+        git_commit_free(commit);
+        if (error != 0)
+            printf("can't get tree from commit\n");
+    }
+
+    while (true) {
+        git_tree *node = NULL;
+        if (rootTree == NULL || treePath == "")
+            node = rootTree;
+        else {
+            QString nodeChild = treePath + "/" + filename;
+            git_tree_get_subtree(&node, rootTree, nodeChild.toStdString().c_str());
+        }
+
+        git_treebuilder *builder = NULL;
+        error = git_treebuilder_create(&builder, node);
+        if (error != 0) {
+            git_tree_free(rootTree);
+            return error;
+        }
+        error = git_treebuilder_insert(NULL, builder, filename.toStdString().c_str(), &oid, fileMode);
+        if (error != 0) {
+            git_tree_free(rootTree);
+            git_treebuilder_free(builder);
+            return error;
+        }
+        error = git_treebuilder_write(&oid, fRepository, builder);
+        git_treebuilder_free(builder);
+        if (error != 0) {
+            git_tree_free(rootTree);
+            return error;
+        }
+
+        // in the folloing we write trees
+        fileMode = 040000;
+        if (treePath == "")
+            break;
+        filename = removeFilename(treePath);
+        printf("dir: %s %s\n", filename.toStdString().c_str(), treePath.toStdString().c_str());
+    }
+
+    git_tree_free(rootTree);
+    fNewRootTreeOid = oid;
+    return 0;
+}
+
+
+int GitInterface::commit()
+{
+    git_tree *tree;
+    int error = git_tree_lookup(&tree, fRepository, &fNewRootTreeOid);
+    if (error != 0)
+        return error;
+
+    QString refName = "refs/heads/";
+    refName += fCurrentBranch;
+
+    git_signature* signature;
+    git_signature_new(&signature, "client", "no mail", time(NULL), 0);
+
+    git_commit *tipCommit = getTipCommit(fCurrentBranch);
+    git_commit *parents[1];
+    int nParents = 0;
+    if (tipCommit) {
+        parents[0] = tipCommit;
+        nParents++;
+    }
+
+    git_oid id;
+    error = git_commit_create(&id, fRepository, refName.toStdString().c_str(), signature, signature, NULL, "message", tree, nParents, (const git_commit**)parents);
+
+    git_commit_free(tipCommit);
+    git_signature_free(signature);
+    git_tree_free(tree);
+    if (error != 0)
+        return error;
+
+    return 0;
+   //git_reference* out;
+    //int result = git_reference_lookup(&out, fRepository, "refs/heads/master");
+    //git_reference_free(out);
+
+    /*int error;
+    git_revwalk *walk;
+    error = git_revwalk_new(&walk, fRepository);
+    error = git_revwalk_push_glob(walk, "refs/heads/master");
+    git_oid oid;
+    error = git_revwalk_next(&oid, walk);
+    git_commit *commit;
+    error = git_commit_lookup(&commit, fRepository, &oid);
+    printf("Name %s\n", git_commit_author(commit)->name);
+    git_commit_free(commit);
+    git_revwalk_free(walk);
+    */
+
+    /*
+    git_oid id;
+    git_oid_fromstr(&id, "229841ec03381379237658d8136a8342b7cd7c23");
+    git_reference *newRef;
+    int status = git_reference_create_oid(&newRef, fRepository, "refs/heads/test", &id, false);
+
+    git_strarray ref_list;
+     git_reference_list(&ref_list, fRepository, GIT_REF_LISTALL);
+
+      const char *refname;
+      git_reference *ref;
+      char out[41];
+      for (int i = 0; i < ref_list.count; ++i) {
+          refname = ref_list.strings[i];
+          git_reference_lookup(&ref, fRepository, refname);
+          if (ref == NULL)
+              continue;
+    switch (git_reference_type(ref)) {
+        case GIT_REF_OID:
+          git_oid_fmt(out, git_reference_oid(ref));
+          out[40] = '\0';
+          printf("%s [%s]\n", refname, out);
+          break;
+
+        case GIT_REF_SYMBOLIC:
+          printf("%s => %s\n", refname, git_reference_target(ref));
+          break;
+        default:
+          fprintf(stderr, "Unexpected reference type\n");
+          exit(1);
+      }
+      }
+
+      git_strarray_free(&ref_list);*/
+
 }
 
 int GitInterface::setTo(const QString &path, bool create)
@@ -100,6 +257,44 @@ int GitInterface::writeFile(const QString &hash, const char *data, int size)
 
 QString GitInterface::getTip(const QString &branch)
 {
+    QString foundOid = "";
+    QString refName = "refs/heads/";
+    refName += branch;
+
+    git_strarray ref_list;
+    git_reference_list(&ref_list, fRepository, GIT_REF_LISTALL);
+
+    git_reference *ref;
+    char out[41];
+    for (int i = 0; i < ref_list.count; ++i) {
+        const char *name = ref_list.strings[i];
+        if (refName != name)
+            continue;
+        git_reference_lookup(&ref, fRepository, name);
+        if (ref == NULL)
+            continue;
+        switch (git_reference_type(ref)) {
+        case GIT_REF_OID:
+          git_oid_fmt(out, git_reference_oid(ref));
+          out[40] = '\0';
+          foundOid = out;
+          break;
+
+        case GIT_REF_SYMBOLIC:
+            foundOid = git_reference_target(ref);
+            break;
+        default:
+            fprintf(stderr, "Unexpected reference type\n");
+            foundOid = "";
+        }
+        break;
+    }
+
+    git_strarray_free(&ref_list);
+
+    return foundOid;
+
+/*
     QString refPath = fRepositoryPath;
     refPath += "/refs/heads/";
     refPath += branch;
@@ -110,29 +305,23 @@ QString GitInterface::getTip(const QString &branch)
     QString oid;
     QTextStream outstream(&file);
     outstream >> oid;
-    return oid;
-
-    /*
-    git_reference* out;
-    if (git_repository_head(&out, fRepository) == 0) {
-        const git_oid* id = git_reference_oid(out);
-        const char* name = git_reference_target(out);
-
-        git_reference_free(out);
-    }
-
-    QString refName = "refs/heads/";
-    refName += branch;
-    git_oid oid;
-    int status = git_reference_name_to_oid(&oid, fRepository, refName.toStdString().c_str());
-    if (status != 0)
-        return "";
-    return (const char*)oid.id;*/
+    return oid;*/
 }
 
 bool GitInterface::updateTip(const QString &branch, const QString &last)
 {
     QString refPath = fRepositoryPath;
+    refPath += "/refs/heads/";
+    refPath += branch;
+    git_oid id;
+    git_oid_fromstr(&id, last.toStdString().c_str());
+    git_reference *newRef;
+    int status = git_reference_create_oid(&newRef, fRepository, refPath.toStdString().c_str(), &id, true);
+    if (status == 0)
+        return true;
+    return false;
+
+   /* QString refPath = fRepositoryPath;
     refPath += "/refs/heads/";
     refPath += branch;
 
@@ -141,7 +330,51 @@ bool GitInterface::updateTip(const QString &branch, const QString &last)
         return false;
     file.resize(0);
     QTextStream outstream(&file);
-    outstream << last;
+    outstream << last << "\n";
 
-    return true;
+    return true;*/
+}
+
+git_commit *GitInterface::getTipCommit(const QString &branch)
+{
+    QString tip = getTip(branch);
+    git_oid out;
+    int error = git_oid_fromstr(&out, tip.toStdString().c_str());
+    if (error != 0)
+        return NULL;
+    git_commit *commit;
+    error = git_commit_lookup(&commit, fRepository, &out);
+    if (error != 0)
+        return NULL;
+    return commit;
+}
+
+QString GitInterface::removeFilename(QString &path)
+{
+    path = path.trimmed();
+    while (!path.isEmpty() && path.at(0) == '/')
+        path.remove(0, 1);
+    if (path.isEmpty())
+        return "";
+    while (true) {
+        int index = path.lastIndexOf("/", -1);
+        if (index < 0) {
+            QString filename = path;
+            path.clear();
+            return filename;
+        }
+
+        // ignore multiple slashes
+        if (index == path.count() - 1) {
+            path.truncate(path.count() -1);
+            continue;
+        }
+        int filenameLength = path.count() - 1 - index;
+        QString filename = path.mid(index + 1, filenameLength);
+        path.truncate(index);
+        while (!path.isEmpty() && path.at(path.count() - 1) == '/')
+            path.remove(path.count() - 1, 1);
+        return filename;
+    }
+    return path;
 }

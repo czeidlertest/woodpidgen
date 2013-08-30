@@ -3,6 +3,8 @@
 
 #include "cryptolib.h"
 
+#include "cryptointerface.h"
+
 
 MainWindow::MainWindow(QWidget *parent) :
     QDialog(parent),
@@ -11,8 +13,21 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
     ui->pushButtonEncrypt->setToolTip("Encrypt");
 
-    CryptoLib crypto;
-    crypto.EncrypteData();
+    const char* kKeyName = "test_label";
+    const char* kKeyPassword = "test1";
+
+    //const char* kKeyFileNamePublic = "pubrsa1.gpg";
+    //const char* kKeyFileNamePrivate = "secrsa1.gpg";
+
+    const char* kKeyFileNameCert = "certkeyset.p15";
+    const char* kKeyFileNamePublic = "pubkeyset.p15";
+    const char* kKeyFileNamePrivate = "seckeyset.p15";
+
+    CryptoInterface crypto;
+    crypto.generateKeyPair(kKeyFileNameCert, kKeyFileNamePublic, kKeyFileNamePrivate, kKeyPassword);
+    crypto.encryptionTest(kKeyFileNameCert, kKeyFileNamePublic, kKeyFileNamePrivate, kKeyPassword);
+    //CryptoLib crypto;
+    //crypto.EncrypteData();
 }
 
 MainWindow::~MainWindow()

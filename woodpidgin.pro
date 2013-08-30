@@ -5,6 +5,7 @@ DEPLOYMENTFOLDERS = folder_01
 
 QT       += core gui
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
+QT += declarative
 
 # Additional import path used to resolve QML modules in Creator's code model
 QML_IMPORT_PATH =
@@ -19,20 +20,20 @@ SOURCES += main.cpp \
     mainwindow.cpp \
     gitinterface.cpp \
     cryptolib.cpp \
-    messagereceiver.cpp
+    messagereceiver.cpp \
+    cryptointerface.cpp \
+    useridentity.cpp
 
 # Installation path
 # target.path =
-
-# Please do not modify the following two lines. Required for deployment.
-include(qtquick2applicationviewer/qtquick2applicationviewer.pri)
-qtcAddDeployment()
 
 HEADERS += \
     mainwindow.h \
     cryptolib.h \
     gitinterface.h \
-    messagereceiver.h
+    messagereceiver.h \
+    cryptointerface.h \
+    useridentity.h
 
 FORMS += \
     mainwindow.ui
@@ -49,3 +50,8 @@ else:win32:CONFIG(debug, debug|release): PRE_TARGETDEPS += $$PWD/../cl342/debug/
 else:unix: PRE_TARGETDEPS += $$PWD/../cl342/libcl.a
 
 unix|win32: LIBS += -lgit2
+
+unix|win32: LIBS += -lqca
+
+OTHER_FILES += \
+    qml/woodpidgin/main.qml

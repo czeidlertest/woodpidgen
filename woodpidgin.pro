@@ -33,7 +33,8 @@ HEADERS += \
     gitinterface.h \
     messagereceiver.h \
     cryptointerface.h \
-    useridentity.h
+    useridentity.h \
+    databaseinterface.h
 
 FORMS += \
     mainwindow.ui

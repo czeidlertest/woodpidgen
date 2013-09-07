@@ -20,8 +20,13 @@ int main(int argc, char *argv[])
 
     QByteArray data;
     data.setRawData("fake", 4);
-    gitInterface.add("//base/dir/dir3/test2", data);
+    gitInterface.add("//base/dir/dir3/test6", data);
     gitInterface.commit();
+
+    QByteArray out;
+    gitInterface.get("base/dir/dir3/test6", out);
+
+
     //gitInterface.AddMessage("test message");
 
     QApplication app(argc, argv);

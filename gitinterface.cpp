@@ -14,6 +14,7 @@ GitInterface::GitInterface()
     fObjectDatabase(NULL),
     fCurrentBranch("master")
 {
+    fNewRootTreeOid.id[0] = '\0';
 }
 
 
@@ -22,7 +23,7 @@ GitInterface::~GitInterface()
     unSet();
 }
 
-int GitInterface::setBranch(const char *branch, bool createBranch)
+int GitInterface::setBranch(const QString &branch, bool createBranch)
 {
     if (fRepository == NULL)
         return DatabaseInterface::kNotInit;
@@ -43,13 +44,12 @@ int GitInterface::add(const QString& path, const QByteArray &data)
     int fileMode = 100644;
 
     git_tree *rootTree = NULL;
-    git_commit *commit = getTipCommit(fCurrentBranch);
-    if (commit != 0) {
-        error = git_commit_tree(&rootTree, commit);
-        git_commit_free(commit);
+    if (fNewRootTreeOid.id[0] != '\0') {
+        error = git_tree_lookup(&rootTree, fRepository, &fNewRootTreeOid);
         if (error != 0)
-            printf("can't get tree from commit\n");
-    }
+            return error;
+    } else
+        rootTree = getTipTree(fCurrentBranch);
 
     while (true) {
         git_tree *node = NULL;
@@ -62,6 +62,8 @@ int GitInterface::add(const QString& path, const QByteArray &data)
 
         git_treebuilder *builder = NULL;
         error = git_treebuilder_create(&builder, node);
+        if (node != rootTree)
+            git_tree_free(node);
         if (error != 0) {
             git_tree_free(rootTree);
             return error;
@@ -84,7 +86,6 @@ int GitInterface::add(const QString& path, const QByteArray &data)
         if (treePath == "")
             break;
         filename = removeFilename(treePath);
-        printf("dir: %s %s\n", filename.toStdString().c_str(), treePath.toStdString().c_str());
     }
 
     git_tree_free(rootTree);
@@ -123,6 +124,7 @@ int GitInterface::commit()
     if (error != 0)
         return error;
 
+    fNewRootTreeOid.id[0] = '\0';
     return 0;
    //git_reference* out;
     //int result = git_reference_lookup(&out, fRepository, "refs/heads/master");
@@ -176,6 +178,38 @@ int GitInterface::commit()
 
       git_strarray_free(&ref_list);*/
 
+}
+
+int GitInterface::get(const QString &path, QByteArray &data)
+{
+    git_tree *rootTree = getTipTree(fCurrentBranch);
+
+    git_tree *node = NULL;
+    int error = git_tree_get_subtree(&node, rootTree, path.toStdString().c_str());
+    git_tree_free(rootTree);
+    if (error != 0)
+        return error;
+
+    QString pathCopy = path;
+    QString filename = removeFilename(pathCopy);
+    const git_tree_entry *treeEntry = git_tree_entry_byname(node, filename.toStdString().c_str());
+
+    if (treeEntry == NULL) {
+        git_tree_free(node);
+        return -1;
+    }
+
+    git_blob *blob;
+    error = git_blob_lookup(&blob, fRepository, git_tree_entry_id(treeEntry));
+    git_tree_free(node);
+    if (error != 0)
+        return error;
+
+    data.clear();
+    data.append((const char*)git_blob_rawcontent(blob), git_blob_rawsize(blob));
+
+    git_blob_free(blob);
+    return 0;
 }
 
 int GitInterface::setTo(const QString &path, bool create)
@@ -347,6 +381,21 @@ git_commit *GitInterface::getTipCommit(const QString &branch)
     if (error != 0)
         return NULL;
     return commit;
+}
+
+git_tree *GitInterface::getTipTree(const QString &branch)
+{
+    git_tree *rootTree = NULL;
+    git_commit *commit = getTipCommit(branch);
+    if (commit != NULL) {
+        int error = git_commit_tree(&rootTree, commit);
+        git_commit_free(commit);
+        if (error != 0) {
+            printf("can't get tree from commit\n");
+            return NULL;
+        }
+    }
+    return rootTree;
 }
 
 QString GitInterface::removeFilename(QString &path)

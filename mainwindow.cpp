@@ -7,11 +7,17 @@
 
 
 MainWindow::MainWindow(QWidget *parent) :
-    QDialog(parent),
+    QMainWindow(parent),
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    ui->pushButtonEncrypt->setToolTip("Encrypt");
+
+    ui->toolBar->setMovable(false);
+    QAction *accountAction = ui->toolBar->addAction("Accounts");
+    QAction *messageAction = ui->toolBar->addAction("Messages");
+
+    ui->horizontalLayout->setMargin(0);
+
 
     const char* kKeyName = "test_label";
     const char* kKeyPassword = "test1";

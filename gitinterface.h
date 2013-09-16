@@ -11,35 +11,43 @@
 class GitInterface : public DatabaseInterface
 {
 public:
-                                GitInterface();
-                                ~GitInterface();
+    GitInterface();
+    ~GitInterface();
 
-            int                 setBranch(const QString &branch, bool createBranch = true);
-            int                 add(const QString &path, const QByteArray& data);
-            int                 commit();
-            int                 get(const QString& path, QByteArray& data);
+    int setBranch(const QString &branch, bool createBranch = true);
+    int add(const QString &path, const QByteArray &data);
+    int commit();
+    int get(const QString &path, QByteArray &data) const;
 
     int setTo(const QString &path, bool create = true);
-    void    unSet();
+    void unSet();
 
-    int     addMessage(const char* data);
-    int     writeObject(const char *data, int size);
-    int     writeFile(const QString& hash, const char *data, int size);
+    int writeObject(const char *data, int size);
+    int writeFile(const QString& hash, const char *data, int size);
 
-            QString             getTip(const QString& branch);
-            bool                updateTip(const QString& branch, const QString& last);
+    QString getTip(const QString &branch) const;
+    bool updateTip(const QString &branch, const QString &last);
+
+    QStringList listFiles(const QString &path) const;
+    QStringList listDirectories(const QString &path) const;
 
 private:
-    git_commit*     getTipCommit(const QString& branch);
-    git_tree*       getTipTree(const QString& branch);
-    QString         removeFilename(QString& path);
+    QStringList listDirectoryContent(const QString &path, int type = -1) const;
 
-    QString         fRepositoryPath;
-    git_repository* fRepository;
-    git_odb*        fObjectDatabase;
-    QString         fCurrentBranch;
+    git_commit *getTipCommit(const QString &branch) const;
+    git_tree *getTipTree(const QString &branch) const;
+    //! returns the tree for the given directory
+    git_tree *getDirectoryTree(const QString &dirPath, const QString &branch) const;
 
-    git_oid         fNewRootTreeOid;
+    QString removeFilename(QString &path) const;
+
+private:
+    QString fRepositoryPath;
+    git_repository *fRepository;
+    git_odb *fObjectDatabase;
+    QString fCurrentBranch;
+
+    git_oid fNewRootTreeOid;
 };
 
 #endif // GITINTERFACE_H

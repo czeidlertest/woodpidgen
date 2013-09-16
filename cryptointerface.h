@@ -1,41 +1,55 @@
 #ifndef CRYPTOINTERFACE_H
 #define CRYPTOINTERFACE_H
 
-#include <QtCrypto/QtCrypto>
+#include <QByteArray>
+
+
+typedef QByteArray SecureArray;
 
 
 class CryptoInterface
 {
 public:
     CryptoInterface();
+    ~CryptoInterface();
 
     void generateKeyPair(const char* certificateFile, const char* publicKeyFile, const char* privateKeyFile, const char *keyPassword);
-    void encryptionTest(const char* certificateFile, const char* publicKeyFile, const char* privateKeyFile, const char *keyPassword);
 
     int generateKeyPair(QString &certificate, QString &publicKey,
-                        QString &privateKey, const QCA::SecureArray &keyPassword);
+                        QString &privateKey, const SecureArray &keyPassword);
 
-    QCA::SecureArray deriveKey(const QCA::SecureArray &secret, const QString& kdf, const QString &kdfAlgo, const QCA::SecureArray &salt,
+    SecureArray deriveKey(const SecureArray &secret, const QString& kdf, const QString &kdfAlgo, const SecureArray &salt,
                                          unsigned int keyLength, unsigned int iterations);
 
     QByteArray generateSalt(const QString& value);
     QByteArray generateInitalizationVector(int size);
-    QCA::SecureArray generateSymetricKey(int size);
+    SecureArray generateSymetricKey(int size);
 
-    int encryptSymmetric(const QCA::SecureArray &input, QByteArray &encrypted, const QCA::SecureArray &key, const QByteArray &iv);
-    int decryptSymmetric(const QByteArray &input, QCA::SecureArray &decrypted, const QCA::SecureArray &key, const QByteArray &iv);
+    int encryptSymmetric(const SecureArray &input, QByteArray &encrypted, const SecureArray &key,
+                         const QByteArray &iv, const char *algo = "aes256");
+    int decryptSymmetric(const QByteArray &input, SecureArray &decrypted, const SecureArray &key,
+                         const QByteArray &iv, const char *algo = "aes256");
 
     int encyrptData(const QByteArray &input, QByteArray &encrypted, const QByteArray& certificate);
     int decryptData(const QByteArray &input, QByteArray &plain, const QString &privateKey,
-                    const char *keyPassword, const QByteArray& certificate);
+                    const SecureArray &keyPassword, const QByteArray& certificate);
 
-private:
-    bool        encyrptMessage(const QByteArray& input, QByteArray& encrypted, const char* certificateFile);
-    bool        decryptMessage(const QByteArray& input, QByteArray& plain,
+    QByteArray sha1Hash(const QByteArray &string) const;
+    QString toHex(const QByteArray& string) const;
+
+    int sign(const QByteArray& input, QByteArray &signatur, const QString &privateKeyString, const SecureArray &keyPassword);
+    bool verifySignatur(const QByteArray& message, const QByteArray &signatur, const QString &publicKeyString);
+
+    // TODO remove
+    int sign(const QByteArray& input, QByteArray &signatur, const char* privateKeyFile, const char *keyPassword);
+    bool verifySignatur(const QByteArray& message, const QByteArray &signatur, const char* publicKeyFile);
+    void encryptionTest(const char* certificateFile, const char* publicKeyFile, const char* privateKeyFile, const char *keyPassword);
+    bool encyrptMessage(const QByteArray& input, QByteArray& encrypted, const char* certificateFile);
+    bool decryptMessage(const QByteArray& input, QByteArray& plain,
                                const char* privateKeyFile, const char *keyPassword, const char* certificateFile);
-
-    int         sign(const QByteArray& input, QByteArray &signatur, const char* privateKeyFile, const char *keyPassword);
-    bool        verifySignatur(const QByteArray& message, const QByteArray &signatur, const char* publicKeyFile);
+private:
+    class Private;
+    Private* fPrivate;
 };
 
 #endif // CRYPTOINTERFACE_H

@@ -38,7 +38,7 @@ int GitInterface::add(const QString& path, const QByteArray &data)
     QString filename = removeFilename(treePath);
 
     git_oid oid;
-    int error = git_odb_write(&oid, fObjectDatabase, data.data(), strlen(data.data()), GIT_OBJ_BLOB);
+    int error = git_odb_write(&oid, fObjectDatabase, data.data(), data.count(), GIT_OBJ_BLOB);
     if (error != 0)
         return error;
     int fileMode = 100644;
@@ -180,7 +180,7 @@ int GitInterface::commit()
 
 }
 
-int GitInterface::get(const QString &path, QByteArray &data)
+int GitInterface::get(const QString &path, QByteArray &data) const
 {
     git_tree *rootTree = getTipTree(fCurrentBranch);
 
@@ -234,13 +234,6 @@ void GitInterface::unSet()
     git_odb_free(fObjectDatabase);
 }
 
-int GitInterface::addMessage(const char *data)
-{
-    git_oid oid;
-    int error = git_odb_write(&oid, fObjectDatabase, data, strlen(data), GIT_OBJ_BLOB);
-    return error;
-}
-
 int GitInterface::writeObject(const char *data, int size)
 {
     QCryptographicHash hash(QCryptographicHash::Sha1);
@@ -289,7 +282,7 @@ int GitInterface::writeFile(const QString &hash, const char *data, int size)
     return 0;
 }
 
-QString GitInterface::getTip(const QString &branch)
+QString GitInterface::getTip(const QString &branch) const
 {
     QString foundOid = "";
     QString refName = "refs/heads/";
@@ -342,6 +335,7 @@ QString GitInterface::getTip(const QString &branch)
     return oid;*/
 }
 
+
 bool GitInterface::updateTip(const QString &branch, const QString &last)
 {
     QString refPath = fRepositoryPath;
@@ -369,7 +363,34 @@ bool GitInterface::updateTip(const QString &branch, const QString &last)
     return true;*/
 }
 
-git_commit *GitInterface::getTipCommit(const QString &branch)
+QStringList GitInterface::listFiles(const QString &path) const
+{
+   return listDirectoryContent(path, GIT_OBJ_BLOB);
+}
+
+QStringList GitInterface::listDirectories(const QString &path) const
+{
+    return listDirectoryContent(path, GIT_OBJ_TREE);
+}
+
+QStringList GitInterface::listDirectoryContent(const QString &path, int type) const
+{
+    QStringList list;
+    git_tree *tree = getDirectoryTree(path, fCurrentBranch);
+    if (tree == NULL)
+        return list;
+    int count = git_tree_entrycount(tree);
+    for (int i = 0; i < count; i++) {
+        const git_tree_entry *entry = git_tree_entry_byindex(tree, i);
+        if (type != -1 && git_tree_entry_type(entry) != type)
+            continue;
+        list.append(git_tree_entry_name(entry));
+    }
+    git_tree_free(tree);
+    return list;
+}
+
+git_commit *GitInterface::getTipCommit(const QString &branch) const
 {
     QString tip = getTip(branch);
     git_oid out;
@@ -383,7 +404,7 @@ git_commit *GitInterface::getTipCommit(const QString &branch)
     return commit;
 }
 
-git_tree *GitInterface::getTipTree(const QString &branch)
+git_tree *GitInterface::getTipTree(const QString &branch) const
 {
     git_tree *rootTree = NULL;
     git_commit *commit = getTipCommit(branch);
@@ -398,7 +419,48 @@ git_tree *GitInterface::getTipTree(const QString &branch)
     return rootTree;
 }
 
-QString GitInterface::removeFilename(QString &path)
+git_tree *GitInterface::getDirectoryTree(const QString &dirPath, const QString &branch) const
+{
+    git_tree *tree = getTipTree(branch);
+    if (tree == NULL)
+        return tree;
+
+    QString dir = dirPath.trimmed();
+    while (!dir.isEmpty() && dir.at(0) == '/')
+        dir.remove(0, 1);
+    while (!dir.isEmpty() && dir.at(dir.count() - 1) == '/')
+        dir.remove(dir.count() - 1, 1);
+    if (dir.isEmpty())
+        return tree;
+
+    while (!dir.isEmpty()) {
+        int slash = dir.indexOf("/");
+        QString subDir;
+        if (slash < 0) {
+            subDir = dir;
+            dir = "";
+        } else {
+            subDir = dir.left(slash);
+            dir.remove(0, slash + 1);
+        }
+        const git_tree_entry *entry = git_tree_entry_byname(tree, subDir.toAscii());
+        if (git_tree_entry_type(entry) != GIT_OBJ_TREE) {
+            git_tree_free(tree);
+            return NULL;
+        }
+        const git_oid *oid = git_tree_entry_id(entry);
+        git_tree *newTree = NULL;
+        int error = git_tree_lookup(&newTree, fRepository, oid);
+        if (error != 0) {
+            git_tree_free(tree);
+            return NULL;
+        }
+        tree = newTree;
+    }
+    return tree;
+}
+
+QString GitInterface::removeFilename(QString &path) const
 {
     path = path.trimmed();
     while (!path.isEmpty() && path.at(0) == '/')

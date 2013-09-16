@@ -1,28 +1,31 @@
 #include "useridentity.h"
 
+#include <QStringList>
+#include <QTextStream>
 #include <QUuid>
 
 #include "cryptointerface.h"
 
 
 const char* kPathMasterKey = "master_key";
-const char* kPathMasterKeyKDF = "master_key_kdf";
-const char* kPathMasterKeyAlgo = "master_key_algo";
-const char* kPathMasterKeySalt = "master_key_salt";
-const char* kPathMasterKeySize = "master_key_size";
+const char* kPathMasterKeyIV = "master_key_iv";
+const char* kPathMasterPasswordKDF = "master_password_kdf";
+const char* kPathMasterPasswordAlgo = "master_password_algo";
+const char* kPathMasterPasswordSalt = "master_password_salt";
+const char* kPathMasterPasswordSize = "master_password_size";
+const char* kPathMasterPasswordIterations = "master_password_iterations";
 
-const int kMasterKeyIterations = 20000;
+const int kMasterPasswordIterations = 20000;
 
 
-int UserIdentity::createNewIdentity(UserIdentity &id, DatabaseInterface *database, const QCA::SecureArray &password, const QString branch)
+int UserIdentity::createNewIdentity(DatabaseInterface *database, const SecureArray &password, const QString branch)
 {
     database->setBranch(branch);
-
     CryptoInterface crypto;
 
     QByteArray salt = crypto.generateSalt(QUuid::createUuid().toString());
-    QString kdfName = "pbkdf2";
-    QString algoName = "sha1";
+    const QString kdfName = "pbkdf2";
+    const QString algoName = "sha1";
     int keyLength = 256;
 
     QString certificate;
@@ -32,34 +35,149 @@ int UserIdentity::createNewIdentity(UserIdentity &id, DatabaseInterface *databas
     if (error != 0)
         return -1;
 
-    QCA::Hash shaHash("sha1");
-    shaHash.update(certificate.toStdString().c_str());
-    QByteArray hashResult = shaHash.final().toByteArray();
+    QByteArray hashResult = crypto.sha1Hash(certificate.toAscii());
 
-    const QString baseDir = hashResult;
+    const QString baseDir = crypto.toHex(hashResult);
 
     // key to encrypte the master key
-    QCA::SymmetricKey passwordKey = crypto.deriveKey(password, kdfName, algoName, salt, keyLength, kMasterKeyIterations);
-
+    SecureArray passwordKey = crypto.deriveKey(password, kdfName, algoName, salt, keyLength, kMasterPasswordIterations);
     // key to encrypte all other data
 
     QByteArray iv = crypto.generateInitalizationVector(keyLength);
-    QCA::SecureArray masterKey = crypto.generateSymetricKey(keyLength);
-
+    SecureArray masterKey = crypto.generateSymetricKey(keyLength);
     QByteArray encryptedMasterKey;
     error = crypto.encryptSymmetric(masterKey, encryptedMasterKey, passwordKey, iv);
 
+    // write master password (master password is encrypted
     QString path = baseDir + "/" + kPathMasterKey;
-    database->add(path, masterKey.toByteArray());
+    database->add(path, encryptedMasterKey);
+    path = baseDir + "/" + kPathMasterKeyIV;
+    database->add(path, iv);
+    path = baseDir + "/" + kPathMasterPasswordKDF;
+    database->add(path, kdfName.toAscii());
+    path = baseDir + "/" + kPathMasterPasswordAlgo;
+    database->add(path, algoName.toAscii());
+    path = baseDir + "/" + kPathMasterPasswordSalt;
+    database->add(path, salt);
+    path = baseDir + "/" + kPathMasterPasswordSize;
+    QString keyLengthString;
+    QTextStream(&keyLengthString) << keyLength;
+    database->add(path, keyLengthString.toAscii());
+    path = baseDir + "/" + kPathMasterPasswordIterations;
+    QString iterationsString;
+    QTextStream(&iterationsString) << kMasterPasswordIterations;
+    database->add(path, iterationsString.toAscii());
 
-     // write master password
+     // write encrypted public key , private key and certificate
+    QByteArray encryptedPrivateKey;
+    error = crypto.encryptSymmetric(SecureArray(privateKey.toAscii()), encryptedPrivateKey, passwordKey, iv);
+    if (error != 0)
+        return -1;
 
-    return 0;
+    path = baseDir + "/" + "public_key";
+    database->add(path, publicKey.toAscii());
+    path = baseDir + "/" + "private_key";
+    database->add(path, encryptedPrivateKey);
+    path = baseDir + "/" + "certificate";
+    database->add(path, certificate.toAscii());
+
+    // test data
+    QByteArray testData("Hello id");
+    QByteArray encyptedTestData;
+    error = crypto.encyrptData(testData, encyptedTestData, certificate.toAscii());
+    if (error != 0)
+        return -1;
+
+    path = baseDir + "/" + "test_data";
+    database->add(path, encyptedTestData);
+
+    error = database->commit();
+
+    return error;
 }
 
-UserIdentity::UserIdentity(DatabaseInterface *database, const QCA::SecureArray& password, const QString branch)
+QStringList UserIdentity::getIdenties(DatabaseInterface *database, const QString branch)
+{
+    database->setBranch(branch);
+    QStringList list = database->listDirectories("");
+    return list;
+}
+
+void UserIdentity::printToStream(QTextStream &stream)
+{
+    fDatabase->setBranch(fBranch);
+}
+
+UserIdentity::UserIdentity()
+{
+}
+
+UserIdentity::UserIdentity(DatabaseInterface *database, const QString id,
+                           const SecureArray &password, const QString branch)
     :
     fDatabase(database),
-    fBranch(branch)
+    fBranch(branch),
+    fIdentityName(id)
 {
+    fDatabase->setBranch(fBranch);
+    CryptoInterface crypto;
+
+    // write master password (master password is encrypted
+    QString path = fIdentityName + "/" + kPathMasterKey;
+    QByteArray encryptedMasterKey;
+    database->get(path, encryptedMasterKey);
+    QByteArray iv;
+    path = fIdentityName + "/" + kPathMasterKeyIV;
+    database->get(path, iv);
+    path = fIdentityName + "/" + kPathMasterPasswordKDF;
+    QByteArray kdfName;
+    database->get(path, kdfName);
+    path = fIdentityName + "/" + kPathMasterPasswordAlgo;
+    QByteArray algoName;
+    database->get(path, algoName);
+    path = fIdentityName + "/" + kPathMasterPasswordSalt;
+    QByteArray salt;
+    database->get(path, salt);
+    path = fIdentityName + "/" + kPathMasterPasswordSize;
+    QByteArray masterPasswordSize;
+    database->get(path, masterPasswordSize);
+    path = fIdentityName + "/" + kPathMasterPasswordIterations;
+    QByteArray masterPasswordIterations;
+    database->get(path, masterPasswordIterations);
+
+    QTextStream sizeStream(masterPasswordSize);
+    unsigned int keyLength;
+    sizeStream >> keyLength;
+    QTextStream iterationsStream(masterPasswordIterations);
+    unsigned int iterations;
+    iterationsStream >> iterations;
+    // key to encrypte the master key
+    SecureArray passwordKey = crypto.deriveKey(password, kdfName, algoName, salt, keyLength, iterations);
+    // key to encrypte all other data
+
+    crypto.decryptSymmetric(encryptedMasterKey, fMasterKey, passwordKey, iv);
+
+
+    // test
+    QByteArray publicKey;
+    path = fIdentityName + "/" + "public_key";
+    database->get(path, publicKey);
+    QByteArray encryptedPrivateKey;
+    path = fIdentityName + "/" + "private_key";
+    database->get(path, encryptedPrivateKey);
+    QByteArray certificate;
+    path = fIdentityName + "/" + "certificate";
+    database->get(path, certificate);
+
+    QByteArray privateKey;
+    crypto.decryptSymmetric(encryptedPrivateKey, privateKey, passwordKey, iv);
+
+    // test data
+    QByteArray encyptedTestData;
+    path = fIdentityName + "/" + "test_data";
+    database->get(path, encyptedTestData);
+    QByteArray testData;
+    crypto.decryptData(encyptedTestData, testData, privateKey, password, certificate);
+
+    printf("test %s\n", testData.data());
 }

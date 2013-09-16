@@ -2,11 +2,12 @@
 #define USERIDENTITY_H
 
 
+#include <QMap>
 #include <QString>
+#include <QTextStream>
 
-#include <QtCrypto/QtCrypto>
-
-#include "databaseinterface.h"
+#include <cryptointerface.h>
+#include <databaseinterface.h>
 
 
 /*! UserIdentity database structure:
@@ -30,10 +31,15 @@ branch identities:
 class UserIdentity
 {
 public:
-    static int createNewIdentity(UserIdentity& id, DatabaseInterface *database, const QCA::SecureArray& password,
+    UserIdentity();
+    UserIdentity(DatabaseInterface *database, const QString id, const SecureArray &password, const QString branch = "identities");
+
+    static int createNewIdentity(DatabaseInterface *database, const SecureArray& password,
                                  const QString branch = "identities");
 
-                                UserIdentity(DatabaseInterface *database, const QCA::SecureArray& password, const QString branch = "identities");
+    static QStringList getIdenties(DatabaseInterface *database, const QString branch = "identities");
+
+    void printToStream(QTextStream& stream);
 
             //! write changes to database
             int                 commit();
@@ -50,7 +56,7 @@ public:
             QList<QString>      getCertificateNames();
 
             QByteArray          getPublicKey(QString name);
-            QCA::SecureArray    getPrivateKey(QString name);
+            SecureArray    getPrivateKey(QString name);
             QByteArray          getCertificate(QString name);
 
             // contacts
@@ -59,12 +65,10 @@ public:
             // channels
 
 private:
-            DatabaseInterface   *fDatabase;
-            QString             fBranch;
-            QCA::SymmetricKey   fMasterKey;
-
-            QString             fIdentityName;
-            QMap<QString, QByteArray>   fPublicKeyCache;
+    DatabaseInterface *fDatabase;
+    QString fBranch;
+    QString fIdentityName;
+    SecureArray fMasterKey;
 };
 
 #endif // USERIDENTITY_H

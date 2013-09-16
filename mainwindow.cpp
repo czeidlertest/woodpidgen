@@ -31,7 +31,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     CryptoInterface crypto;
     crypto.generateKeyPair(kKeyFileNameCert, kKeyFileNamePublic, kKeyFileNamePrivate, kKeyPassword);
-    crypto.encryptionTest(kKeyFileNameCert, kKeyFileNamePublic, kKeyFileNamePrivate, kKeyPassword);
+    //crypto.encryptionTest(kKeyFileNameCert, kKeyFileNamePublic, kKeyFileNamePrivate, kKeyPassword);
     //CryptoLib crypto;
     //crypto.EncrypteData();
 }

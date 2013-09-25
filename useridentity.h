@@ -8,6 +8,7 @@
 
 #include <cryptointerface.h>
 #include <databaseinterface.h>
+#include <databaseutil.h>
 
 
 /*! UserIdentity database structure:
@@ -28,26 +29,22 @@ branch identities:
 --\contacts
 }
  */
-class UserIdentity
+class UserIdentity : public DatabaseEncryption
 {
 public:
-    UserIdentity();
-    UserIdentity(DatabaseInterface *database, const QString id, const SecureArray &password, const QString branch = "identities");
+    UserIdentity(DatabaseInterface *database, CryptoInterface *crypto,
+                 const QString branch = "identities");
 
-    static int createNewIdentity(DatabaseInterface *database, const SecureArray& password,
-                                 const QString branch = "identities");
+    int createNewIdentity(const SecureArray& password);
+    int open(const SecureArray &password, const QString id);
 
     static QStringList getIdenties(DatabaseInterface *database, const QString branch = "identities");
 
-    void printToStream(QTextStream& stream);
+    QString getId();
 
-            //! write changes to database
-            int                 commit();
             //! discare changes and reload values from database
             int                 reload();
 
-            void                setIdentityName(const QString& id);
-            QString             getIdentityName();
 
             QString             getSignatureName();
             // keys
@@ -65,10 +62,9 @@ public:
             // channels
 
 private:
-    DatabaseInterface *fDatabase;
-    QString fBranch;
     QString fIdentityName;
     SecureArray fMasterKey;
+    QByteArray fMasterKeyIV;
 };
 
 #endif // USERIDENTITY_H

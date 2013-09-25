@@ -182,16 +182,20 @@ int GitInterface::commit()
 
 int GitInterface::get(const QString &path, QByteArray &data) const
 {
+    QString pathCopy = path;
+    while (!pathCopy.isEmpty() && pathCopy.at(0) == '/')
+        pathCopy.remove(0, 1);
+
     git_tree *rootTree = getTipTree(fCurrentBranch);
 
     git_tree *node = NULL;
-    int error = git_tree_get_subtree(&node, rootTree, path.toStdString().c_str());
+    int error = git_tree_get_subtree(&node, rootTree, pathCopy.toStdString().c_str());
     git_tree_free(rootTree);
     if (error != 0)
         return error;
 
-    QString pathCopy = path;
     QString filename = removeFilename(pathCopy);
+
     const git_tree_entry *treeEntry = git_tree_entry_byname(node, filename.toStdString().c_str());
 
     if (treeEntry == NULL) {
@@ -232,6 +236,11 @@ void GitInterface::unSet()
 {
     git_repository_free(fRepository);
     git_odb_free(fObjectDatabase);
+}
+
+QString GitInterface::path()
+{
+    return fRepositoryPath;
 }
 
 int GitInterface::writeObject(const char *data, int size)

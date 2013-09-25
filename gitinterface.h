@@ -21,6 +21,7 @@ public:
 
     int setTo(const QString &path, bool create = true);
     void unSet();
+    QString path();
 
     int writeObject(const char *data, int size);
     int writeFile(const QString& hash, const char *data, int size);

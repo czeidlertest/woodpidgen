@@ -16,6 +16,10 @@ public:
 
     virtual int get(const QString& path, QByteArray& data) const = 0;
 
+    virtual int setTo(const QString &path, bool create = true) = 0;
+    virtual void unSet() = 0;
+    virtual QString path() = 0;
+
     virtual QStringList listFiles(const QString &path) const = 0;
     virtual QStringList listDirectories(const QString &path) const = 0;
 
@@ -23,5 +27,6 @@ public:
         kNotInit = -1
     };
 };
+
 
 #endif // DATABASEINTERFACE_H

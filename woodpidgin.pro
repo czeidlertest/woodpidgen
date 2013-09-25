@@ -6,6 +6,7 @@ DEPLOYMENTFOLDERS = folder_01
 QT       += core gui
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 QT += declarative
+QT += network
 
 # Additional import path used to resolve QML modules in Creator's code model
 QML_IMPORT_PATH =
@@ -19,22 +20,32 @@ QML_IMPORT_PATH =
 SOURCES += main.cpp \
     mainwindow.cpp \
     gitinterface.cpp \
-    cryptolib.cpp \
     messagereceiver.cpp \
     cryptointerface.cpp \
-    useridentity.cpp
+    useridentity.cpp \
+    useridentityview.cpp \
+    messageview.cpp \
+    profile.cpp \
+    databaseutil.cpp \
+    mainapplication.cpp \
+    serverconnection.cpp
 
 # Installation path
 # target.path =
 
 HEADERS += \
     mainwindow.h \
-    cryptolib.h \
     gitinterface.h \
     messagereceiver.h \
     cryptointerface.h \
     useridentity.h \
-    databaseinterface.h
+    databaseinterface.h \
+    useridentityview.h \
+    messageview.h \
+    profile.h \
+    databaseutil.h \
+    mainapplication.h \
+    serverconnection.h
 
 FORMS += \
     mainwindow.ui

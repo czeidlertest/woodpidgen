@@ -3,6 +3,9 @@
 
 #include <QMainWindow>
 
+#include <profile.h>
+
+
 namespace Ui {
 class MainWindow;
 }
@@ -12,11 +15,16 @@ class MainWindow : public QMainWindow
     Q_OBJECT
     
 public:
-    explicit MainWindow(QWidget *parent = 0);
+    explicit MainWindow(Profile *profile, QWidget *parent = 0);
     ~MainWindow();
     
+public slots:
+    void accountActionToggled(bool checked);
+    void messageActionToggled(bool checked);
 private:
     Ui::MainWindow *ui;
+    QWidget* fIdentityView;
+    QWidget* fMessageView;
 };
 
 #endif // MAINWINDOW_H

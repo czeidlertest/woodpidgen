@@ -23,8 +23,9 @@ public slots:
     void messageActionToggled(bool checked);
 private:
     Ui::MainWindow *ui;
-    QWidget* fIdentityView;
-    QWidget* fMessageView;
+    QWidget *fIdentityView;
+    QWidget *fMessageView;
+    Profile *fProfile;
 };
 
 #endif // MAINWINDOW_H

@@ -117,3 +117,13 @@ int DatabaseEncryption::commit()
 {
     return fDatabase->commit();
 }
+
+CryptoInterface *DatabaseEncryption::getCryptoInterface()
+{
+    return fCrypto;
+}
+
+DatabaseInterface *DatabaseEncryption::getDatabaseInterface()
+{
+    return fDatabase;
+}

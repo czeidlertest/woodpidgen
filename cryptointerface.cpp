@@ -4,6 +4,9 @@
 
 #include <QtCrypto/QtCrypto>
 
+#include <BigInteger/BigIntegerAlgorithms.hh>
+#include <BigInteger/BigIntegerUtils.hh>
+
 class CryptoInterface::Private {
 public:
     Private()
@@ -292,6 +295,45 @@ bool CryptoInterface::verifySignatur(const QByteArray &message, const QByteArray
     }
     return true;
 }
+
+void CryptoInterface::generateDHParam(QString &prime, QString &base, QString &secret, QString &pub)
+{
+    QCA::KeyGenerator generator;
+    QCA::DLGroup group = generator.createDLGroup(QCA::DSA_512);
+    prime = group.p().toString();
+    base = group.g().toString();
+    QCA::PrivateKey privateKey = generator.createDH(group);
+    secret = privateKey.toDH().x().toString();
+    pub = privateKey.toDH().y().toString();
+}
+
+#include <QDebug>
+SecureArray CryptoInterface::sharedDHKey(const QString &prime, const QString &base, const QString &secret)
+{
+    BigUnsigned primeNumber = stringToBigUnsigned(prime.toStdString());
+    BigInteger baseNumber = stringToBigUnsigned(base.toStdString());
+    BigUnsigned secretNumber = stringToBigUnsigned(secret.toStdString());
+    BigUnsigned result = modexp(baseNumber, secretNumber, primeNumber);
+
+    std::string resultString = bigUnsignedToString(result);
+
+    QByteArray array;
+
+    BigUnsigned result2(result);
+    while (result2 !=  0) {
+         char rest = (result2 % 256).toUnsignedShort();
+         array.prepend(rest);
+         result2 = result2 / 256;
+    }
+
+    int size = array.size();
+    qDebug() << "ByteArray " << size << ":" << array.toBase64() << endl;
+
+
+    SecureArray resultArray(resultString.data(), resultString.length());
+    return resultArray;
+}
+
 
 bool CryptoInterface::encyrptMessage(const QByteArray &input, QByteArray &encrypted, const char *certificateFile)
 {

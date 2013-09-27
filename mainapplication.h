@@ -11,6 +11,37 @@
 
 class DatabaseInterface;
 
+#include <serverconnection.h>
+#include <QDebug>
+class PingRCReply : public RemoteConnectionReply
+{
+Q_OBJECT
+public:
+    PingRCReply(NetworkConnection *connection, QObject *parent = NULL) :
+        RemoteConnectionReply(parent),
+        fNetworkConnection(connection)
+    {
+    }
+
+public slots:
+    void connectionAttemptFinished(QNetworkReply::NetworkError code)
+    {
+        if (code != QNetworkReply::NoError)
+            return;
+
+        QByteArray data("ping");
+        fNetworkConnection->send(this, data);
+    }
+
+    virtual void received(const QByteArray &data)
+    {
+        qDebug() << data << endl;
+    }
+
+private:
+    NetworkConnection* fNetworkConnection;
+};
+
 
 class MainApplication : public QApplication
 {

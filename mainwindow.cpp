@@ -7,7 +7,8 @@
 
 MainWindow::MainWindow(Profile *profile, QWidget *parent) :
     QMainWindow(parent),
-    ui(new Ui::MainWindow)
+    ui(new Ui::MainWindow),
+    fProfile(profile)
 {
     ui->setupUi(this);
 
@@ -22,7 +23,7 @@ MainWindow::MainWindow(Profile *profile, QWidget *parent) :
     actionGroup->addAction(accountAction);
     actionGroup->addAction(messageAction);
 
-    fIdentityView = new UserIdentityView(profile->getIdentityList(), this);
+    fIdentityView = new UserIdentityView(fProfile->getIdentityList(), this);
     fMessageView = new MessageView(this);
     ui->horizontalLayout->setMargin(0);
     ui->stackedWidget->addWidget(fIdentityView);

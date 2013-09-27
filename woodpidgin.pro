@@ -28,7 +28,12 @@ SOURCES += main.cpp \
     profile.cpp \
     databaseutil.cpp \
     mainapplication.cpp \
-    serverconnection.cpp
+    serverconnection.cpp \
+    BigInteger/BigUnsigned.cpp \
+    BigInteger/BigIntegerUtils.cpp \
+    BigInteger/BigIntegerAlgorithms.cpp \
+    BigInteger/BigInteger.cpp \
+    BigInteger/BigUnsignedInABase.cc
 
 # Installation path
 # target.path =
@@ -45,7 +50,13 @@ HEADERS += \
     profile.h \
     databaseutil.h \
     mainapplication.h \
-    serverconnection.h
+    serverconnection.h \
+    BigInteger/BigUnsigned.hh \
+    BigInteger/BigIntegerUtils.hh \
+    BigInteger/BigIntegerAlgorithms.hh \
+    BigInteger/BigInteger.hh \
+    BigInteger/NumberlikeArray.hh \
+    BigInteger/BigUnsignedInABase.hh
 
 FORMS += \
     mainwindow.ui

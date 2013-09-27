@@ -19,6 +19,9 @@ public:
 
     int commit();
 
+    CryptoInterface* getCryptoInterface();
+    DatabaseInterface* getDatabaseInterface();
+
 protected:
     DatabaseInterface *fDatabase;
     QString fBranch;

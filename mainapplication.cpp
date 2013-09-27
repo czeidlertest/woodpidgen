@@ -9,6 +9,9 @@
 #include <useridentity.h>
 
 
+#include <serverconnection.h>
+
+
 MainApplication::MainApplication(int &argc, char *argv[]) :
     QApplication(argc, argv)
 {
@@ -33,6 +36,12 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
             quit();
         }
     }
+
+    EncryptedPHPConnection *encryptedPHPConnection = new EncryptedPHPConnection(QUrl("http://clemens-zeidler.de/woodpidgin/portal.php"), fCrypto, this);
+    encryptedPHPConnection->connectToServer();
+
+    PingRCReply *replyTest = new PingRCReply(encryptedPHPConnection, this);
+    connect(encryptedPHPConnection, SIGNAL(connectionAttemptFinished(QNetworkReply::NetworkError)), replyTest, SLOT(connectionAttemptFinished(QNetworkReply::NetworkError)));
 
     //UserIdentity identity(&gitInterface, &crypto);
     //identity.createNewIdentity(password);

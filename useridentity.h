@@ -29,14 +29,15 @@ branch identities:
 --\contacts
 }
  */
-class UserIdentity : public DatabaseEncryption
+class UserIdentity : public EncryptedUserData
 {
 public:
-    UserIdentity(DatabaseInterface *database, CryptoInterface *crypto,
-                 const QString branch = "identities");
+    UserIdentity(const QString &path, const QString &branch, const QString &baseDir = "");
+    UserIdentity(const QString &path, const QString &branch, const QString &id, const QString &baseDir = "");
+    ~UserIdentity();
 
-    int createNewIdentity(const SecureArray& password);
-    int open(const SecureArray &password, const QString id);
+    int createNewIdentity(KeyStore *keyStore);
+    int setTo(KeyStore *keyStore);
 
     static QStringList getIdenties(DatabaseInterface *database, const QString branch = "identities");
 
@@ -62,9 +63,10 @@ public:
             // channels
 
 private:
+    QString fIdentityKey;
+
     QString fIdentityName;
-    SecureArray fMasterKey;
-    QByteArray fMasterKeyIV;
+
 };
 
 #endif // USERIDENTITY_H

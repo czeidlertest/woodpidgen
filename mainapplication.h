@@ -54,8 +54,6 @@ public:
 private:
     MainWindow *fMainWindow;
 
-    DatabaseInterface *fDatabase;
-    CryptoInterface *fCrypto;
     Profile* fProfile;
 
     QNetworkAccessManager *fNetworkAccessManager;

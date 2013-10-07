@@ -56,27 +56,34 @@ private:
 };
 
 
-class Profile : public DatabaseEncryption
+class Profile
 {
 public:
-    Profile(DatabaseInterface *database, CryptoInterface *crypto,
-            const QString branch = "profile");
+    Profile(const QString &path, const QString &branch);
+    ~Profile();
 
     int createNewProfile(const SecureArray& password);
     int open(const SecureArray &password);
 
+    int commit();
+
     ProfileEntryIdentity* addIdentity(UserIdentity *identity);
     IdentityListModel* getIdentityList();
 
+    KeyStore *findKeyStore(const QString &keyStoreId);
 private:
     int writeEntry(const ProfileEntry* entry);
 
 
 private:
-    SecureArray fMasterKey;
-    QByteArray fMasterKeyIV;
-
+    DatabaseInterface *fDatabase;
+    CryptoInterface *fCrypto;
+    KeyStore *fKeyStore;
     IdentityListModel fIdentities;
+
+    QString fDatabasePath;
+    QString fDatabaseBranch;
 };
+
 
 #endif // PROFILE_H

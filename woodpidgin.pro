@@ -33,7 +33,8 @@ SOURCES += main.cpp \
     BigInteger/BigIntegerUtils.cpp \
     BigInteger/BigIntegerAlgorithms.cpp \
     BigInteger/BigInteger.cpp \
-    BigInteger/BigUnsignedInABase.cc
+    BigInteger/BigUnsignedInABase.cc \
+    databaseinterface.cpp
 
 # Installation path
 # target.path =

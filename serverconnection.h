@@ -63,7 +63,7 @@ public:
 
 private slots:
     virtual void replyFinished(QNetworkReply *reply);
-
+    virtual void replyError(QNetworkReply::NetworkError code);
 protected:
     QUrl fUrl;
 
@@ -76,8 +76,7 @@ class EncryptedPHPConnection : public NetworkConnection
 {
 Q_OBJECT
 public:
-    EncryptedPHPConnection(QUrl url, CryptoInterface *crypto,
-                          QObject *parent = NULL);
+    EncryptedPHPConnection(QUrl url, QObject *parent = NULL);
 
     int connectToServer();
 

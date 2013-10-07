@@ -16,6 +16,7 @@ public:
 
     int setBranch(const QString &branch, bool createBranch = true);
     int add(const QString &path, const QByteArray &data);
+    int remove(const QString& path);
     int commit();
     int get(const QString &path, QByteArray &data) const;
 

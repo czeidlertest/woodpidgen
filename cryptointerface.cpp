@@ -155,8 +155,8 @@ int CryptoInterface::decryptSymmetric(const QByteArray &input, SecureArray &decr
     return 0;
 }
 
-int CryptoInterface::encyrptData(const QByteArray &input, QByteArray &encrypted,
-                                 const QByteArray &certificate)
+int CryptoInterface::encyrptAsymmetric(const QByteArray &input, QByteArray &encrypted,
+                                 const QString &certificate)
 {
     // Read in a matching public key cert
     // you could also build this using the fromPEMFile() method
@@ -196,9 +196,9 @@ int CryptoInterface::encyrptData(const QByteArray &input, QByteArray &encrypted,
     return 0;
 }
 
-int CryptoInterface::decryptData(const QByteArray &input, QByteArray &plain,
+int CryptoInterface::decryptAsymmetric(const QByteArray &input, QByteArray &plain,
                                  const QString &privateKey, const SecureArray &keyPassword,
-                                 const QByteArray &certificate)
+                                 const QString &certificate)
 {
     QCA::PrivateKey privKey;
     QCA::ConvertResult convRes;
@@ -317,21 +317,19 @@ SecureArray CryptoInterface::sharedDHKey(const QString &prime, const QString &ba
 
     std::string resultString = bigUnsignedToString(result);
 
-    QByteArray array;
+    QByteArray key;
 
     BigUnsigned result2(result);
     while (result2 !=  0) {
          char rest = (result2 % 256).toUnsignedShort();
-         array.prepend(rest);
+         key.prepend(rest);
          result2 = result2 / 256;
     }
 
-    int size = array.size();
-    qDebug() << "ByteArray " << size << ":" << array.toBase64() << endl;
+    int size = key.size();
+    qDebug() << "ByteArray " << size << ":" << key.toBase64() << endl;
 
-
-    SecureArray resultArray(resultString.data(), resultString.length());
-    return resultArray;
+    return key;
 }
 
 
@@ -466,4 +464,20 @@ bool CryptoInterface::verifySignatur(const QByteArray& message, const QByteArray
         }
     }
     return true;
+}
+
+
+CryptoInterface *CryptoInterfaceSingleton::sCryptoInterface = NULL;
+
+CryptoInterface *CryptoInterfaceSingleton::getCryptoInterface()
+{
+    if (sCryptoInterface == NULL)
+        sCryptoInterface = new CryptoInterface;
+    return sCryptoInterface;
+}
+
+void CryptoInterfaceSingleton::destroy()
+{
+    delete sCryptoInterface;
+    sCryptoInterface = NULL;
 }

@@ -71,6 +71,7 @@ int NetworkConnection::send(RemoteConnectionReply *remoteConnectionReply, const 
         return -1;
 
     connect(manager, SIGNAL(finished(QNetworkReply*)), this, SLOT(replyFinished(QNetworkReply*)));
+    connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(replyError(QNetworkReply::NetworkError)));
 
     fReplyMap.insert(reply, remoteConnectionReply);
     return 0;
@@ -81,22 +82,28 @@ void NetworkConnection::replyFinished(QNetworkReply *reply)
     QMap<QNetworkReply*, RemoteConnectionReply*>::iterator it = fReplyMap.find(reply);
     RemoteConnectionReply *receiver = it.value();
 
+    QByteArray incoming = reply->readAll();
     if (fFilter != NULL) {
-        QByteArray incoming;
-        fFilter->receiveFilter(reply->readAll(), incoming);
-        receiver->received(incoming);
+        QByteArray filtered;
+        fFilter->receiveFilter(incoming, filtered);
+        receiver->received(filtered);
     } else {
-        receiver->received(reply->readAll());
+        receiver->received(incoming);
     }
 
     fReplyMap.remove(reply);
 }
 
-
-EncryptedPHPConnection::EncryptedPHPConnection(QUrl url, CryptoInterface *crypto, QObject *parent) :
-    NetworkConnection(url, parent),
-    fCrypto(crypto)
+void NetworkConnection::replyError(QNetworkReply::NetworkError code)
 {
+    qDebug() << "NetworkConnection::replyError: " << code << endl;
+}
+
+
+EncryptedPHPConnection::EncryptedPHPConnection(QUrl url, QObject *parent) :
+    NetworkConnection(url, parent)
+{
+    fCrypto = CryptoInterfaceSingleton::getCryptoInterface();
 }
 
 
@@ -124,13 +131,10 @@ int EncryptedPHPConnection::connectToServer()
     connect(fNetworkReply, SIGNAL(error(QNetworkReply::NetworkError)), this,
             SLOT(networkRequestError(QNetworkReply::NetworkError)));
 
-    //PHPEncryptionFilter* filter = new PHPEncryptionFilter();
-    //fConnection->setFilter(filter);
     return 0;
 }
 
 
-#include <QDebug>
 void EncryptedPHPConnection::replyFinished()
 {
     QByteArray data = fNetworkReply->readAll();
@@ -160,13 +164,12 @@ void EncryptedPHPConnection::replyFinished()
             break;
         }
     }
-    qDebug() << "Data :" << data << endl;
-
     if (prime == "" || base == "" || publicKey == "")
         return;
     SecureArray key = fCrypto->sharedDHKey(prime, publicKey, fSecretNumber);
-
-    qDebug() << "shared key: " <<  key.data() << endl;
+    // make it at least 128 byte
+    for (int i = key.count(); i < 128; i++)
+        key.append('\0');
 
     PHPEncryptionFilter *filter = new PHPEncryptionFilter(fCrypto, key, fInitVector);
     setFilter(filter);
@@ -193,11 +196,14 @@ EncryptedPHPConnection::PHPEncryptionFilter::PHPEncryptionFilter(CryptoInterface
 
 void EncryptedPHPConnection::PHPEncryptionFilter::sendFilter(const QByteArray &in, QByteArray &out)
 {
-    fCrypto->encryptSymmetric(in, out, fCipherKey, fIV);
+    qDebug() << "Key: " << fCipherKey.toBase64().data() << " iv: " << fIV.toBase64().data() << endl;
+    fCrypto->encryptSymmetric(in, out, fCipherKey, fIV, "aes128");
+    out = out.toBase64();
 }
 
 
 void EncryptedPHPConnection::PHPEncryptionFilter::receiveFilter(const QByteArray &in, QByteArray &out)
 {
-    fCrypto->decryptSymmetric(in, out, fCipherKey, fIV);
+    QByteArray raw = QByteArray::fromBase64(in);
+    fCrypto->decryptSymmetric(raw, out, fCipherKey, fIV, "aes128");
 }

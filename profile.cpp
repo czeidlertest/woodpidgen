@@ -19,7 +19,7 @@ QVariant IdentityListModel::data(const QModelIndex &index, int role) const
     return QVariant();
 }
 
-int IdentityListModel::rowCount(const QModelIndex &parent) const
+int IdentityListModel::rowCount(const QModelIndex &/*parent*/) const
 {
     return fIdentities.count();
 }
@@ -41,38 +41,55 @@ void IdentityListModel::removeIdentity(ProfileEntryIdentity *identity)
 }
 
 
-Profile::Profile(DatabaseInterface *database, CryptoInterface *crypto, const QString branch)
-    :
-    DatabaseEncryption(database, crypto, branch)
+Profile::Profile(const QString &path, const QString &branch) :
+    fDatabase(NULL),
+    fKeyStore(NULL),
+    fDatabasePath(path),
+    fDatabaseBranch(branch)
 {
+    fCrypto = CryptoInterfaceSingleton::getCryptoInterface();
+}
+
+Profile::~Profile()
+{
+    delete fDatabase;
 }
 
 int Profile::createNewProfile(const SecureArray &password)
 {
-    fDatabase->setBranch(fBranch);
-
-    int error = createNewMasterKey(password, fMasterKey, fMasterKeyIV);
+    int error = DatabaseFactory::open(fDatabasePath, fDatabaseBranch, &fDatabase);
     if (error != 0)
-        return -1;
+        return error;
 
     return 0;
 }
 
 int Profile::open(const SecureArray &password)
 {
-    fDatabase->setBranch(fBranch);
-
-    int error = readMasterKey(password, fMasterKey, fMasterKeyIV);
-    if (error != 0)
+    if (fDatabase != NULL)
         return -1;
+    int error = DatabaseFactory::open(fDatabasePath, fDatabaseBranch, &fDatabase);
+    if (error != 0)
+        return error;
 
     QStringList ids = UserIdentity::getIdenties(fDatabase);
     for (int i = 0; i < ids.count(); i++) {
-        UserIdentity *id = new UserIdentity(fDatabase, fCrypto);
-        id->open("none", ids.at(i));
+        UserIdentity *id = new UserIdentity(fDatabasePath, fDatabaseBranch);
+        QString keyStoreId = id->getKeyStoreId();
+        KeyStore *keyStore = findKeyStore(keyStoreId);
+        if (keyStore == NULL) {
+            delete id;
+            continue;
+        }
+        id->setTo(keyStore);
         addIdentity(id);
     }
     return 0;
+}
+
+int Profile::commit()
+{
+    return fDatabase->commit();
 }
 
 ProfileEntryIdentity *Profile::addIdentity(UserIdentity *identity)
@@ -92,6 +109,12 @@ int Profile::writeEntry(const ProfileEntry *entry)
 IdentityListModel *Profile::getIdentityList()
 {
     return &fIdentities;
+}
+
+KeyStore *Profile::findKeyStore(const QString &keyStoreId)
+{
+    TODO
+    return NULL;
 }
 
 

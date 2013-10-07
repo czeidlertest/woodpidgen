@@ -23,7 +23,7 @@ GitInterface::~GitInterface()
     unSet();
 }
 
-int GitInterface::setBranch(const QString &branch, bool createBranch)
+int GitInterface::setBranch(const QString &branch, bool /*createBranch*/)
 {
     if (fRepository == NULL)
         return DatabaseInterface::kNotInit;
@@ -93,6 +93,11 @@ int GitInterface::add(const QString& path, const QByteArray &data)
     return 0;
 }
 
+int GitInterface::remove(const QString &path)
+{
+    // TODO implement
+    return 0;
+}
 
 int GitInterface::commit()
 {
@@ -302,7 +307,7 @@ QString GitInterface::getTip(const QString &branch) const
 
     git_reference *ref;
     char out[41];
-    for (int i = 0; i < ref_list.count; ++i) {
+    for (unsigned int i = 0; i < ref_list.count; ++i) {
         const char *name = ref_list.strings[i];
         if (refName != name)
             continue;

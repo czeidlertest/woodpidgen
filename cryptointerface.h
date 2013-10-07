@@ -30,9 +30,9 @@ public:
     int decryptSymmetric(const QByteArray &input, SecureArray &decrypted, const SecureArray &key,
                          const QByteArray &iv, const char *algo = "aes256");
 
-    int encyrptData(const QByteArray &input, QByteArray &encrypted, const QByteArray& certificate);
-    int decryptData(const QByteArray &input, QByteArray &plain, const QString &privateKey,
-                    const SecureArray &keyPassword, const QByteArray& certificate);
+    int encyrptAsymmetric(const QByteArray &input, QByteArray &encrypted, const QString& certificate);
+    int decryptAsymmetric(const QByteArray &input, QByteArray &plain, const QString &privateKey,
+                    const SecureArray &keyPassword, const QString& certificate);
 
     QByteArray sha1Hash(const QByteArray &string) const;
     QString toHex(const QByteArray& string) const;
@@ -53,6 +53,15 @@ public:
 private:
     class Private;
     Private* fPrivate;
+};
+
+
+class CryptoInterfaceSingleton {
+public:
+    static CryptoInterface *getCryptoInterface();
+    static void destroy();
+private:
+    static CryptoInterface *sCryptoInterface;
 };
 
 #endif // CRYPTOINTERFACE_H

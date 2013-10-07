@@ -32,6 +32,9 @@ MainWindow::MainWindow(Profile *profile, QWidget *parent) :
     connect(accountAction, SIGNAL(toggled(bool)), this, SLOT(accountActionToggled(bool)));
     connect(messageAction, SIGNAL(toggled(bool)), this, SLOT(messageActionToggled(bool)));
 
+    fProgressBar = new QProgressBar(this);
+    statusBar()->addWidget(fProgressBar);
+
     accountAction->setChecked(true);
 }
 

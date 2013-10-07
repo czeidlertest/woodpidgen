@@ -12,6 +12,7 @@ public:
     virtual int setBranch(const QString &branch,
                           bool createBranch = true) = 0;
     virtual int add(const QString& path, const QByteArray& data) = 0;
+    virtual int remove(const QString& path) = 0;
     virtual int commit() = 0;
 
     virtual int get(const QString& path, QByteArray& data) const = 0;
@@ -28,5 +29,10 @@ public:
     };
 };
 
+
+class DatabaseFactory {
+public:
+    static int open(const QString &databasePath, const QString &branch, DatabaseInterface **database);
+};
 
 #endif // DATABASEINTERFACE_H

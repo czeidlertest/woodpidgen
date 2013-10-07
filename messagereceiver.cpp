@@ -116,7 +116,8 @@ QString MessageReceiver::getMessagesRequest()
     return _CreateXMLMessageRequest(branch, first, "");
 }
 
-void MessageReceiver::commitPackReceived(const QByteArray& data, const QString& branch, const QString& first, const QString& last)
+void MessageReceiver::commitPackReceived(const QByteArray& data, const QString& branch,
+                                         const QString &/*first*/, const QString &last)
 {
     QByteArray text = QByteArray::fromBase64(data);
 

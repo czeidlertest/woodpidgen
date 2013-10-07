@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QProgressBar>
 
 #include <profile.h>
 
@@ -26,6 +27,7 @@ private:
     QWidget *fIdentityView;
     QWidget *fMessageView;
     Profile *fProfile;
+    QProgressBar *fProgressBar;
 };
 
 #endif // MAINWINDOW_H

@@ -3,16 +3,30 @@
 #include "gitinterface.h"
 
 
-int DatabaseFactory::open(const QString &databasePath, const QString &branch, DatabaseInterface **database)
+WP::err DatabaseFactory::open(const QString &databasePath, const QString &branch, DatabaseInterface **database)
 {
     *database = NULL;
     DatabaseInterface *gitDatabase = new GitInterface;
-    int error = gitDatabase->setTo(databasePath);
-    if (error != 0)
+    WP::err error = gitDatabase->setTo(databasePath);
+    if (error != WP::kOk)
         return error;
     error = gitDatabase->setBranch(branch);
-    if (error != 0)
+    if (error != WP::kOk)
         return error;
     *database = gitDatabase;
-    return 0;
+    return WP::kOk;
+}
+
+
+WP::err DatabaseInterface::write(const QString &path, const QString &data)
+{
+    return write(path, data.toAscii());
+}
+
+WP::err DatabaseInterface::read(const QString &path, QString &data) const
+{
+    QByteArray dataArray;
+    WP::err status = read(path, dataArray);
+    data = dataArray;
+    return status;
 }

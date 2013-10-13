@@ -33,15 +33,12 @@ class UserIdentity : public EncryptedUserData
 {
 public:
     UserIdentity(const QString &path, const QString &branch, const QString &baseDir = "");
-    UserIdentity(const QString &path, const QString &branch, const QString &id, const QString &baseDir = "");
     ~UserIdentity();
 
-    int createNewIdentity(KeyStore *keyStore);
-    int setTo(KeyStore *keyStore);
+    WP::err createNewIdentity(bool addUidToBaseDir = true);
+    WP::err open();
 
     static QStringList getIdenties(DatabaseInterface *database, const QString branch = "identities");
-
-    QString getId();
 
             //! discare changes and reload values from database
             int                 reload();
@@ -64,9 +61,6 @@ public:
 
 private:
     QString fIdentityKey;
-
-    QString fIdentityName;
-
 };
 
 #endif // USERIDENTITY_H

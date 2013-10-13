@@ -23,31 +23,31 @@ GitInterface::~GitInterface()
     unSet();
 }
 
-int GitInterface::setBranch(const QString &branch, bool /*createBranch*/)
+WP::err GitInterface::setBranch(const QString &branch, bool /*createBranch*/)
 {
     if (fRepository == NULL)
-        return DatabaseInterface::kNotInit;
+        return WP::kUninit;
     fCurrentBranch = branch;
-    return 0;
+    return WP::kOk;
 }
 
 
-int GitInterface::add(const QString& path, const QByteArray &data)
+WP::err GitInterface::write(const QString& path, const QByteArray &data)
 {
     QString treePath = path;
     QString filename = removeFilename(treePath);
 
     git_oid oid;
     int error = git_odb_write(&oid, fObjectDatabase, data.data(), data.count(), GIT_OBJ_BLOB);
-    if (error != 0)
-        return error;
+    if (error != WP::kOk)
+        return (WP::err)error;
     int fileMode = 100644;
 
     git_tree *rootTree = NULL;
     if (fNewRootTreeOid.id[0] != '\0') {
-        error = git_tree_lookup(&rootTree, fRepository, &fNewRootTreeOid);
-        if (error != 0)
-            return error;
+        error = (WP::err)git_tree_lookup(&rootTree, fRepository, &fNewRootTreeOid);
+        if (error != WP::kOk)
+            return (WP::err)error;
     } else
         rootTree = getTipTree(fCurrentBranch);
 
@@ -61,24 +61,24 @@ int GitInterface::add(const QString& path, const QByteArray &data)
         }
 
         git_treebuilder *builder = NULL;
-        error = git_treebuilder_create(&builder, node);
+        error = (WP::err)git_treebuilder_create(&builder, node);
         if (node != rootTree)
             git_tree_free(node);
-        if (error != 0) {
+        if (error != WP::kOk) {
             git_tree_free(rootTree);
-            return error;
+            return (WP::err)error;
         }
         error = git_treebuilder_insert(NULL, builder, filename.toStdString().c_str(), &oid, fileMode);
-        if (error != 0) {
+        if (error != WP::kOk) {
             git_tree_free(rootTree);
             git_treebuilder_free(builder);
-            return error;
+            return (WP::err)error;
         }
         error = git_treebuilder_write(&oid, fRepository, builder);
         git_treebuilder_free(builder);
-        if (error != 0) {
+        if (error != WP::kOk) {
             git_tree_free(rootTree);
-            return error;
+            return (WP::err)error;
         }
 
         // in the folloing we write trees
@@ -90,21 +90,21 @@ int GitInterface::add(const QString& path, const QByteArray &data)
 
     git_tree_free(rootTree);
     fNewRootTreeOid = oid;
-    return 0;
+    return WP::kOk;
 }
 
-int GitInterface::remove(const QString &path)
+WP::err GitInterface::remove(const QString &path)
 {
     // TODO implement
-    return 0;
+    return WP::kError;
 }
 
-int GitInterface::commit()
+WP::err GitInterface::commit()
 {
     git_tree *tree;
     int error = git_tree_lookup(&tree, fRepository, &fNewRootTreeOid);
     if (error != 0)
-        return error;
+        return (WP::err)error;
 
     QString refName = "refs/heads/";
     refName += fCurrentBranch;
@@ -127,10 +127,10 @@ int GitInterface::commit()
     git_signature_free(signature);
     git_tree_free(tree);
     if (error != 0)
-        return error;
+        return (WP::err)error;
 
     fNewRootTreeOid.id[0] = '\0';
-    return 0;
+    return WP::kOk;
    //git_reference* out;
     //int result = git_reference_lookup(&out, fRepository, "refs/heads/master");
     //git_reference_free(out);
@@ -185,7 +185,7 @@ int GitInterface::commit()
 
 }
 
-int GitInterface::get(const QString &path, QByteArray &data) const
+WP::err GitInterface::read(const QString &path, QByteArray &data) const
 {
     QString pathCopy = path;
     while (!pathCopy.isEmpty() && pathCopy.at(0) == '/')
@@ -197,7 +197,7 @@ int GitInterface::get(const QString &path, QByteArray &data) const
     int error = git_tree_get_subtree(&node, rootTree, pathCopy.toStdString().c_str());
     git_tree_free(rootTree);
     if (error != 0)
-        return error;
+        return WP::kEntryNotFound;
 
     QString filename = removeFilename(pathCopy);
 
@@ -205,23 +205,23 @@ int GitInterface::get(const QString &path, QByteArray &data) const
 
     if (treeEntry == NULL) {
         git_tree_free(node);
-        return -1;
+        return WP::kEntryNotFound;
     }
 
     git_blob *blob;
     error = git_blob_lookup(&blob, fRepository, git_tree_entry_id(treeEntry));
     git_tree_free(node);
     if (error != 0)
-        return error;
+        return WP::kEntryNotFound;
 
     data.clear();
     data.append((const char*)git_blob_rawcontent(blob), git_blob_rawsize(blob));
 
     git_blob_free(blob);
-    return 0;
+    return WP::kOk;
 }
 
-int GitInterface::setTo(const QString &path, bool create)
+WP::err GitInterface::setTo(const QString &path, bool create)
 {
     unSet();
     fRepositoryPath = path;
@@ -232,9 +232,9 @@ int GitInterface::setTo(const QString &path, bool create)
         error = git_repository_init(&fRepository, fRepositoryPath.toStdString().c_str(), true);
 
     if (error != 0)
-        return error;
+        return (WP::err)error;
 
-    return git_repository_odb(&fObjectDatabase, fRepository);
+    return (WP::err)git_repository_odb(&fObjectDatabase, fRepository);
 }
 
 void GitInterface::unSet()
@@ -248,7 +248,7 @@ QString GitInterface::path()
     return fRepositoryPath;
 }
 
-int GitInterface::writeObject(const char *data, int size)
+WP::err GitInterface::writeObject(const char *data, int size)
 {
     QCryptographicHash hash(QCryptographicHash::Sha1);
     hash.addData(data, size);
@@ -266,17 +266,17 @@ int GitInterface::writeObject(const char *data, int size)
     path += hashHex.substr(2).c_str();
     QFile file(path);
     if (file.exists())
-        return -1;
+        return WP::kError;
 
     file.open(QIODevice::WriteOnly | QIODevice::Truncate);
     QByteArray arrayData;
     arrayData = QByteArray::fromRawData(data, size);
     QByteArray compressedData = qCompress(arrayData);
     file.write(compressedData.data(), compressedData.size());
-    return 0;
+    return WP::kOk;
 }
 
-int GitInterface::writeFile(const QString &hash, const char *data, int size)
+WP::err GitInterface::writeFile(const QString &hash, const char *data, int size)
 {
     std::string hashHex = hash.toStdString();
     QString path;
@@ -289,11 +289,11 @@ int GitInterface::writeFile(const QString &hash, const char *data, int size)
     path += hashHex.substr(2).c_str();
     QFile file(path);
     if (file.exists())
-        return -1;
+        return WP::kError;
 
     file.open(QIODevice::WriteOnly | QIODevice::Truncate);
     file.write(data, size);
-    return 0;
+    return WP::kOk;
 }
 
 QString GitInterface::getTip(const QString &branch) const

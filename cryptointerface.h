@@ -3,6 +3,7 @@
 
 #include <QByteArray>
 
+#include "error_codes.h"
 
 typedef QByteArray SecureArray;
 
@@ -15,8 +16,8 @@ public:
 
     void generateKeyPair(const char* certificateFile, const char* publicKeyFile, const char* privateKeyFile, const char *keyPassword);
 
-    int generateKeyPair(QString &certificate, QString &publicKey,
-                        QString &privateKey, const SecureArray &keyPassword);
+    WP::err generateKeyPair(QString &certificate, QString &publicKey,
+                            QString &privateKey, const SecureArray &keyPassword);
 
     SecureArray deriveKey(const SecureArray &secret, const QString& kdf, const QString &kdfAlgo, const SecureArray &salt,
                                          unsigned int keyLength, unsigned int iterations);
@@ -25,19 +26,22 @@ public:
     QByteArray generateInitalizationVector(int size);
     SecureArray generateSymetricKey(int size);
 
-    int encryptSymmetric(const SecureArray &input, QByteArray &encrypted, const SecureArray &key,
-                         const QByteArray &iv, const char *algo = "aes256");
-    int decryptSymmetric(const QByteArray &input, SecureArray &decrypted, const SecureArray &key,
-                         const QByteArray &iv, const char *algo = "aes256");
+    WP::err encryptSymmetric(const SecureArray &input, QByteArray &encrypted,
+                             const SecureArray &key, const QByteArray &iv,
+                             const char *algo = "aes256");
+    WP::err decryptSymmetric(const QByteArray &input, SecureArray &decrypted,
+                             const SecureArray &key, const QByteArray &iv,
+                             const char *algo = "aes256");
 
-    int encyrptAsymmetric(const QByteArray &input, QByteArray &encrypted, const QString& certificate);
-    int decryptAsymmetric(const QByteArray &input, QByteArray &plain, const QString &privateKey,
+    WP::err encyrptAsymmetric(const QByteArray &input, QByteArray &encrypted, const QString& certificate);
+    WP::err decryptAsymmetric(const QByteArray &input, QByteArray &plain, const QString &privateKey,
                     const SecureArray &keyPassword, const QString& certificate);
 
     QByteArray sha1Hash(const QByteArray &string) const;
     QString toHex(const QByteArray& string) const;
 
-    int sign(const QByteArray& input, QByteArray &signatur, const QString &privateKeyString, const SecureArray &keyPassword);
+    WP::err sign(const QByteArray& input, QByteArray &signatur, const QString &privateKeyString,
+                 const SecureArray &keyPassword);
     bool verifySignatur(const QByteArray& message, const QByteArray &signatur, const QString &publicKeyString);
 
     void generateDHParam(QString &prime, QString &base, QString &secret, QString &pub);

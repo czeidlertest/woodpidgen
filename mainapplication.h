@@ -52,10 +52,11 @@ public:
     QNetworkAccessManager* getNetworkAccessManager();
 
 private:
+    WP::err createNewProfile();
+
     MainWindow *fMainWindow;
 
     Profile* fProfile;
-
     QNetworkAccessManager *fNetworkAccessManager;
 };
 

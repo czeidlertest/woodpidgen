@@ -7,38 +7,109 @@
 #include <cryptointerface.h>
 #include <databaseinterface.h>
 #include <databaseutil.h>
+#include <error_codes.h>
 
 const QString kStorageTypeProfile = "profile";
 const QString kStorageTypeIdentity = "identity";
 const QString kStorageTypeMessages = "messages";
 
 
+template<class Type>
 class ProfileEntry {
 public:
-    ProfileEntry(const QString &location, const QString &branch);
-    virtual ~ProfileEntry() {}
+    ProfileEntry(DatabaseInterface *database, const QString &path) :
+        fProfileDatabase(database),
+        fProfileEntryPath(path),
+        fUserData(NULL)
+    {
+    }
 
-    virtual int write(DatabaseInterface *database, CryptoInterface *crypto) const;
-    virtual int load(DatabaseInterface *database, CryptoInterface *crypto);
-    virtual QString hash(CryptoInterface *crypto) const;
+    virtual ~ProfileEntry() {
+        delete fUserData;
+    }
+
+    virtual WP::err write() const
+    {
+        QString path = fProfileEntryPath + "/database_path";
+        WP::err error = fProfileDatabase->write(path, fDatabasePath);
+        if (error != WP::kOk)
+            return error;
+        path = fProfileEntryPath + "/database_branch";
+        error = fProfileDatabase->write(path, fDatabaseBranch);
+        if (error != WP::kOk) {
+            fProfileDatabase->remove(fDatabasePath);
+            return error;
+        }
+        path = fDatabasePath + "/database_base_dir";
+        error = fProfileDatabase->write(path, fDatabaseBaseDir);
+        if (error != WP::kOk) {
+            fProfileDatabase->remove(fDatabasePath);
+            return error;
+        }
+        return WP::kOk;
+    }
+
+    virtual WP::err load() {
+        QString path = fProfileEntryPath + "/database_path";
+        WP::err error = fProfileDatabase->read(path, fDatabasePath);
+        if (error != WP::kOk)
+            return error;
+        path = fProfileEntryPath + "/database_branch";
+        error = fProfileDatabase->read(path, fDatabaseBranch);
+        if (error != WP::kOk)
+            return error;
+        path = fDatabasePath + "/database_base_dir";
+        error = fProfileDatabase->read(path, fDatabaseBaseDir);
+        if (error != WP::kOk)
+            return error;
+
+        fUserData = instanciate();
+        return WP::kOk;
+    }
+
+    void setUserData(Type *data) {
+        delete fUserData;
+        fUserData = data;
+    }
+
+    Type *getUserData() const {
+        return fUserData;
+    }
+
+    Type *writeEntry() const {
+        return fUserData;
+    }
 
 protected:
-    QString fLocation;
-    QString fBranch;
+    virtual Type *instanciate() {
+        return new Type(fDatabasePath, fDatabaseBranch, fDatabaseBaseDir);
+    }
+
+protected:
+    DatabaseInterface *fProfileDatabase;
+    QString fProfileEntryPath;
+
+    QString fDatabasePath;
+    QString fDatabaseBranch;
+    QString fDatabaseBaseDir;
+
+    Type *fUserData;
+};
+
+
+class KeyStore;
+
+class ProfileEntryKeyStore : public ProfileEntry<KeyStore> {
+public:
+    ProfileEntryKeyStore(DatabaseInterface *database, const QString &path);
 };
 
 
 class UserIdentity;
 
-
-class ProfileEntryIdentity : public ProfileEntry {
+class ProfileEntryIdentity : public ProfileEntry<UserIdentity> {
 public:
-    ProfileEntryIdentity(UserIdentity* identity, const QString &location, const QString &branch);
-
-    UserIdentity* identity();
-
-protected:
-    UserIdentity *fIdentity;
+    ProfileEntryIdentity(DatabaseInterface *database, const QString &path);
 };
 
 
@@ -56,33 +127,42 @@ private:
 };
 
 
-class Profile
+class Profile : public EncryptedUserData
 {
 public:
     Profile(const QString &path, const QString &branch);
     ~Profile();
 
-    int createNewProfile(const SecureArray& password);
-    int open(const SecureArray &password);
+    /*! create a new profile and adds a new KeyStore with \par password. */
+    WP::err createNewProfile(const SecureArray &password);
 
-    int commit();
+    //! adds an external key store to the profile
+    WP::err addKeyStore(KeyStore *keyStore);
+    WP::err removeKeyStore(KeyStore *keyStore);
+    KeyStore *findKeyStore(const QString &keyStoreId);
+
+    WP::err addUserIdentity(UserIdentity *useIdentity);
+    WP::err removeUserIdentity(UserIdentity *useIdentity);
+
+    WP::err open(const SecureArray &password);
 
     ProfileEntryIdentity* addIdentity(UserIdentity *identity);
     IdentityListModel* getIdentityList();
 
-    KeyStore *findKeyStore(const QString &keyStoreId);
 private:
-    int writeEntry(const ProfileEntry* entry);
+    WP::err loadKeyStores();
+    WP::err loadUserIdentities();
 
+    WP::err createNewKeyStore(const SecureArray &password, KeyStore **keyStoreOut);
+    WP::err createNewUserIdentity(KeyStore *keyStore, UserIdentity **userIdentityOut);
 
-private:
-    DatabaseInterface *fDatabase;
-    CryptoInterface *fCrypto;
-    KeyStore *fKeyStore;
+private:    
     IdentityListModel fIdentities;
 
-    QString fDatabasePath;
-    QString fDatabaseBranch;
+    QString fMasterKeyStoreId;
+    QString fMasterKeyId;
+    QMap<QString, KeyStore*> fMapOfKeyStores;
+    QMap<QString, UserIdentity*> fMapOfUserIdenties;
 };
 
 

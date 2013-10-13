@@ -79,19 +79,19 @@ void CryptoInterface::encryptionTest(const char* certificateFile, const char *pu
 
 }
 
-int CryptoInterface::generateKeyPair(QString &certificate, QString &publicKey,
+WP::err CryptoInterface::generateKeyPair(QString &certificate, QString &publicKey,
                                      QString &privateKey,
                                      const SecureArray &keyPassword)
 {
     if(!QCA::isSupported("pkey") || !QCA::PKey::supportedIOTypes().contains(QCA::PKey::RSA)) {
         printf("RSA not supported!\n");
-        return -1;
+        return WP::kError;
     }
 
     QCA::PrivateKey secretKey = QCA::KeyGenerator().createRSA(2048);
     if(secretKey.isNull()) {
         printf("Failed to make private RSA key\n");
-        return -1;
+        return WP::kError;
     }
 
     privateKey = secretKey.toPEM(keyPassword);
@@ -105,7 +105,7 @@ int CryptoInterface::generateKeyPair(QString &certificate, QString &publicKey,
     QCA::PublicKey pubkey = secretKey.toPublicKey();
     publicKey = pubkey.toPEM();
 
-    return 0;
+    return WP::kOk;
 }
 
 SecureArray CryptoInterface::deriveKey(const SecureArray &secret, const QString &kdf, const QString &kdfAlgo, const SecureArray &salt, unsigned int keyLength, unsigned int iterations)
@@ -133,29 +133,29 @@ SecureArray CryptoInterface::generateSymetricKey(int size)
     return QCA::SymmetricKey(size).toByteArray();
 }
 
-int CryptoInterface::encryptSymmetric(const SecureArray &input, QByteArray &encrypted,
+WP::err CryptoInterface::encryptSymmetric(const SecureArray &input, QByteArray &encrypted,
                                       const SecureArray &key, const QByteArray &iv,
                                       const char *algo)
 {
     QCA::Cipher encoder(algo, QCA::Cipher::CBC, QCA::Cipher::DefaultPadding, QCA::Encode, key, iv);
     encrypted = encoder.process(input).toByteArray();
     if (!encoder.ok())
-        return -1;
-    return 0;
+        return WP::kError;
+    return WP::kOk;
 }
 
-int CryptoInterface::decryptSymmetric(const QByteArray &input, SecureArray &decrypted,
+WP::err CryptoInterface::decryptSymmetric(const QByteArray &input, SecureArray &decrypted,
                                       const SecureArray &key, const QByteArray &iv,
                                       const char *algo)
 {
     QCA::Cipher decoder(algo, QCA::Cipher::CBC, QCA::Cipher::DefaultPadding, QCA::Decode, key, iv);
     decrypted = decoder.process(input).toByteArray();
     if (!decoder.ok())
-        return -1;
-    return 0;
+        return WP::kError;
+    return WP::kOk;
 }
 
-int CryptoInterface::encyrptAsymmetric(const QByteArray &input, QByteArray &encrypted,
+WP::err CryptoInterface::encyrptAsymmetric(const QByteArray &input, QByteArray &encrypted,
                                  const QString &certificate)
 {
     // Read in a matching public key cert
@@ -164,7 +164,7 @@ int CryptoInterface::encyrptAsymmetric(const QByteArray &input, QByteArray &encr
     QCA::Certificate pubCert = QCA::Certificate::fromPEM(certificate, &convRes);
     if (convRes != QCA::ConvertGood) {
         std::cout << "Sorry, could not import public key certificate" << std::endl;
-        return convRes;
+        return (WP::err)convRes;
     }
     // We are building the certificate into a SecureMessageKey object, via a
     // CertificateChain
@@ -188,15 +188,15 @@ int CryptoInterface::encyrptAsymmetric(const QByteArray &input, QByteArray &encr
     // check to see if it worked
     if(!msg.success()) {
         std::cout << "Error encrypting: " << msg.errorCode() << std::endl;
-        return msg.errorCode();
+        return (WP::err)msg.errorCode();
     }
 
     // get the result
     encrypted = msg.read();
-    return 0;
+    return WP::kOk;
 }
 
-int CryptoInterface::decryptAsymmetric(const QByteArray &input, QByteArray &plain,
+WP::err CryptoInterface::decryptAsymmetric(const QByteArray &input, QByteArray &plain,
                                  const QString &privateKey, const SecureArray &keyPassword,
                                  const QString &certificate)
 {
@@ -205,7 +205,7 @@ int CryptoInterface::decryptAsymmetric(const QByteArray &input, QByteArray &plai
     privKey = QCA::PrivateKey::fromPEM(privateKey, keyPassword, &convRes);
     if (convRes != QCA::ConvertGood) {
         std::cout << "Sorry, could not import Private Key" << std::endl;
-        return convRes;
+        return (WP::err)convRes;
     }
 
     // Read in a matching public key cert
@@ -213,7 +213,7 @@ int CryptoInterface::decryptAsymmetric(const QByteArray &input, QByteArray &plai
     QCA::Certificate pubCert = QCA::Certificate::fromPEM(certificate, &convRes);
     if (convRes != QCA::ConvertGood) {
         std::cout << "Sorry, could not import public key certificate" << std::endl;
-        return convRes;
+        return (WP::err)convRes;
     }
     // We are building the certificate into a SecureMessageKey object, via a
     // CertificateChain
@@ -235,7 +235,7 @@ int CryptoInterface::decryptAsymmetric(const QByteArray &input, QByteArray &plai
     decryptedMessage.waitForFinished(-1);
 
     plain = decryptedMessage.read();
-    return 0;
+    return WP::kOk;
 }
 
 QByteArray CryptoInterface::sha1Hash(const QByteArray &string) const
@@ -250,7 +250,7 @@ QString CryptoInterface::toHex(const QByteArray &string) const
     return QCA::arrayToHex(string);
 }
 
-int CryptoInterface::sign(const QByteArray &input, QByteArray &signatur,
+WP::err CryptoInterface::sign(const QByteArray &input, QByteArray &signatur,
                           const QString &privateKeyString, const SecureArray &keyPassword)
 {
     QCA::PrivateKey privateKey;
@@ -258,16 +258,16 @@ int CryptoInterface::sign(const QByteArray &input, QByteArray &signatur,
     privateKey = QCA::PrivateKey::fromPEM(privateKeyString, keyPassword, &convRes);
     if (convRes != QCA::ConvertGood) {
         std::cout << "Sorry, could not import Private Key" << std::endl;
-        return -1;
+        return WP::kError;
     }
     if(!privateKey.canSign()) {
         std::cout << "Error: this kind of key cannot sign" << std::endl;
-        return -1;
+        return WP::kError;
     }
     privateKey.startSign(QCA::EMSA3_MD5);
     privateKey.update(input); // just reuse the same message
     signatur = privateKey.signature();
-    return 0;
+    return WP::kOk;
 }
 
 bool CryptoInterface::verifySignatur(const QByteArray &message, const QByteArray &signatur,

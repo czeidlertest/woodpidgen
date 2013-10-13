@@ -14,18 +14,18 @@ public:
     GitInterface();
     ~GitInterface();
 
-    int setBranch(const QString &branch, bool createBranch = true);
-    int add(const QString &path, const QByteArray &data);
-    int remove(const QString& path);
-    int commit();
-    int get(const QString &path, QByteArray &data) const;
+    WP::err setBranch(const QString &branch, bool createBranch = true);
+    WP::err write(const QString &path, const QByteArray &data);
+    WP::err remove(const QString& path);
+    WP::err commit();
+    WP::err read(const QString &path, QByteArray &data) const;
 
-    int setTo(const QString &path, bool create = true);
+    WP::err setTo(const QString &path, bool create = true);
     void unSet();
     QString path();
 
-    int writeObject(const char *data, int size);
-    int writeFile(const QString& hash, const char *data, int size);
+    WP::err writeObject(const char *data, int size);
+    WP::err writeFile(const QString& hash, const char *data, int size);
 
     QString getTip(const QString &branch) const;
     bool updateTip(const QString &branch, const QString &last);

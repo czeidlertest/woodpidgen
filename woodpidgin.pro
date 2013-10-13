@@ -57,7 +57,8 @@ HEADERS += \
     BigInteger/BigIntegerAlgorithms.hh \
     BigInteger/BigInteger.hh \
     BigInteger/NumberlikeArray.hh \
-    BigInteger/BigUnsignedInABase.hh
+    BigInteger/BigUnsignedInABase.hh \
+    error_codes.h
 
 FORMS += \
     mainwindow.ui

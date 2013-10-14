@@ -17,11 +17,22 @@ const QString kStorageTypeMessages = "messages";
 template<class Type>
 class ProfileEntry {
 public:
-    ProfileEntry(DatabaseInterface *database, const QString &path) :
-        fProfileDatabase(database),
-        fProfileEntryPath(path),
-        fUserData(NULL)
+    ProfileEntry(DatabaseInterface *database, const QString &path, Type *userData) :
+        fEntryDatabase(database),
+        fUserData(userData)
     {
+        if (fUserData != NULL) {
+            fDatabasePath = fUserData->getDatabasePath();
+            fDatabaseBranch = fUserData->getDatabaseBranch();
+            fDatabaseBaseDir = fUserData->getDatabaseBaseDir();
+        }
+
+        if (path != "") {
+            fEntryDatabasePath = path;
+            if (fDatabaseBaseDir != "")
+                fEntryDatabasePath += "/" + fDatabaseBaseDir;
+        } else
+            fEntryDatabasePath += fDatabaseBaseDir;
     }
 
     virtual ~ProfileEntry() {
@@ -30,36 +41,36 @@ public:
 
     virtual WP::err write() const
     {
-        QString path = fProfileEntryPath + "/database_path";
-        WP::err error = fProfileDatabase->write(path, fDatabasePath);
+        QString path = fEntryDatabasePath + "/database_path";
+        WP::err error = fEntryDatabase->write(path, fDatabasePath);
         if (error != WP::kOk)
             return error;
-        path = fProfileEntryPath + "/database_branch";
-        error = fProfileDatabase->write(path, fDatabaseBranch);
+        path = fEntryDatabasePath + "/database_branch";
+        error = fEntryDatabase->write(path, fDatabaseBranch);
         if (error != WP::kOk) {
-            fProfileDatabase->remove(fDatabasePath);
+            fEntryDatabase->remove(fDatabasePath);
             return error;
         }
-        path = fDatabasePath + "/database_base_dir";
-        error = fProfileDatabase->write(path, fDatabaseBaseDir);
+        path = fEntryDatabasePath + "/database_base_dir";
+        error = fEntryDatabase->write(path, fDatabaseBaseDir);
         if (error != WP::kOk) {
-            fProfileDatabase->remove(fDatabasePath);
+            fEntryDatabase->remove(fDatabasePath);
             return error;
         }
         return WP::kOk;
     }
 
     virtual WP::err load() {
-        QString path = fProfileEntryPath + "/database_path";
-        WP::err error = fProfileDatabase->read(path, fDatabasePath);
+        QString path = fEntryDatabasePath + "/database_path";
+        WP::err error = fEntryDatabase->read(path, fDatabasePath);
         if (error != WP::kOk)
             return error;
-        path = fProfileEntryPath + "/database_branch";
-        error = fProfileDatabase->read(path, fDatabaseBranch);
+        path = fEntryDatabasePath + "/database_branch";
+        error = fEntryDatabase->read(path, fDatabaseBranch);
         if (error != WP::kOk)
             return error;
-        path = fDatabasePath + "/database_base_dir";
-        error = fProfileDatabase->read(path, fDatabaseBaseDir);
+        path = fEntryDatabasePath + "/database_base_dir";
+        error = fEntryDatabase->read(path, fDatabaseBaseDir);
         if (error != WP::kOk)
             return error;
 
@@ -76,18 +87,14 @@ public:
         return fUserData;
     }
 
-    Type *writeEntry() const {
-        return fUserData;
-    }
-
 protected:
     virtual Type *instanciate() {
         return new Type(fDatabasePath, fDatabaseBranch, fDatabaseBaseDir);
     }
 
 protected:
-    DatabaseInterface *fProfileDatabase;
-    QString fProfileEntryPath;
+    DatabaseInterface *fEntryDatabase;
+    QString fEntryDatabasePath;
 
     QString fDatabasePath;
     QString fDatabaseBranch;
@@ -101,7 +108,8 @@ class KeyStore;
 
 class ProfileEntryKeyStore : public ProfileEntry<KeyStore> {
 public:
-    ProfileEntryKeyStore(DatabaseInterface *database, const QString &path);
+    ProfileEntryKeyStore(DatabaseInterface *database, const QString &path,
+                         KeyStore *keyStore);
 };
 
 
@@ -109,7 +117,7 @@ class UserIdentity;
 
 class ProfileEntryIdentity : public ProfileEntry<UserIdentity> {
 public:
-    ProfileEntryIdentity(DatabaseInterface *database, const QString &path);
+    ProfileEntryIdentity(DatabaseInterface *database, const QString &path, UserIdentity *identity);
 };
 
 
@@ -120,8 +128,9 @@ public:
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
     int rowCount(const QModelIndex & parent = QModelIndex()) const;
 
-    void addIdentity(ProfileEntryIdentity* identity);
-    void removeIdentity(ProfileEntryIdentity* identity);
+    void addIdentity(ProfileEntryIdentity *identity);
+    void removeIdentity(ProfileEntryIdentity *identity);
+    ProfileEntryIdentity *removeIdentityAt(int index);
 private:
     QList<ProfileEntryIdentity*> fIdentities;
 };
@@ -141,17 +150,20 @@ public:
     WP::err removeKeyStore(KeyStore *keyStore);
     KeyStore *findKeyStore(const QString &keyStoreId);
 
-    WP::err addUserIdentity(UserIdentity *useIdentity);
+    WP::err addUserIdentity(UserIdentity *identity);
     WP::err removeUserIdentity(UserIdentity *useIdentity);
 
     WP::err open(const SecureArray &password);
 
-    ProfileEntryIdentity* addIdentity(UserIdentity *identity);
     IdentityListModel* getIdentityList();
 
 private:
+    void clear();
+
     WP::err loadKeyStores();
+    void addKeyStore(ProfileEntryKeyStore *entry);
     WP::err loadUserIdentities();
+    void addUserIdentity(ProfileEntryIdentity *entry);
 
     WP::err createNewKeyStore(const SecureArray &password, KeyStore **keyStoreOut);
     WP::err createNewUserIdentity(KeyStore *keyStore, UserIdentity **userIdentityOut);
@@ -161,8 +173,7 @@ private:
 
     QString fMasterKeyStoreId;
     QString fMasterKeyId;
-    QMap<QString, KeyStore*> fMapOfKeyStores;
-    QMap<QString, UserIdentity*> fMapOfUserIdenties;
+    QMap<QString, ProfileEntryKeyStore*> fMapOfKeyStores;
 };
 
 

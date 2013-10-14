@@ -31,8 +31,11 @@ WP::err UserIdentity::createNewIdentity(bool addUidToBaseDir)
 
     QByteArray hashResult = fCrypto->sha1Hash(certificate.toAscii());
     QString uid = fCrypto->toHex(hashResult);
-    if (addUidToBaseDir)
-        setBaseDir(fDatabaseBaseDir + "/" + uid);
+    if (addUidToBaseDir) {
+        QString newBaseDir;
+        (fDatabaseBaseDir == "") ? newBaseDir = uid : newBaseDir = fDatabaseBaseDir + "/" + uid;
+        setBaseDir(newBaseDir);
+    }
     // write uid
     setUid(uid);
 
@@ -40,9 +43,9 @@ WP::err UserIdentity::createNewIdentity(bool addUidToBaseDir)
     if (error != WP::kOk)
         return error;
 
-    QString path = prependBaseDir(uid + "/key_store_id");
+    QString path = prependBaseDir("key_store_id");
     write(path, fKeyStore->getUid().toAscii());
-    path = prependBaseDir(uid + "/identity_key");
+    path = prependBaseDir("identity_key");
     write(path, keyId.toAscii());
 
     // test data
@@ -52,7 +55,7 @@ WP::err UserIdentity::createNewIdentity(bool addUidToBaseDir)
     if (error != WP::kOk)
         return error;
 
-    path = prependBaseDir(uid + "/" + "test_data");
+    path = prependBaseDir("test_data");
     write(path, encyptedTestData);
 
     return error;
@@ -81,11 +84,4 @@ WP::err UserIdentity::open()
     printf("test %s\n", testData.data());
 
     return error;
-}
-
-QStringList UserIdentity::getIdenties(DatabaseInterface *database, const QString branch)
-{
-    database->setBranch(branch);
-    QStringList list = database->listDirectories("");
-    return list;
 }

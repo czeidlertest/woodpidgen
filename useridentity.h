@@ -38,8 +38,6 @@ public:
     WP::err createNewIdentity(bool addUidToBaseDir = true);
     WP::err open();
 
-    static QStringList getIdenties(DatabaseInterface *database, const QString branch = "identities");
-
             //! discare changes and reload values from database
             int                 reload();
 

@@ -23,6 +23,10 @@ public:
     WP::err read(const QString& path, QByteArray& data) const;
     WP::err read(const QString& path, QString& data) const;
 
+    QString getDatabasePath() const;
+    QString getDatabaseBranch() const;
+    QString getDatabaseBaseDir() const;
+
 protected:
     WP::err setUid(const QString &uid);
     WP::err setToDatabase(const QString &path, const QString &branch, const QString &baseDir = "",

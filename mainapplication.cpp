@@ -29,11 +29,11 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
             QMessageBox::information(NULL, "Error", "Unable to create or load a profile!");
             quit();
         }
-        fProfile->commit();
+        //fProfile->commit();
     }
 
     //EncryptedPHPConnection *encryptedPHPConnection = new EncryptedPHPConnection(QUrl("http://clemens-zeidler.de/woodpidgin/portal.php"), this);
-    EncryptedPHPConnection *encryptedPHPConnection = new EncryptedPHPConnection(QUrl("localhost/php_server/portal.php"), this);
+    EncryptedPHPConnection *encryptedPHPConnection = new EncryptedPHPConnection(QUrl("http://localhost/php_server/portal.php"), this);
     encryptedPHPConnection->connectToServer();
 
     PingRCReply *replyTest = new PingRCReply(encryptedPHPConnection, this);

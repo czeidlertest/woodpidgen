@@ -192,6 +192,8 @@ WP::err GitInterface::read(const QString &path, QByteArray &data) const
         pathCopy.remove(0, 1);
 
     git_tree *rootTree = getTipTree(fCurrentBranch);
+    if (rootTree == NULL)
+        return WP::kUninit;
 
     git_tree *node = NULL;
     int error = git_tree_get_subtree(&node, rootTree, pathCopy.toStdString().c_str());

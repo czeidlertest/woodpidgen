@@ -8,11 +8,15 @@ WP::err DatabaseFactory::open(const QString &databasePath, const QString &branch
     *database = NULL;
     DatabaseInterface *gitDatabase = new GitInterface;
     WP::err error = gitDatabase->setTo(databasePath);
-    if (error != WP::kOk)
+    if (error != WP::kOk) {
+        delete gitDatabase;
         return error;
+    }
     error = gitDatabase->setBranch(branch);
-    if (error != WP::kOk)
+    if (error != WP::kOk) {
+        delete gitDatabase;
         return error;
+    }
     *database = gitDatabase;
     return WP::kOk;
 }

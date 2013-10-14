@@ -70,6 +70,21 @@ WP::err UserData::read(const QString &path, QString &data) const
     return fDatabase->read(path, data);
 }
 
+QString UserData::getDatabasePath() const
+{
+    return fDatabasePath;
+}
+
+QString UserData::getDatabaseBranch() const
+{
+    return fDatabaseBranch;
+}
+
+QString UserData::getDatabaseBaseDir() const
+{
+    return fDatabaseBaseDir;
+}
+
 WP::err UserData::setUid(const QString &uid)
 {
     if (fInitStatus != WP::kOk)
@@ -139,8 +154,11 @@ WP::err KeyStore::create(const SecureArray &password, bool addUidToBaseDir)
         return error;
 
     QString uid = fCrypto->toHex(fCrypto->sha1Hash(encryptedMasterKey));
-    if (addUidToBaseDir)
-        setBaseDir(fDatabaseBaseDir + "/" + uid);
+    if (addUidToBaseDir) {
+        QString newBaseDir;
+        (fDatabaseBaseDir == "") ? newBaseDir = uid : newBaseDir = fDatabaseBaseDir + "/" + uid;
+        setBaseDir(newBaseDir);
+    }
     // write uid
     setUid(uid);
 
@@ -376,9 +394,7 @@ WP::err EncryptedUserData::readKeyStoreId(QString &keyStoreId) const
         return WP::kUninit;
 
     QString path = prependBaseDir(kPathKeyStoreID);
-    fDatabase->read(path, keyStoreId);
-
-    return WP::kOk;
+    return fDatabase->read(path, keyStoreId);
 }
 
 WP::err EncryptedUserData::writeSafe(const QString &path, const QByteArray &data)

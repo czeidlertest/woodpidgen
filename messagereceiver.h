@@ -5,6 +5,8 @@
 
 #include <gitinterface.h>
 
+
+
 class MessageReceiver : public QObject
 {
     Q_OBJECT

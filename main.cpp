@@ -4,7 +4,6 @@
 #include <QtDeclarative/QDeclarativeView>
 #else
 #include <QtGui/QGuiApplication>
-#include <QQmlContext>
 #endif
 
 #include <mainapplication.h>

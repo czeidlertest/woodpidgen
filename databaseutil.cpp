@@ -168,19 +168,19 @@ WP::err KeyStore::create(const SecureArray &password, bool addUidToBaseDir)
     path = fDatabaseBaseDir + "/" + kPathMasterKeyIV;
     fDatabase->write(path, fMasterKeyIV);
     path = fDatabaseBaseDir + "/" + kPathMasterPasswordKDF;
-    fDatabase->write(path, kdfName.toAscii());
+    fDatabase->write(path, kdfName.toLatin1());
     path = fDatabaseBaseDir + "/" + kPathMasterPasswordAlgo;
-    fDatabase->write(path, algoName.toAscii());
+    fDatabase->write(path, algoName.toLatin1());
     path = fDatabaseBaseDir + "/" + kPathMasterPasswordSalt;
     fDatabase->write(path, salt);
     path = fDatabaseBaseDir + "/" + kPathMasterPasswordSize;
     QString keyLengthString;
     QTextStream(&keyLengthString) << kMasterPasswordLength;
-    fDatabase->write(path, keyLengthString.toAscii());
+    fDatabase->write(path, keyLengthString.toLatin1());
     path = fDatabaseBaseDir + "/" + kPathMasterPasswordIterations;
     QString iterationsString;
     QTextStream(&iterationsString) << kMasterPasswordIterations;
-    fDatabase->write(path, iterationsString.toAscii());
+    fDatabase->write(path, iterationsString.toLatin1());
 
     return WP::kOk;
 }
@@ -266,17 +266,17 @@ WP::err KeyStore::writeAsymmetricKey(const QString &certificate, const QString &
                                const QString &privateKey, QString &keyId)
 {
     QByteArray encryptedPrivate;
-    WP::err error = fCrypto->encryptSymmetric(privateKey.toAscii(), encryptedPrivate, fMasterKey,
+    WP::err error = fCrypto->encryptSymmetric(privateKey.toLatin1(), encryptedPrivate, fMasterKey,
                                           fMasterKeyIV);
     if (error != WP::kOk)
         return error;
     QByteArray encryptedPublic;
-    error = fCrypto->encryptSymmetric(publicKey.toAscii(), encryptedPublic, fMasterKey,
+    error = fCrypto->encryptSymmetric(publicKey.toLatin1(), encryptedPublic, fMasterKey,
                                       fMasterKeyIV);
     if (error != WP::kOk)
         return error;
     QByteArray encryptedCertificate;
-    error = fCrypto->encryptSymmetric(certificate.toAscii(), encryptedCertificate, fMasterKey,
+    error = fCrypto->encryptSymmetric(certificate.toLatin1(), encryptedCertificate, fMasterKey,
                                       fMasterKeyIV);
     if (error != WP::kOk)
         return error;

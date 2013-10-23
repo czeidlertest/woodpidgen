@@ -24,7 +24,7 @@ WP::err DatabaseFactory::open(const QString &databasePath, const QString &branch
 
 WP::err DatabaseInterface::write(const QString &path, const QString &data)
 {
-    return write(path, data.toAscii());
+    return write(path, data.toLatin1());
 }
 
 WP::err DatabaseInterface::read(const QString &path, QString &data) const

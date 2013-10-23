@@ -107,7 +107,7 @@ EncryptedPHPConnection::EncryptedPHPConnection(QUrl url, QObject *parent) :
 }
 
 
-int EncryptedPHPConnection::connectToServer()
+WP::err EncryptedPHPConnection::connectToServer()
 {
     fInitVector = fCrypto->generateInitalizationVector(512);
     QString prime, base, pub;
@@ -131,7 +131,7 @@ int EncryptedPHPConnection::connectToServer()
     connect(fNetworkReply, SIGNAL(error(QNetworkReply::NetworkError)), this,
             SLOT(networkRequestError(QNetworkReply::NetworkError)));
 
-    return 0;
+    return WP::kOk;
 }
 
 

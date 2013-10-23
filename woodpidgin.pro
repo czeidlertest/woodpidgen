@@ -1,15 +1,14 @@
 # Add more folders to ship with the application, here
-folder_01.source = qml/woodpidgin
-folder_01.target = qml
-DEPLOYMENTFOLDERS = folder_01
+#folder_01.source = qml/woodpidgin
+#folder_01.target = qml
+#DEPLOYMENTFOLDERS = folder_01
 
 QT       += core gui
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
-QT += declarative
 QT += network
 
 # Additional import path used to resolve QML modules in Creator's code model
-QML_IMPORT_PATH =
+#QML_IMPORT_PATH =
 
 # If your application uses the Qt Mobility libraries, uncomment the following
 # lines and add the respective components to the MOBILITY variable.
@@ -34,7 +33,9 @@ SOURCES += main.cpp \
     BigInteger/BigIntegerAlgorithms.cpp \
     BigInteger/BigInteger.cpp \
     BigInteger/BigUnsignedInABase.cc \
-    databaseinterface.cpp
+    databaseinterface.cpp \
+    remotesync.cpp \
+    protocolparser.cpp
 
 # Installation path
 # target.path =
@@ -58,25 +59,22 @@ HEADERS += \
     BigInteger/BigInteger.hh \
     BigInteger/NumberlikeArray.hh \
     BigInteger/BigUnsignedInABase.hh \
-    error_codes.h
+    error_codes.h \
+    remotesync.h \
+    protocolparser.h
 
 FORMS += \
     mainwindow.ui
 
-win32:CONFIG(release, debug|release): LIBS += -L$$PWD/../cl342/release/ -lcl
-else:win32:CONFIG(debug, debug|release): LIBS += -L$$PWD/../cl342/debug/ -lcl
-else:unix: LIBS += -L$$PWD/../cl342/ -lcl
+unix: LIBS += -L$$PWD/../libgit2/build -lgit2
 
-INCLUDEPATH += $$PWD/../cl342
-DEPENDPATH += $$PWD/../cl342
+INCLUDEPATH += $$PWD/../libgit2/include
+DEPENDPATH += $$PWD/../libgit2
 
-win32:CONFIG(release, debug|release): PRE_TARGETDEPS += $$PWD/../cl342/release/cl.lib
-else:win32:CONFIG(debug, debug|release): PRE_TARGETDEPS += $$PWD/../cl342/debug/cl.lib
-else:unix: PRE_TARGETDEPS += $$PWD/../cl342/libcl.a
+#unix: PRE_TARGETDEPS += $$PWD/../libgit2/.a
 
-unix|win32: LIBS += -lgit2
-
+#unix|win32: LIBS += -lgit2
 unix|win32: LIBS += -lqca
 
-OTHER_FILES += \
-    qml/woodpidgin/main.qml
+#OTHER_FILES += \
+ #   qml/woodpidgin/main.qml

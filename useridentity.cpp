@@ -29,7 +29,7 @@ WP::err UserIdentity::createNewIdentity(bool addUidToBaseDir)
     if (error != WP::kOk)
         return error;
 
-    QByteArray hashResult = fCrypto->sha1Hash(certificate.toAscii());
+    QByteArray hashResult = fCrypto->sha1Hash(certificate.toLatin1());
     QString uid = fCrypto->toHex(hashResult);
     if (addUidToBaseDir) {
         QString newBaseDir;
@@ -44,14 +44,14 @@ WP::err UserIdentity::createNewIdentity(bool addUidToBaseDir)
         return error;
 
     QString path = prependBaseDir("key_store_id");
-    write(path, fKeyStore->getUid().toAscii());
+    write(path, fKeyStore->getUid().toLatin1());
     path = prependBaseDir("identity_key");
-    write(path, keyId.toAscii());
+    write(path, keyId.toLatin1());
 
     // test data
     QByteArray testData("Hello id");
     QByteArray encyptedTestData;
-    error = fCrypto->encyrptAsymmetric(testData, encyptedTestData, certificate.toAscii());
+    error = fCrypto->encyrptAsymmetric(testData, encyptedTestData, certificate.toLatin1());
     if (error != WP::kOk)
         return error;
 

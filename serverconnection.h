@@ -39,6 +39,7 @@ public:
     RemoteConnection(QObject *parent = NULL);
     virtual ~RemoteConnection();
 
+    virtual WP::err connectToServer() = 0;
     virtual int send(RemoteConnectionReply* request, const QByteArray& data) = 0;
 
     //! filter can be NULL
@@ -78,7 +79,7 @@ Q_OBJECT
 public:
     EncryptedPHPConnection(QUrl url, QObject *parent = NULL);
 
-    int connectToServer();
+    WP::err connectToServer();
 
 signals:
     void connectionAttemptFinished(QNetworkReply::NetworkError code);

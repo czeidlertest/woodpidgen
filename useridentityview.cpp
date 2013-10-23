@@ -6,7 +6,7 @@
 #include <QSpacerItem>
 #include <QStackedWidget>
 #include <QHBoxLayout>
-#include <QtGui/QVBoxLayout>
+#include <QVBoxLayout>
 
 #include <profile.h>
 

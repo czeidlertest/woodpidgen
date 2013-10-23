@@ -11,8 +11,14 @@ class DatabaseInterface {
 public:
     virtual ~DatabaseInterface() {}
 
+    virtual WP::err setTo(const QString &path, bool create = true) = 0;
+    virtual void unSet() = 0;
+    virtual QString path() = 0;
+
     virtual WP::err setBranch(const QString &branch,
                               bool createBranch = true) = 0;
+    virtual QString branch() = 0;
+
     virtual WP::err write(const QString& path, const QByteArray& data) = 0;
     virtual WP::err write(const QString& path, const QString& data);
     virtual WP::err remove(const QString& path) = 0;
@@ -21,12 +27,15 @@ public:
     virtual WP::err read(const QString& path, QByteArray& data) const = 0;
     virtual WP::err read(const QString& path, QString& data) const;
 
-    virtual WP::err setTo(const QString &path, bool create = true) = 0;
-    virtual void unSet() = 0;
-    virtual QString path() = 0;
-
     virtual QStringList listFiles(const QString &path) const = 0;
     virtual QStringList listDirectories(const QString &path) const = 0;
+
+    virtual QString getTip() const = 0;
+    virtual WP::err updateTip(const QString &commit) = 0;
+
+    virtual WP::err exportPack(QByteArray &pack, const QString &startCommit, const QString &endCommit, int format = -1) const = 0;
+    //! import pack and update the tip to endCommit
+    virtual WP::err importPack(const QByteArray &pack, const QString &startCommit, const QString &endCommit, int format = -1) = 0;
 };
 
 

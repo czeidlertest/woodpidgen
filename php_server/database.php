@@ -93,7 +93,7 @@ class TreeBuilder {
 }
 
 
-class MessageFeeder {
+class GitDatabase {
 	public $repository;
 	public $dir;
 
@@ -216,101 +216,12 @@ class MessageFeeder {
 		return $rootTree;
 	}
 
-	public function addMessage($header, $body, $attachments) {
-		$branch = "master";
-
-		# get root tree and last commit
-		$rootTree = NULL;
-		$tip = "";
-		try {
-			$tip = $this->repository->getTip($branch);
-			$rootCommit = $this->repository->getObject($tip);
-			$rootTree = clone $this->repository->getObject($rootCommit->tree);
-		} catch (Exception $e) {
-			$rootTree = new GitTree($this->repository);
-			$rootTree->write();
-		}
-
-		# find message name
-		$hash = hash_init('sha1');
-		hash_update($hash, $header);
-		hash_update($hash, $body);
-		foreach ($attachments as $attachment)
-			hash_update($hash, $attachment);
-		$messageName = sha1_hex(hash_final($hash, TRUE));
-
-		$treeBuilder = new TreeBuilder($rootTree);
-		# build new tree
-		$headerObj = $this->writeBlob($header);
-		$treeBuilder->updateNode("messages/$messageName/header",
-			100644, $headerObj->getName());
-
-		$bodyObj = $this->writeBlob($body);
-		$treeBuilder->updateNode("messages/$messageName/body",
-			100644, $bodyObj->getName());
-		$attachmentsObj = array();
-
-		foreach ($attachments as $attachment) {
-			$attachmentObj = $this->writeBlob($attachment->data);
-			$treeBuilder->updateNode(
-				"messages/$messageName/".$attachment->name, 100644,
-				$attachmentObj->getName());
-		}
-
-		$treeBuilder->write();
-
-		# write tree and new sub trees
-		$rootTree->rehash();
-		$rootTree->write();
-
-		# write commit
-		$parents = array();
-		if (strlen($tip) > 0)
-			$parents[] = $tip;
-
-		$commit = $this->commitMessage($rootTree->getName(), $parents);
-		$commit->rehash();
-
-		$this->setBranchTip($branch, $commit->getName());
-	}
-
 	private function writeBlob($data) {
 		$object = new GitBlob($this->repository);
 		$object->data = $data;
 		$object->rehash();
 		$object->write();
 		return $object;
-	}
-
-	private function commitMessage($tree, $parents) {
-		$commit = new GitCommit($this->repository);
-		$commit->tree = $tree;
-		$commit->parents = $parents;
-
-		$commitStamp = new GitCommitStamp;
-		$commitStamp->name = "no name";
-		$commitStamp->email = "no mail";
-		$commitStamp->time = time();
-		$commitStamp->offset = 0;
-
-		$commit->author = $commitStamp;
-		$commit->committer = $commitStamp;
-		$commit->summary = "Message";
-		$commit->detail = "";
-
-		$commit->rehash();
-		$commit->write();
-
-		return $commit;
-	}
-}
-
-
-class MessageSyncManager {
-	public $repository;
-
-	public function __construct($repository) {
-		$this->repository = $repository;
 	}
 
 	public function printObject($name) {
@@ -325,8 +236,84 @@ class MessageSyncManager {
 			echo "Object Blob: ".sha1_hex($object->getName())."<br>";
 		}
 	}
+}
 
-	public function listTreeOjects($treeName) {
+
+class PackManager {
+	public $repository;
+
+	public function __construct($repository) {
+		$this->repository = $repository;
+	}
+
+	public function exportPack($branch, $commitOldest, &$commitLatest, $type) {
+		if ($commitLatest == NULL)
+			$commitLatest = $this->repository->getTip($branch);
+
+		$blobs = $this->collectMissingBlobs($commitOldest, $commitLatest, $type);
+		return $this->packObjects($blobs);
+	}
+
+	public function importPack($branch, $pack, $startCommit, $endCommit, $format = -1) {
+		$text = base64_encode($pack);
+
+		$objectStart = 0;
+		while ($objectStart < length(text)) {
+			$hash;
+			$size;
+			$objectEnd = readTill($text, $hash, $objectStart, ' ');
+			$objectEnd = readTill($text, $size, $objectEnd, '\0');
+			$blobStart = $objectEnd;
+			$objectEnd += $size;
+
+			writeFile($hash, substr($text, $blobStart, $objectEnd - $blobStart));
+			$objectStart = $objectEnd;
+		}
+
+		// update tip
+		return fDatabase->updateTip(last);
+	}
+
+	private function writeFile($hashHex, $data)
+    {
+		$path = sprintf('%s/objects/%s/%s', $this->repository->dir, substr($hashHex, 0, 2), substr($hashHex, 2));
+		if (file_exists($path))
+			return false;
+		$dir = dirname($path);
+		if (!is_dir($dir))
+			mkdir(dirname($path), 0770);
+		$f = fopen($path, 'ab');
+		flock($f, LOCK_EX);
+		ftruncate($f, 0);
+		fwrite($f, $data);
+		fclose($f);
+		return true;
+    }
+    
+	private function readTill($in, &$out, $start, $stopChar) {
+		$pos = start;
+		while ($pos < length(in) && in[$pos] != $stopChar) {
+			out[] = in[$pos];
+			$pos++;
+		}
+		$pos++;
+		return $pos;
+	}
+
+	private function packObjects($objects) {
+		$pack;
+		foreach ($objects as $object) {
+			list($type, $data) = $this->repository->getRawObject($object);
+			$blob = Git::getTypeName($type).' '.strlen($data)."\0".$data;
+			$blob = gzcompress($blob);
+			$blob = sha1_hex($object).' '.strlen($blob)."\0".$blob;
+			$pack = $pack.$blob;
+		}
+		//return $pack;
+		return base64_encode($pack);
+	}
+
+	private function listTreeOjects($treeName) {
 		$objects = array();
 		$objects[] = $treeName;
 		$treesQueue = array();
@@ -350,7 +337,7 @@ class MessageSyncManager {
 		return $objects;
     }
 
-	public function findMissingObjects($listOld, $listNew) {
+	private function findMissingObjects($listOld, $listNew) {
 		$missing = array();
 
 		sort($listOld);
@@ -416,31 +403,10 @@ class MessageSyncManager {
 				$commits[] = $parent;
 			}
 		}
-		foreach ($handledCommits as $handledCommits)
-			$blobs[] = $handledCommits;
+		foreach ($handledCommits as $handledCommit)
+			$blobs[] = $handledCommit;
 
 		return $blobs;
-	}
-
-	public function packMissingDiffs($branch, $commitOldest, &$commitLatest, $type) {
-		if ($commitLatest == NULL)
-			$commitLatest = $this->repository->getTip($branch);
-
-		$blobs = $this->collectMissingBlobs($commitOldest, $commitLatest, $type);
-		return $this->packObjects($blobs);
-	}
-
-	public function packObjects($objects) {
-		$pack;
-		foreach ($objects as $object) {
-			list($type, $data) = $this->repository->getRawObject($object);
-			$blob = Git::getTypeName($type).' '.strlen($data)."\0".$data;
-			$blob = gzcompress($blob);
-			$blob = sha1_hex($object).' '.strlen($blob)."\0".$blob;
-			$pack = $pack.$blob;
-		}
-		//return $pack;
-		return base64_encode($pack);
 	}
 }
 

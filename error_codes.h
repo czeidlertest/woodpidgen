@@ -7,6 +7,7 @@ enum err {
     kUninit,
     kNoKeyStore,
     kEntryNotFound,
+    kOutOfRange,
 
     kError = -1,
     kOk = 0,

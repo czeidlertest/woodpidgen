@@ -39,11 +39,6 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
     PingRCReply *replyTest = new PingRCReply(encryptedPHPConnection, this);
     connect(encryptedPHPConnection, SIGNAL(connectionAttemptFinished(QNetworkReply::NetworkError)), replyTest, SLOT(connectionAttemptFinished(QNetworkReply::NetworkError)));
 
-    //UserIdentity identity(&gitInterface, &crypto);
-    //identity.createNewIdentity(password);
-    //identity.commit();
-    //identity.open(password, list.at(0));
-
     /*
     MessageReceiver receiver(&gitInterface);
     QDeclarativeView view;
@@ -51,7 +46,6 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
     view.setSource(QUrl::fromLocalFile("qml/woodpidgin/main.qml"));
     view.show();
 */
-
 
 }
 

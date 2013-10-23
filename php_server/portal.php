@@ -6,24 +6,6 @@ require 'Crypt/DiffieHellman.php';
 require 'RetrieveMessages.php'; 
 require 'phpseclib0.3.5/Crypt/AES.php';
 
-/*
-$key = base64_decode("jh6y5VcEuDXpUTrLWq8pJYyMHmLQCBOGSGWh2YiC0GBr0VRzsBV79HdxQJ8t7utUniNr6LG4Av8TT7MSwQnIPA==");
-$iv = base64_decode("qf90IciaKTsBk/yS4r27 vCRXgLWYrQCWq1vAz54DVw1JUfTYy45vMXmQMZmsGAVCi/dJqP6hE1PmkjHV9lOGdcut6Syd6Vc1y2eVT21Obpa4woS6ku9oTi6TVAP1bVDsKrblM/F63UJYXRc/7og5n kBx3N6kMYvc2L3clLbUwBWxctA SpeUDuhftEARn0YsNubw/tWObH5sSi1FEMzzyq0oaoPXmTeq9clE5TX6Q U7sBnJtk3 T4sJFaXAoLNVAJAAOupDD6fzcOOYHbpRCirkFmMRWLay9lSyDR/ORM lAMNDxkLnrgPfEcex5ioblmNj1o2TDw3yNItFQDr9dRd0SNWVAddc0OuekutZ/ZATeeuSHIBXuFve0K4NgWFGJmYsw0kHtIP28hQS8KhN71B3vBUIJfMknQXDLDIWsW9oMP1xrOOzrQ2hQZHgwIjgawmUfbA4246AM6cuXEWLWoF4vHf2g0HG1UJSdt5pGWeycUee82wmcKiYnalRxWCqaCXP0eE0bfBaWAkScuMJuZwscGCsVTy8Sl3MF5vKpqQ6M3frYgsTW1zZYsow9Yzkm1rZBCWh1VbBtO9TNP6ksU2/eOdQSWuPAQQo9qm6OB8IW5gDI3Ndz9OIZERt5/FNkB872qZNMtET2ddFWHVXGQhURR6nwR7TWjYk5k Ck=");
-
-$aes = new Crypt_AES(CRYPT_AES_MODE_CBC);
-$aes->setKey($key);
-$aes->setIV($iv);
-		
-for ($i = count(key); $i < 256; $i = $i + 1)
-	$key.'\0';
-
-$testData = "Hello World";
-$encrypted = $aes->encrypt($testData);
-echo base64_encode($encrypted)."\n";
-
-echo $aes->decrypt($encrypted)."\n";
-
-    */
 
 interface IPortalInterface
 {
@@ -48,7 +30,6 @@ class EncryptedPortal implements IPortalInterface{
 	private $fIV;
 
 	public function __construct($key, $iv) {
-		//echo "remote1: ".strlen($key)." ".base64_encode($key)." iv ".base64_encode($iv)."\n";
 		$this->fAES = new Crypt_AES(CRYPT_AES_MODE_CBC);
 		$this->fAES->setKeyLength(128);
 		$this->fAES->setKey($key);
@@ -68,7 +49,6 @@ class EncryptedPortal implements IPortalInterface{
     public function sendData($data) {
 		$this->fAES->setKey($this->fKey);
 		$this->fAES->setIV($this->fIV);
-		//echo "remote: ".strlen($this->fAES->key)." ".base64_encode($this->fAES->key)." iv ".base64_encode($this->fIV)."\n";
 		return base64_encode($this->fAES->encrypt($data));
     }
     
@@ -130,19 +110,24 @@ if ($request == "neqotiate_dh_key") {
 	finished();
 }
 
-//echo "remote0: ".strlen($_SESSION['dh_private_key'])." ".$_SESSION['dh_private_key']." iv ".$_SESSION['encrypt_iv']."\n";
-		
+
 // check if we use an encrypted connection and set portal accordantly
 if (isset($_SESSION['dh_private_key']) && isset($_SESSION['encrypt_iv']))
 	$gPortal = new EncryptedPortal(base64_decode($_SESSION['dh_private_key']), base64_decode($_SESSION['encrypt_iv']));
+else {
+	writeToOutput("php encryption required");
+	finished();
+}
 
 // get data
-//echo "input ".$request."\n";
-$response = $gPortal->receiveData($request);
-//echo "input2 ".$response."\n";
-// start working
-writeToOutput($response." pong");
-finished();
+$request = $gPortal->receiveData($request);
 
+$XMLHandler = new XMLHandler($response);
+
+$response = $XMLHandler->handle();
+
+// start working
+writeToOutput($response);
+finished();
 
 ?>

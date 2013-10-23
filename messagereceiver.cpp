@@ -7,8 +7,6 @@
 #include <QXmlStreamWriter>
 
 
-
-
 class XMLHandler {
 public:
     XMLHandler(const QByteArray& input, MessageReceiver* receiver)
@@ -111,9 +109,8 @@ void MessageReceiver::messageDataReceived(const QByteArray& data)
 
 QString MessageReceiver::getMessagesRequest()
 {
-    QString branch("master");
-    QString first = fGitInterface->getTip(branch);
-    return _CreateXMLMessageRequest(branch, first, "");
+    QString first = fGitInterface->getTip();
+    return _CreateXMLMessageRequest("master", first, "");
 }
 
 void MessageReceiver::commitPackReceived(const QByteArray& data, const QString& branch,
@@ -140,7 +137,7 @@ void MessageReceiver::commitPackReceived(const QByteArray& data, const QString& 
     }
 
     // update tip
-    fGitInterface->updateTip(branch, last);
+    fGitInterface->updateTip(last);
 }
 
 
@@ -177,3 +174,4 @@ QString MessageReceiver::_CreateXMLMessageRequest(const QString& branch, const Q
     printf("xml: %s\n", output.toStdString().c_str());
     return output;
 }
+

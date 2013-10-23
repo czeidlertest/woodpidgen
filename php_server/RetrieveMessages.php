@@ -71,12 +71,11 @@ class XMLResponse {
 
 class XMLHandler {
 	private $xml;
-	private $syncManager;
-	
-	public function __construct($input, $syncManager) {
+	private $response;
+
+	public function __construct($input) {
 		$this->xml = new XMLReader;
 		$this->xml->xml(str_replace("\\\"", "'", $input));
-		$this->syncManager = $syncManager;
 	}
 
 	public function handle() {
@@ -95,6 +94,7 @@ class XMLHandler {
 				break;
 			}
 		}
+		return $this->response;
 	}
 
 	public function handleIqGet() {
@@ -127,7 +127,7 @@ class XMLHandler {
 						if ($branch !== NULL && $first !== NULL && $last !== NULL) {
 							
 							$data = $this->syncManager->packMissingDiffs($branch, $first, $last, -1);
-							echo XMLResponse::qsGetQueryCommit($data, $branch, sha1_hex($first), sha1_hex($last));
+							$this->response = XMLResponse::qsGetQueryCommit($data, $branch, sha1_hex($first), sha1_hex($last));
 						}
 					}
 				break;

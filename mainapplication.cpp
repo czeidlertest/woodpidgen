@@ -42,6 +42,20 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
     fMainWindow = new MainWindow(fProfile);
     fMainWindow->show();
 
+
+    CryptoInterface *crypto = CryptoInterfaceSingleton::getCryptoInterface();
+
+    QByteArray iv = crypto->generateInitalizationVector(256);
+    SecureArray symKey = crypto->generateSymetricKey(256);
+
+    QByteArray dataIn = "test";
+    QByteArray encrypted;
+    crypto->encryptSymmetric(dataIn, encrypted, symKey, iv);
+    SecureArray decrypted;
+    crypto->decryptSymmetric(encrypted, decrypted, symKey, iv);
+
+
+
     SecureArray password("test_password");
     if (fProfile->open(password) != WP::kOk) {
         PHPRemoteStorage* remote = new PHPRemoteStorage("http://localhost/php_server/portal.php");

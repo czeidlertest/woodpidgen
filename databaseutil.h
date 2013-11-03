@@ -122,10 +122,6 @@ public:
     CryptoInterface* getCryptoInterface();
     DatabaseInterface* getDatabaseInterface();
 
-private:
-    WP::err readMasterKey(const SecureArray &password, SecureArray &masterKey, QByteArray& iv,
-                      const QString &baseDir = "");
-
 protected:
     SecureArray fMasterKey;
     QByteArray fMasterKeyIV;

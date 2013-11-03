@@ -120,7 +120,7 @@ SecureArray CryptoInterface::deriveKey(const SecureArray &secret, const QString 
 
 QByteArray CryptoInterface::generateSalt(const QString &value)
 {
-    return QCA::InitializationVector(QCA::hexToArray(value)).toByteArray();
+    return QCA::InitializationVector(value.toLatin1()).toByteArray();
 }
 
 QByteArray CryptoInterface::generateInitalizationVector(int size)

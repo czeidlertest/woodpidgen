@@ -87,10 +87,7 @@ private:
 
     IdentityListModel fIdentities;
 
-    QString fMasterKeyStoreId;
-    QString fMasterKeyId;
     QMap<QString, ProfileEntryKeyStore*> fMapOfKeyStores;
-
     QMap<QString, ProfileEntryRemote*> fMapOfRemotes;
     
     //! map points to where the UserData's config information is stored

@@ -74,15 +74,13 @@ WP::err Profile::createNewProfile(const SecureArray &password, RemoteDataStorage
     setKeyStore(keyStore);
 
     SecureArray masterKey = fCrypto->generateSymetricKey(256);
+    QString masterKeyId;
     error = keyStore->writeSymmetricKey(masterKey, fCrypto->generateInitalizationVector(256),
-                                        fMasterKeyId);
-    if (error != WP::kOk)
-        return error;
-    error = write("master_key_id", fMasterKeyId);
+                                        masterKeyId);
     if (error != WP::kOk)
         return error;
 
-    setDefaultKeyId(fMasterKeyId);
+    setDefaultKeyId(masterKeyId);
     error = writeConfig();
     if (error != WP::kOk)
         return error;
@@ -132,10 +130,6 @@ WP::err Profile::open(const SecureArray &password)
     if (error != WP::kOk)
         return error;
     error = fKeyStore->open(password);
-    if (error != WP::kOk)
-        return error;
-
-    error = read("master_key_id", fMasterKeyId);
     if (error != WP::kOk)
         return error;
 
@@ -205,6 +199,7 @@ WP::err Profile::loadRemotes()
     for (int i = 0; i < identityList.count(); i++) {
         ProfileEntryRemote *entry
             = new ProfileEntryRemote(this, prependBaseDir("remotes/" + identityList.at(i)), NULL);
+        entry->setTo(this, entry->getDatabaseBaseDir());
         if (entry->load(this) != WP::kOk)
             continue;
         RemoteDataStorage *remote = entry->getUserData();
@@ -380,6 +375,7 @@ WP::err Profile::addRemoteDataStorage(RemoteDataStorage *remote)
     dir += remote->getUid();
 
     ProfileEntryRemote *entry = new ProfileEntryRemote(this, dir, remote);
+    entry->setTo(this, entry->getDatabaseBaseDir());
     WP::err error = entry->writeEntry();
     if (error != WP::kOk)
         return error;

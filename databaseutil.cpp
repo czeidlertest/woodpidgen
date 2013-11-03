@@ -135,7 +135,46 @@ KeyStore::KeyStore(const DatabaseBranch *branch, const QString &baseDir)
 
 WP::err KeyStore::open(const SecureArray &password)
 {
-    return readMasterKey(password, fMasterKey, fMasterKeyIV, fDatabaseBaseDir);
+    // write master password (master password is encrypted
+    QByteArray encryptedMasterKey;
+    WP::err error = read(kPathMasterKey, encryptedMasterKey);
+    if (error != WP::kOk)
+        return error;
+    error = read(kPathMasterKeyIV, fMasterKeyIV);
+    if (error != WP::kOk)
+        return error;
+    QByteArray kdfName;
+    error = read(kPathMasterPasswordKDF, kdfName);
+    if (error != WP::kOk)
+        return error;
+    QByteArray algoName;
+    error = read(kPathMasterPasswordAlgo, algoName);
+    if (error != WP::kOk)
+        return error;
+    QByteArray salt;
+    error = read(kPathMasterPasswordSalt, salt);
+    if (error != WP::kOk)
+        return error;
+    QByteArray masterPasswordSize;
+    error = read(kPathMasterPasswordSize, masterPasswordSize);
+    if (error != WP::kOk)
+        return error;
+    QByteArray masterPasswordIterations;
+    error = read(kPathMasterPasswordIterations, masterPasswordIterations);
+    if (error != WP::kOk)
+        return error;
+
+    QTextStream sizeStream(masterPasswordSize);
+    unsigned int keyLength;
+    sizeStream >> keyLength;
+    QTextStream iterationsStream(masterPasswordIterations);
+    unsigned int iterations;
+    iterationsStream >> iterations;
+    // key to encrypte the master key
+    SecureArray passwordKey = fCrypto->deriveKey(password, kdfName, algoName, salt, keyLength, iterations);
+    // key to encrypte all other data
+
+    return fCrypto->decryptSymmetric(encryptedMasterKey, fMasterKey, passwordKey, fMasterKeyIV);
 }
 
 WP::err KeyStore::create(const SecureArray &password, bool addUidToBaseDir)
@@ -151,7 +190,7 @@ WP::err KeyStore::create(const SecureArray &password, bool addUidToBaseDir)
     fMasterKey = fCrypto->generateSymetricKey(kMasterPasswordLength);
 
     QByteArray encryptedMasterKey;
-    WP::err error = fCrypto->encryptSymmetric(fMasterKeyIV, encryptedMasterKey, passwordKey, fMasterKeyIV);
+    WP::err error = fCrypto->encryptSymmetric(fMasterKey, encryptedMasterKey, passwordKey, fMasterKeyIV);
     if (error != WP::kOk)
         return error;
 
@@ -183,37 +222,6 @@ WP::err KeyStore::create(const SecureArray &password, bool addUidToBaseDir)
     return WP::kOk;
 }
 
-WP::err KeyStore::readMasterKey(const SecureArray &password,
-                                SecureArray &masterKey, QByteArray &iv,
-                                const QString &baseDir)
-{
-    // write master password (master password is encrypted
-    QByteArray encryptedMasterKey;
-    read(kPathMasterKey, encryptedMasterKey);
-    read(kPathMasterKeyIV, iv);
-    QByteArray kdfName;
-    read(kPathMasterPasswordKDF, kdfName);
-    QByteArray algoName;
-    read(kPathMasterPasswordAlgo, algoName);
-    QByteArray salt;
-    read(kPathMasterPasswordSalt, salt);
-    QByteArray masterPasswordSize;
-    read(kPathMasterPasswordSize, masterPasswordSize);
-    QByteArray masterPasswordIterations;
-    read(kPathMasterPasswordIterations, masterPasswordIterations);
-
-    QTextStream sizeStream(masterPasswordSize);
-    unsigned int keyLength;
-    sizeStream >> keyLength;
-    QTextStream iterationsStream(masterPasswordIterations);
-    unsigned int iterations;
-    iterationsStream >> iterations;
-    // key to encrypte the master key
-    SecureArray passwordKey = fCrypto->deriveKey(password, kdfName, algoName, salt, keyLength, iterations);
-    // key to encrypte all other data
-
-    return fCrypto->decryptSymmetric(encryptedMasterKey, masterKey, passwordKey, iv);
-}
 
 WP::err KeyStore::writeSymmetricKey(const SecureArray &key, const QByteArray &iv, QString &keyId)
 {

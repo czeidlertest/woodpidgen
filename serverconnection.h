@@ -40,11 +40,25 @@ public:
     virtual ~RemoteConnection();
 
     virtual WP::err connectToServer() = 0;
-    virtual int send(RemoteConnectionReply* request, const QByteArray& data) = 0;
+    virtual WP::err disconnect() = 0;
+    virtual WP::err send(RemoteConnectionReply* request, const QByteArray& data) = 0;
+
+    bool isConnected();
+    bool isConnecting();
 
     //! filter can be NULL
     void setFilter(RemoteConnectionFilter *filter);
+
+signals:
+    void connectionAttemptFinished(QNetworkReply::NetworkError code);
+
 protected:
+    void setConnectionStarted();
+    void setConnected();
+    void setDisconnected();
+
+    bool fConnected;
+    bool fConnecting;
     RemoteConnectionFilter *fFilter;
 };
 
@@ -60,7 +74,7 @@ public:
 
     static QNetworkAccessManager* getNetworkAccessManager();
 
-    virtual int send(RemoteConnectionReply* remoteConnectionReply, const QByteArray& data);
+    virtual WP::err send(RemoteConnectionReply* remoteConnectionReply, const QByteArray& data);
 
 private slots:
     virtual void replyFinished(QNetworkReply *reply);
@@ -80,9 +94,7 @@ public:
     EncryptedPHPConnection(QUrl url, QObject *parent = NULL);
 
     WP::err connectToServer();
-
-signals:
-    void connectionAttemptFinished(QNetworkReply::NetworkError code);
+    WP::err disconnect();
 
 private slots:
     void replyFinished();

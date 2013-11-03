@@ -4,10 +4,12 @@
 namespace WP {
 enum err {
     kUnkown = -50000,
-    kUninit,
+    kNotInit,
     kNoKeyStore,
     kEntryNotFound,
     kOutOfRange,
+    kOutOfMemory,
+    kIsConnected,
 
     kError = -1,
     kOk = 0,

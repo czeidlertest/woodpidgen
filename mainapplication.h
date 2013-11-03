@@ -45,11 +45,15 @@ private:
 
 class MainApplication : public QApplication
 {
+Q_OBJECT
 public:
     MainApplication(int &argc, char *argv[]);
     ~MainApplication();
 
     QNetworkAccessManager* getNetworkAccessManager();
+
+public slots:
+    void connectionAttemptFinished(QNetworkReply::NetworkError);
 
 private:
     WP::err createNewProfile();

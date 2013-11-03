@@ -213,6 +213,7 @@ WP::err PackManager::packObjects(const QList<QString> &objects, QByteArray &out)
     }
 
     out = pack.toBase64();
+    return WP::kOk;
 }
 
 WP::err PackManager::exportPack(QByteArray &pack, const QString &commitOldest, const QString &commitLatest, int format) const
@@ -308,7 +309,7 @@ QString GitInterface::path()
 WP::err GitInterface::setBranch(const QString &branch, bool /*createBranch*/)
 {
     if (fRepository == NULL)
-        return WP::kUninit;
+        return WP::kNotInit;
     fCurrentBranch = branch;
     return WP::kOk;
 }
@@ -484,9 +485,16 @@ WP::err GitInterface::read(const QString &path, QByteArray &data) const
     while (!pathCopy.isEmpty() && pathCopy.at(0) == '/')
         pathCopy.remove(0, 1);
 
-    git_tree *rootTree = getTipTree();
+    git_tree *rootTree = NULL;
+    if (fNewRootTreeOid.id[0] != '\0') {
+        int error = git_tree_lookup(&rootTree, fRepository, &fNewRootTreeOid);
+        if (error != 0)
+            return WP::kError;
+    } else
+        rootTree = getTipTree();
+
     if (rootTree == NULL)
-        return WP::kUninit;
+        return WP::kNotInit;
 
     git_tree_entry *treeEntry;
     int error = git_tree_entry_bypath(&treeEntry, rootTree, pathCopy.toLatin1().data());
@@ -551,7 +559,6 @@ QString GitInterface::getTip() const
     git_reference_list(&ref_list, fRepository);
 
     git_reference *ref;
-    char out[41];
     for (unsigned int i = 0; i < ref_list.count; ++i) {
         const char *name = ref_list.strings[i];
         if (refName != name)
@@ -707,7 +714,7 @@ git_tree *GitInterface::getDirectoryTree(const QString &dirPath) const
             dir.remove(0, slash + 1);
         }
         const git_tree_entry *entry = git_tree_entry_byname(tree, subDir.toLatin1().data());
-        if (git_tree_entry_type(entry) != GIT_OBJ_TREE) {
+        if (entry == NULL || git_tree_entry_type(entry) != GIT_OBJ_TREE) {
             git_tree_free(tree);
             return NULL;
         }

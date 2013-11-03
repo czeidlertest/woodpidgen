@@ -3,7 +3,7 @@
 #folder_01.target = qml
 #DEPLOYMENTFOLDERS = folder_01
 
-QT       += core gui
+QT += core gui
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 QT += network
 
@@ -35,7 +35,9 @@ SOURCES += main.cpp \
     BigInteger/BigUnsignedInABase.cc \
     databaseinterface.cpp \
     remotesync.cpp \
-    protocolparser.cpp
+    protocolparser.cpp \
+    connectionmanager.cpp \
+    phpremotestorage.cpp
 
 # Installation path
 # target.path =
@@ -61,7 +63,9 @@ HEADERS += \
     BigInteger/BigUnsignedInABase.hh \
     error_codes.h \
     remotesync.h \
-    protocolparser.h
+    protocolparser.h \
+    connectionmanager.h \
+    phpremotestorage.h
 
 FORMS += \
     mainwindow.ui

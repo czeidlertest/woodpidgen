@@ -1,56 +1,110 @@
 #ifndef DATABASEUTIL_H
 #define DATABASEUTIL_H
 
-#include <cryptointerface.h>
-#include <databaseinterface.h>
-#include <error_codes.h>
+#include <qobject.h>
+
+#include "cryptointerface.h"
+#include "databaseinterface.h"
+#include "error_codes.h"
+
+/*
+class EncryptedUserData;
+
+class StorageDirectory {
+public:
+    StorageDirectory(EncryptedUserData *database, const QString &directory);
+
+    WP::err write(const QString& path, const QByteArray& data);
+    WP::err write(const QString& path, const QString& data);
+    WP::err read(const QString& path, QByteArray& data) const;
+    WP::err read(const QString& path, QString& data) const;
+    WP::err writeSafe(const QString& path, const QString& data);
+    WP::err writeSafe(const QString& path, const QByteArray& data);
+    WP::err writeSafe(const QString& path, const QByteArray& data, const QString &keyId);
+    WP::err readSafe(const QString& path, QString& data) const;
+    WP::err readSafe(const QString& path, QByteArray& data) const;
+    WP::err readSafe(const QString& path, QByteArray& data, const QString &keyId) const;
+
+    WP::err remove(const QString& path);
+
+    const QString& directory();
+
+protected:
+    EncryptedUserData *fDatabase;
+    QString fDirectory;
+};
+*/
+
+class RemoteDataStorage;
 
 
-class UserData {
+class DatabaseBranch {
+public:
+    DatabaseBranch(const QString &getDatabasePath, const QString &getBranch);
+    ~DatabaseBranch();
+
+    void setTo(const QString &getDatabasePath, const QString &getBranch);
+    const QString &getDatabasePath() const;
+    const QString &getBranch() const;
+    QString databaseHash() const;
+    DatabaseInterface *getDatabase() const;
+
+    WP::err commit();
+    int countRemotes() const;
+    RemoteDataStorage *remoteAt(int i) const;
+    WP::err addRemote(RemoteDataStorage* data);
+private:
+    QString fDatabasePath;
+    QString fBranch;
+    QList<RemoteDataStorage*> fRemotes;
+    DatabaseInterface *fDatabase;
+};
+
+
+class UserData : public QObject {
+Q_OBJECT
 public:
     UserData();
     virtual ~UserData();
 
-    virtual WP::err initCheck() const;
+    virtual WP::err writeConfig();
 
-    WP::err commit();
-
-    QString getUid() const;
+    QString getUid();
 
     // convenient functions to DatabaseInterface
     WP::err write(const QString& path, const QByteArray& data);
     WP::err write(const QString& path, const QString& data);
     WP::err read(const QString& path, QByteArray& data) const;
     WP::err read(const QString& path, QString& data) const;
+    WP::err remove(const QString& path);
 
-    QString getDatabasePath() const;
-    QString getDatabaseBranch() const;
+    QStringList listDirectories(const QString &path) const;
+
+    const DatabaseBranch *getDatabaseBranch() const;
     QString getDatabaseBaseDir() const;
+    DatabaseInterface *getDatabase() const;
+    void setBaseDir(const QString &baseDir);
 
 protected:
-    WP::err setUid(const QString &uid);
-    WP::err setToDatabase(const QString &path, const QString &branch, const QString &baseDir = "",
-                          bool createDatabase = true);
-    void setBaseDir(const QString &baseDir);
+    void setUid(const QString &uid);
+    WP::err setToDatabase(const DatabaseBranch *branch, const QString &baseDir = "");
 
     QString prependBaseDir(const QString &path) const;
 
 protected:
-    QString fDatabasePath;
-    QString fDatabaseBranch;
+    const DatabaseBranch *fDatabaseBranch;
     QString fDatabaseBaseDir;
 
     CryptoInterface *fCrypto;
     DatabaseInterface *fDatabase;
 
 private:
-    WP::err fInitStatus;
     QString fUid;
 };
 
 class KeyStore : public UserData {
 public:
-    KeyStore(const QString &path, const QString &branch = "keystore", const QString &baseDir = "");
+    KeyStore(const DatabaseBranch *branch, const QString &baseDir = "");
 
     WP::err open(const SecureArray &password);
     WP::err create(const SecureArray &password, bool addUidToBaseDir = true);
@@ -69,8 +123,6 @@ public:
     DatabaseInterface* getDatabaseInterface();
 
 private:
-    QString getDirectory(const QString &keyId);
-
     WP::err readMasterKey(const SecureArray &password, SecureArray &masterKey, QByteArray& iv,
                       const QString &baseDir = "");
 
@@ -79,34 +131,60 @@ protected:
     QByteArray fMasterKeyIV;
 };
 
+class KeyStoreFinder {
+public:
+    virtual ~KeyStoreFinder() {}
+    virtual KeyStore *find(const QString &keyStoreId) = 0;
+};
 
 class EncryptedUserData : public UserData {
 public:
+    EncryptedUserData(const EncryptedUserData& data);
     EncryptedUserData();
     virtual ~EncryptedUserData();
 
-    virtual WP::err initCheck();
+    void setTo(EncryptedUserData *database, const QString &baseDir);
 
-    /*! To initialize a EncryptedUserData the returned key store id should be used to load the
-     *  keyStore.*/
-    virtual WP::err readKeyStoreId(QString &keyStoreId) const;
-    virtual WP::err setKeyStore(KeyStore *keyStore);
+    virtual WP::err writeConfig();
+    virtual WP::err readKeyStore(KeyStoreFinder *keyStoreFinder);
+
+    KeyStore *getKeyStore() const;
+    void setKeyStore(KeyStore *keyStore);
 
     QString getDefaultKeyId() const;
-    WP::err setDefaultKeyId(const QString &keyId);
+    void setDefaultKeyId(const QString &keyId);
 
     // add and get encrypted data using the default key
     WP::err writeSafe(const QString& path, const QByteArray& data);
     WP::err readSafe(const QString& path, QByteArray& data) const;
+    WP::err writeSafe(const QString& path, const QString& data);
+    WP::err readSafe(const QString& path, QString& data) const;
     // add and get encrypted data
+    WP::err writeSafe(const QString& path, const QString& data, const QString &keyId);
     WP::err writeSafe(const QString& path, const QByteArray& data, const QString &keyId);
+    WP::err readSafe(const QString& path, QString& data, const QString &keyId) const;
     WP::err readSafe(const QString& path, QByteArray& data, const QString &keyId) const;
 
 protected:
-    WP::err writeKeyStoreId();
-
     KeyStore *fKeyStore;
     QString fDefaultKeyId;
+};
+
+
+class RemoteConnection;
+
+class RemoteDataStorage : public EncryptedUserData {
+public:
+    RemoteDataStorage();
+    RemoteDataStorage(const DatabaseBranch *database, const QString &baseDir);
+    virtual ~RemoteDataStorage() {}
+
+    RemoteConnection *getRemoteConnection();
+
+    virtual QString type() const = 0;
+
+protected:
+    RemoteConnection *fConnection;
 };
 
 

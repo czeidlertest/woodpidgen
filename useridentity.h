@@ -32,11 +32,11 @@ branch identities:
 class UserIdentity : public EncryptedUserData
 {
 public:
-    UserIdentity(const QString &path, const QString &branch, const QString &baseDir = "");
+    UserIdentity(const DatabaseBranch *branch, const QString &baseDir = "");
     ~UserIdentity();
 
     WP::err createNewIdentity(bool addUidToBaseDir = true);
-    WP::err open();
+    WP::err open(KeyStoreFinder *keyStoreFinder);
 
             //! discare changes and reload values from database
             int                 reload();

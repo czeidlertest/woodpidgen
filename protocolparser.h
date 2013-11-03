@@ -1,67 +1,118 @@
 #ifndef PROTOCOLPARSER_H
 #define PROTOCOLPARSER_H
 
+#include <QMap>
 #include <QXmlStreamAttributes>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 
 
-class Stanza {
+class InStanzaHandler {
 public:
-    Stanza(const QString &elementName, Stanza *parent = NULL);
-    virtual ~Stanza();
+    InStanzaHandler(const QString &stanza, bool textRequired = false);
+    virtual ~InStanzaHandler();
 
-    const QString &name() const;
-    Stanza *parent() const;
+    QString stanzaName() const;
+    bool isTextRequired() const;
 
-    Stanza *addChild(const QString &elementName);
-    bool addChild(Stanza *child);
-    const QList<Stanza*> &childs() const;
+    virtual void handleStanza(const QXmlStreamAttributes &attributes);
+    virtual void handleText(const QStringRef &text);
 
-    void setText(const QString &text);
-    const QString& text();
+    void addChildHandler(InStanzaHandler *handler);
 
-    const QXmlStreamAttributes& attributes() const;
-    void addAttribute(const QString &namespaceUri, const QString &name, const QString &value);
-    void addAttribute(const QString &qualifiedName, const QString &value);
-protected:
-    void setParent(Stanza *parent);
-
-    QString fElementName;
-    Stanza *fParent;
-    QXmlStreamAttributes fAttributes;
-    QList<Stanza*> fChilds;
-    QString fText;
-};
-
-
-class StanzaView {
-public:
-    StanzaView(const Stanza *stanza);
-
-    const QString &name() const;
-    Stanza *parent() const;
-    const QList<Stanza*> &childs() const;
-    const QXmlStreamAttributes& attributes() const;
+    InStanzaHandler *parent() const;
+    const QList<InStanzaHandler *> &childs() const;
 
 private:
-    const Stanza *fStanza;
+    void setParent(InStanzaHandler *parent);
+
+    QString fName;
+    bool fTextRequired;
+
+    InStanzaHandler *fParent;
+    QList<InStanzaHandler*> fChildHandlers;
 };
 
-class IqStanza : public Stanza {
+
+class ProtocolInStream {
 public:
-    enum IqType {
-        kGet,
-        kSet,
-        kResult,
-        kError,
-        kBadType
+    ProtocolInStream(QIODevice *device);
+    ProtocolInStream(const QByteArray &data);
+    void parse();
+
+    void addHandler(InStanzaHandler *handler);
+
+private:
+    struct handler_tree {
+        handler_tree(handler_tree *parent);
+        ~handler_tree();
+
+        handler_tree *parent;
+        QList<InStanzaHandler*> handlers;
     };
 
-    IqStanza(IqType type);
+    QXmlStreamReader fXMLReader;
+    handler_tree fRoot;
+    handler_tree *fCurrentHandlerTree;
+};
 
-    //! tries to read from a generic DataEntry
-    static IqStanza* fromStanza(Stanza* entry);
+class OutStanza {
+public:
+    OutStanza(const QString &name);
+
+    const QString &name() const;
+    const QXmlStreamAttributes &attributes() const;
+    const QString &text() const;
+    OutStanza *parent() const;
+
+    void setText(const QString &text);
+    void addAttribute(const QString &namespaceUri, const QString &name, const QString &value);
+    void addAttribute(const QString &qualifiedName, const QString &value);
+
+    /*! Clear all data except the stanza name. This can be used to free memory of large text in
+     *  nested stanza trees. */
+    void clearData();
+
+    void setParent(OutStanza *parent);
+private:
+    QString fName;
+    QXmlStreamAttributes fAttributes;
+    QString fText;
+    OutStanza *fParent;
+};
+
+class ProtocolOutStream {
+public:
+    ProtocolOutStream(QIODevice* device);
+    ProtocolOutStream(QByteArray* data);
+
+    void pushStanza(OutStanza *stanza);
+    void pushChildStanza(OutStanza *stanza);
+    void cdDotDot();
+    void flush();
+
+private:
+    void writeStanze(OutStanza *stanza);
+
+    OutStanza *fCurrentStanza;
+    QXmlStreamWriter fXMLWriter;
+};
+
+
+// special stanzas
+
+enum IqType {
+    kGet,
+    kSet,
+    kResult,
+    kError,
+    kBadType
+};
+
+
+class IqOutStanza : public OutStanza {
+public:
+    IqOutStanza(IqType type);
 
     IqType type();
 
@@ -72,27 +123,5 @@ private:
     IqType fType;
 };
 
-class ProtocolParser
-{
-public:
-    static Stanza* parse(const QByteArray& input);
-    static bool write(QString &output, Stanza* rootEntry);
-private:
-    static void writeDataEntry(QXmlStreamWriter &xmlWriter, Stanza *entry);
-};
-
-
-class ProtocolInStreamHandler {
-    typedef bool (ProtocolInStreamHandler::*handleStanza)() const;
-};
-
-
-class ProtocolInStream {
-public:
-    void parse();
-
-    //void registerHandler(const QString &stanza, )
-
-};
 
 #endif // PROTOCOLPARSER_H

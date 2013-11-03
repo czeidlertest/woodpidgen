@@ -1,167 +1,278 @@
 #include "protocolparser.h"
 
-Stanza::Stanza(const QString &elementName, Stanza *parent) :
-    fElementName(elementName),
-    fParent(parent)
+
+OutStanza::OutStanza(const QString &name) :
+    fName(name),
+    fParent(NULL)
 {
 }
 
-Stanza::~Stanza()
+const QString &OutStanza::name() const
 {
-    for (int i = 0; i < fChilds.count(); i++)
-        delete fChilds.at(i);
+    return fName;
 }
 
-Stanza *Stanza::parent() const
-{
-    return fParent;
-}
-
-Stanza *Stanza::addChild(const QString &elementName)
-{
-    if (fText != "")
-        return NULL;
-    Stanza *entry = new Stanza(elementName, this);
-    fChilds.append(entry);
-    return entry;
-}
-
-bool Stanza::addChild(Stanza *child)
-{
-    if (fText != "")
-        return false;
-    child->setParent(this);
-    fChilds.append(child);
-    return true;
-}
-
-const QList<Stanza *> &Stanza::childs() const
-{
-    return fChilds;
-}
-
-void Stanza::setText(const QString &text)
-{
-    if (fChilds.count() == 0)
-        fText = text;
-}
-
-const QString &Stanza::text()
-{
-    return fText;
-}
-
-const QString &Stanza::name() const
-{
-    return fElementName;
-}
-
-const QXmlStreamAttributes &Stanza::attributes() const
+const QXmlStreamAttributes &OutStanza::attributes() const
 {
     return fAttributes;
 }
 
-void Stanza::addAttribute(const QString &namespaceUri, const QString &name, const QString &value)
+const QString &OutStanza::text() const
+{
+    return fText;
+}
+
+OutStanza *OutStanza::parent() const
+{
+    return fParent;
+}
+
+void OutStanza::setText(const QString &text)
+{
+    fText = text;
+}
+
+void OutStanza::addAttribute(const QString &namespaceUri, const QString &name, const QString &value)
 {
     fAttributes.append(namespaceUri, name, value);
 }
 
-void Stanza::addAttribute(const QString &qualifiedName, const QString &value)
+void OutStanza::addAttribute(const QString &qualifiedName, const QString &value)
 {
     fAttributes.append(qualifiedName, value);
 }
 
-void Stanza::setParent(Stanza *parent)
+void OutStanza::clearData()
+{
+    fText = "";
+    fAttributes = QXmlStreamAttributes();
+}
+
+void OutStanza::setParent(OutStanza *parent)
 {
     fParent = parent;
 }
 
 
-Stanza *ProtocolParser::parse(const QByteArray &input)
+ProtocolOutStream::ProtocolOutStream(QIODevice *device) :
+    fXMLWriter(device),
+    fCurrentStanza(NULL)
 {
-    QXmlStreamReader reader(input);
-    Stanza *current = NULL;
-    while (!reader.atEnd()) {
-        switch (reader.readNext()) {
-        case QXmlStreamReader::EndElement:
-            if (current != NULL)
-                current = current->parent();
+    fXMLWriter.writeStartDocument();
+}
+
+ProtocolOutStream::ProtocolOutStream(QByteArray *data) :
+    fXMLWriter(data),
+    fCurrentStanza(NULL)
+{
+    fXMLWriter.writeStartDocument();
+}
+
+void ProtocolOutStream::pushStanza(OutStanza *stanza)
+{
+    if (fCurrentStanza != NULL)
+        fXMLWriter.writeEndElement();
+    writeStanze(stanza);
+
+    OutStanza *parent = NULL;
+    if (fCurrentStanza != NULL) {
+        parent = fCurrentStanza->parent();
+        delete fCurrentStanza;
+    }
+    stanza->setParent(parent);
+    fCurrentStanza = stanza;
+}
+
+void ProtocolOutStream::pushChildStanza(OutStanza *stanza)
+{
+    writeStanze(stanza);
+
+    stanza->setParent(fCurrentStanza);
+    fCurrentStanza = stanza;
+}
+
+void ProtocolOutStream::cdDotDot()
+{
+    if (fCurrentStanza != NULL) {
+        fXMLWriter.writeEndElement();
+        OutStanza *parent = fCurrentStanza->parent();
+        delete fCurrentStanza;
+        fCurrentStanza = parent;
+    }
+}
+
+void ProtocolOutStream::flush()
+{
+    while (fCurrentStanza != NULL) {
+        fXMLWriter.writeEndElement();
+        OutStanza *parent = fCurrentStanza->parent();
+        delete fCurrentStanza;
+        fCurrentStanza = parent;
+    }
+    fXMLWriter.writeEndDocument();
+}
+
+void ProtocolOutStream::writeStanze(OutStanza *stanza)
+{
+    fXMLWriter.writeStartElement(stanza->name());
+    const QXmlStreamAttributes& attributes = stanza->attributes();
+    for (int i = 0; i < attributes.count(); i++)
+        fXMLWriter.writeAttribute(attributes.at(i));
+    if (stanza->text() != "")
+        fXMLWriter.writeCharacters(stanza->text());
+}
+
+
+ProtocolInStream::ProtocolInStream(QIODevice *device) :
+    fXMLReader(device),
+    fRoot(NULL)
+{
+    fCurrentHandlerTree = &fRoot;
+}
+
+ProtocolInStream::ProtocolInStream(const QByteArray &data) :
+    fXMLReader(data),
+    fRoot(NULL)
+{
+    fCurrentHandlerTree = &fRoot;
+}
+
+void ProtocolInStream::parse()
+{
+    while (!fXMLReader.atEnd()) {
+        switch (fXMLReader.readNext()) {
+        case QXmlStreamReader::EndElement: {
+            handler_tree *parent = fCurrentHandlerTree->parent;
+            delete fCurrentHandlerTree;
+            fCurrentHandlerTree = parent;
+
+            // update handler list
+            fCurrentHandlerTree->handlers.clear();
+            handler_tree *parentHandler = fCurrentHandlerTree->parent;
+            if (parentHandler != NULL) {
+                for (int i = 0; i < parentHandler->handlers.count(); i++)
+                    fCurrentHandlerTree->handlers.append(parentHandler->handlers.at(i));
+            }
             break;
-        case QXmlStreamReader::StartElement:
-            if (current != NULL)
-                current = current->addChild(reader.name().toLatin1());
-            else
-                current = new Stanza(reader.name().toLatin1());
+        }
+
+        case QXmlStreamReader::StartElement: {
+            handler_tree *handlerTree = new handler_tree(fCurrentHandlerTree);
+
+            for (int i = 0; i < fCurrentHandlerTree->handlers.count(); i++) {
+                InStanzaHandler *handler = fCurrentHandlerTree->handlers.at(i);
+                if (handler->stanzaName() == fXMLReader.name()) {
+                    handler->handleStanza(fXMLReader.attributes());
+                    for (int a = 0; a < handler->childs().count(); a++)
+                        handlerTree->handlers.append(handler->childs().at(a));
+                }
+            }
+            fCurrentHandlerTree = handlerTree;
             break;
-        case QXmlStreamReader::Characters:
-            if (current != NULL)
-                current->setText(reader.text().toLatin1());
+        }
+
+        case QXmlStreamReader::Characters: {
+            for (int i = 0; i < fCurrentHandlerTree->handlers.count(); i++) {
+                InStanzaHandler *handler = fCurrentHandlerTree->handlers.at(i);
+                if (handler->isTextRequired())
+                    handler->handleText(fXMLReader.text());
+
+            }
             break;
+        }
+
         default:
             break;
         }
     }
-    return current;
 }
 
-
-void ProtocolParser::writeDataEntry(QXmlStreamWriter &xmlWriter, Stanza *entry)
+void ProtocolInStream::addHandler(InStanzaHandler *handler)
 {
-    xmlWriter.writeStartElement(entry->name());
-    const QXmlStreamAttributes& attributes = entry->attributes();
-    for (int i = 0; i < attributes.count(); i++)
-        xmlWriter.writeAttribute(attributes.at(i));
-    for (int i = 0; i < entry->childs().count(); i++)
-        writeDataEntry(xmlWriter, entry->childs().at(i));
-    xmlWriter.writeCharacters(entry->text());
-    xmlWriter.writeEndElement();
+    fRoot.handlers.append(handler);
 }
 
-bool ProtocolParser::write(QString &output, Stanza *rootEntry)
+
+InStanzaHandler::InStanzaHandler(const QString &stanza, bool textRequired) :
+    fName(stanza),
+    fTextRequired(textRequired),
+    fParent(NULL)
 {
-    if (rootEntry == NULL)
-        return false;
+}
 
-    QXmlStreamWriter xmlWriter(&output);
-    xmlWriter.writeStartDocument();
+InStanzaHandler::~InStanzaHandler()
+{
+    for (int i = 0; i < fChildHandlers.count(); i++)
+        delete fChildHandlers.at(i);
+}
 
-    writeDataEntry(xmlWriter, rootEntry);
+QString InStanzaHandler::stanzaName() const
+{
+    return fName;
+}
 
-    xmlWriter.writeEndDocument();
-    return true;
+bool InStanzaHandler::isTextRequired() const
+{
+    return fTextRequired;
+}
+
+void InStanzaHandler::handleStanza(const QXmlStreamAttributes &attributes)
+{
+}
+
+void InStanzaHandler::handleText(const QStringRef &text)
+{
+}
+
+void InStanzaHandler::addChildHandler(InStanzaHandler *handler)
+{
+    fChildHandlers.append(handler);
+    handler->setParent(this);
+}
+
+InStanzaHandler *InStanzaHandler::parent() const
+{
+    return fParent;
+}
+
+const QList<InStanzaHandler *> &InStanzaHandler::childs() const
+{
+    return fChildHandlers;
+}
+
+void InStanzaHandler::setParent(InStanzaHandler *parent)
+{
+    fParent = parent;
+}
+
+ProtocolInStream::handler_tree::handler_tree(ProtocolInStream::handler_tree *p) :
+    parent(p)
+{
+}
+
+ProtocolInStream::handler_tree::~handler_tree()
+{
+    for (int i = 0; i < handlers.count(); i++)
+        delete handlers.at(i);
 }
 
 
-IqStanza::IqStanza(IqType type) :
-    Stanza("iq"),
+
+
+IqOutStanza::IqOutStanza(IqType type) :
+    OutStanza("iq"),
     fType(type)
 {
-    fAttributes.append("type", toString(fType));
+    addAttribute("type", toString(fType));
 }
 
-IqStanza *IqStanza::fromStanza(Stanza *entry)
-{
-    if (entry == NULL)
-        return NULL;
 
-    if (entry->name().compare("iq", Qt::CaseInsensitive) != 0)
-        return NULL;
-    if (!entry->attributes().hasAttribute("type"))
-        return NULL;
-    IqType type = fromString(entry->attributes().value("type").toString());
-    if (type == kBadType)
-        return NULL;
-    IqStanza *iqStanza = new IqStanza(type);
-    //*iqStanza = *entry;
-    return iqStanza;
-}
-
-IqStanza::IqType IqStanza::type()
+IqType IqOutStanza::type()
 {
     return fType;
 }
 
-QString IqStanza::toString(IqType type)
+QString IqOutStanza::toString(IqType type)
 {
     switch (type) {
     case kGet:
@@ -178,7 +289,7 @@ QString IqStanza::toString(IqType type)
     return "";
 }
 
-IqStanza::IqType IqStanza::fromString(const QString &string)
+IqType IqOutStanza::fromString(const QString &string)
 {
     if (string.compare("get", Qt::CaseInsensitive) == 0)
         return kGet;
@@ -190,4 +301,3 @@ IqStanza::IqType IqStanza::fromString(const QString &string)
         return kError;
     return kBadType;
 }
-

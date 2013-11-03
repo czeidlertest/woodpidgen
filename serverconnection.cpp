@@ -16,6 +16,8 @@ RemoteConnectionReply::RemoteConnectionReply(QObject *parent) :
 
 RemoteConnection::RemoteConnection(QObject *parent) :
     QObject(parent),
+    fConnected(false),
+    fConnecting(false),
     fFilter(NULL)
 {
 }
@@ -25,9 +27,37 @@ RemoteConnection::~RemoteConnection()
     delete fFilter;
 }
 
+bool RemoteConnection::isConnected()
+{
+    return fConnected;
+}
+
+bool RemoteConnection::isConnecting()
+{
+    return fConnecting;
+}
+
 void RemoteConnection::setFilter(RemoteConnectionFilter *filter)
 {
     fFilter = filter;
+}
+
+void RemoteConnection::setConnectionStarted()
+{
+    fConnecting = true;
+    fConnected = false;
+}
+
+void RemoteConnection::setConnected()
+{
+    fConnected = true;
+    fConnecting = false;
+}
+
+void RemoteConnection::setDisconnected()
+{
+    fConnecting = false;
+    fConnected = false;
 }
 
 
@@ -51,7 +81,7 @@ QNetworkAccessManager* NetworkConnection::getNetworkAccessManager()
     return ((MainApplication*)qApp)->getNetworkAccessManager();
 }
 
-int NetworkConnection::send(RemoteConnectionReply *remoteConnectionReply, const QByteArray &data)
+WP::err NetworkConnection::send(RemoteConnectionReply *remoteConnectionReply, const QByteArray &data)
 {
     QNetworkRequest request;
     request.setUrl(fUrl);
@@ -68,13 +98,13 @@ int NetworkConnection::send(RemoteConnectionReply *remoteConnectionReply, const 
         reply = manager->post(request, data);
     }
     if (reply == NULL)
-        return -1;
+        return WP::kError;
 
     connect(manager, SIGNAL(finished(QNetworkReply*)), this, SLOT(replyFinished(QNetworkReply*)));
     connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(replyError(QNetworkReply::NetworkError)));
 
     fReplyMap.insert(reply, remoteConnectionReply);
-    return 0;
+    return WP::kOk;
 }
 
 void NetworkConnection::replyFinished(QNetworkReply *reply)
@@ -109,6 +139,11 @@ EncryptedPHPConnection::EncryptedPHPConnection(QUrl url, QObject *parent) :
 
 WP::err EncryptedPHPConnection::connectToServer()
 {
+    if (isConnected())
+        return WP::kIsConnected;
+    if (isConnecting())
+        return WP::kOk;
+
     fInitVector = fCrypto->generateInitalizationVector(512);
     QString prime, base, pub;
     fCrypto->generateDHParam(prime, base, fSecretNumber, pub);
@@ -131,6 +166,14 @@ WP::err EncryptedPHPConnection::connectToServer()
     connect(fNetworkReply, SIGNAL(error(QNetworkReply::NetworkError)), this,
             SLOT(networkRequestError(QNetworkReply::NetworkError)));
 
+    setConnectionStarted();
+    return WP::kOk;
+}
+
+WP::err EncryptedPHPConnection::disconnect()
+{
+    // TODO notify the server
+    setDisconnected();
     return WP::kOk;
 }
 
@@ -175,11 +218,13 @@ void EncryptedPHPConnection::replyFinished()
     setFilter(filter);
 
     fNetworkReply->deleteLater();
+    setConnected();
     emit connectionAttemptFinished(QNetworkReply::NoError);
 }
 
 void EncryptedPHPConnection::networkRequestError(QNetworkReply::NetworkError code)
 {
+    setDisconnected();
     fNetworkReply->deleteLater();
     emit connectionAttemptFinished(code);
 }

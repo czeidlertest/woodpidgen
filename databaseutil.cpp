@@ -1,5 +1,6 @@
 #include "databaseutil.h"
 
+#include <QStringList>
 #include <QTextStream>
 #include <QUuid>
 
@@ -24,58 +25,64 @@ const char *kPathCertificate = "certificate";
 const char *kPathUniqueId = "uid";
 
 UserData::UserData() :
-    fDatabase(NULL),
-    fInitStatus(WP::kUninit)
+    fDatabase(NULL)
 {
     fCrypto = CryptoInterfaceSingleton::getCryptoInterface();
 }
 
 UserData::~UserData()
 {
-    delete fDatabase;
 }
 
-WP::err UserData::initCheck() const
+WP::err UserData::writeConfig()
 {
-    return fInitStatus;
+    if (fDatabase == NULL)
+        return WP::kNotInit;
+    WP::err status = write(kPathUniqueId, fUid);
+    if (status != WP::kOk)
+        return status;
+    return WP::kOk;
 }
 
-WP::err UserData::commit()
+QString UserData::getUid()
 {
-    return fDatabase->commit();
-}
+    if (fUid == "")
+        read(kPathUniqueId, fUid);
 
-QString UserData::getUid() const
-{
     return fUid;
 }
 
 WP::err UserData::write(const QString &path, const QByteArray &data)
 {
-    return fDatabase->write(path, data);
+    return fDatabase->write(prependBaseDir(path), data);
 }
 
 WP::err UserData::write(const QString &path, const QString &data)
 {
-    return fDatabase->write(path, data);
+    return fDatabase->write(prependBaseDir(path), data);
 }
 
 WP::err UserData::read(const QString &path, QByteArray &data) const
 {
-    return fDatabase->read(path, data);
+    return fDatabase->read(prependBaseDir(path), data);
 }
 
 WP::err UserData::read(const QString &path, QString &data) const
 {
-    return fDatabase->read(path, data);
+    return fDatabase->read(prependBaseDir(path), data);
 }
 
-QString UserData::getDatabasePath() const
+WP::err UserData::remove(const QString &path)
 {
-    return fDatabasePath;
+    return fDatabase->remove(prependBaseDir(path));
 }
 
-QString UserData::getDatabaseBranch() const
+QStringList UserData::listDirectories(const QString &path) const
+{
+    return fDatabase->listDirectories(prependBaseDir(path));
+}
+
+const DatabaseBranch *UserData::getDatabaseBranch() const
 {
     return fDatabaseBranch;
 }
@@ -85,27 +92,23 @@ QString UserData::getDatabaseBaseDir() const
     return fDatabaseBaseDir;
 }
 
-WP::err UserData::setUid(const QString &uid)
+DatabaseInterface *UserData::getDatabase() const
 {
-    if (fInitStatus != WP::kOk)
-        return fInitStatus;
-    WP::err status = fDatabase->write(prependBaseDir(kPathUniqueId), uid);
-    if (status != WP::kOk)
-        return status;
-    fUid = uid;
-    return WP::kOk;
+    return fDatabase;
 }
 
-WP::err UserData::setToDatabase(const QString &path, const QString &branch, const QString &baseDir, bool createDatabase)
+void UserData::setUid(const QString &uid)
 {
-    fDatabasePath = path;
+    fUid = uid;
+}
+
+WP::err UserData::setToDatabase(const DatabaseBranch *branch, const QString &baseDir)
+{
     fDatabaseBranch = branch;
     fDatabaseBaseDir = baseDir;
-    fInitStatus = DatabaseFactory::open(fDatabasePath, fDatabaseBranch, &fDatabase);
-    if (fInitStatus != WP::kOk)
-        return fInitStatus;
-
-    fDatabase->read(prependBaseDir(kPathUniqueId), fUid);
+    fDatabase = branch->getDatabase();
+    if (fDatabase == NULL)
+        return WP::kError;
 
     return WP::kOk;
 }
@@ -125,11 +128,10 @@ QString UserData::prependBaseDir(const QString &path) const
 }
 
 
-KeyStore::KeyStore(const QString &path, const QString &branch, const QString &baseDir)
+KeyStore::KeyStore(const DatabaseBranch *branch, const QString &baseDir)
 {
-    setToDatabase(path, branch, baseDir);
+    setToDatabase(branch, baseDir);
 }
-
 
 WP::err KeyStore::open(const SecureArray &password)
 {
@@ -159,28 +161,24 @@ WP::err KeyStore::create(const SecureArray &password, bool addUidToBaseDir)
         (fDatabaseBaseDir == "") ? newBaseDir = uid : newBaseDir = fDatabaseBaseDir + "/" + uid;
         setBaseDir(newBaseDir);
     }
-    // write uid
     setUid(uid);
 
+    error = UserData::writeConfig();
+    if (error != WP::kOk)
+        return error;
+
     // write master password (master password is encrypted
-    QString path = fDatabaseBaseDir + "/" + kPathMasterKey;
-    fDatabase->write(path, encryptedMasterKey);
-    path = fDatabaseBaseDir + "/" + kPathMasterKeyIV;
-    fDatabase->write(path, fMasterKeyIV);
-    path = fDatabaseBaseDir + "/" + kPathMasterPasswordKDF;
-    fDatabase->write(path, kdfName.toLatin1());
-    path = fDatabaseBaseDir + "/" + kPathMasterPasswordAlgo;
-    fDatabase->write(path, algoName.toLatin1());
-    path = fDatabaseBaseDir + "/" + kPathMasterPasswordSalt;
-    fDatabase->write(path, salt);
-    path = fDatabaseBaseDir + "/" + kPathMasterPasswordSize;
+    write(kPathMasterKey, encryptedMasterKey);
+    write(kPathMasterKeyIV, fMasterKeyIV);
+    write(kPathMasterPasswordKDF, kdfName.toLatin1());
+    write(kPathMasterPasswordAlgo, algoName.toLatin1());
+    write(kPathMasterPasswordSalt, salt);
     QString keyLengthString;
     QTextStream(&keyLengthString) << kMasterPasswordLength;
-    fDatabase->write(path, keyLengthString.toLatin1());
-    path = fDatabaseBaseDir + "/" + kPathMasterPasswordIterations;
+    write(kPathMasterPasswordSize, keyLengthString.toLatin1());
     QString iterationsString;
     QTextStream(&iterationsString) << kMasterPasswordIterations;
-    fDatabase->write(path, iterationsString.toLatin1());
+    write(kPathMasterPasswordIterations, iterationsString.toLatin1());
 
     return WP::kOk;
 }
@@ -190,26 +188,19 @@ WP::err KeyStore::readMasterKey(const SecureArray &password,
                                 const QString &baseDir)
 {
     // write master password (master password is encrypted
-    QString path = baseDir + "/" + kPathMasterKey;
     QByteArray encryptedMasterKey;
-    fDatabase->read(path, encryptedMasterKey);
-    path = baseDir + "/" + kPathMasterKeyIV;
-    fDatabase->read(path, iv);
-    path = baseDir + "/" + kPathMasterPasswordKDF;
+    read(kPathMasterKey, encryptedMasterKey);
+    read(kPathMasterKeyIV, iv);
     QByteArray kdfName;
-    fDatabase->read(path, kdfName);
-    path = baseDir + "/" + kPathMasterPasswordAlgo;
+    read(kPathMasterPasswordKDF, kdfName);
     QByteArray algoName;
-    fDatabase->read(path, algoName);
-    path = baseDir + "/" + kPathMasterPasswordSalt;
+    read(kPathMasterPasswordAlgo, algoName);
     QByteArray salt;
-    fDatabase->read(path, salt);
-    path = baseDir + "/" + kPathMasterPasswordSize;
+    read(kPathMasterPasswordSalt, salt);
     QByteArray masterPasswordSize;
-    fDatabase->read(path, masterPasswordSize);
-    path = baseDir + "/" + kPathMasterPasswordIterations;
+    read(kPathMasterPasswordSize, masterPasswordSize);
     QByteArray masterPasswordIterations;
-    fDatabase->read(path, masterPasswordIterations);
+    read(kPathMasterPasswordIterations, masterPasswordIterations);
 
     QTextStream sizeStream(masterPasswordSize);
     unsigned int keyLength;
@@ -232,15 +223,14 @@ WP::err KeyStore::writeSymmetricKey(const SecureArray &key, const QByteArray &iv
         return error;
     keyId = fCrypto->toHex(fCrypto->sha1Hash(encryptedKey));
 
-    const QString dir = getDirectory(keyId);
-    QString path = dir + "/" + kPathSymmetricKey;
-    error = fDatabase->write(path, encryptedKey);
+    QString path = keyId + "/" + kPathSymmetricKey;
+    error = write(path, encryptedKey);
     if (error != WP::kOk)
         return error;
-    path = dir + "/" + kPathSymmetricIV;
-    error = fDatabase->write(path, iv);
+    path = keyId + "/" + kPathSymmetricIV;
+    error = write(path, iv);
     if (error != WP::kOk) {
-        fDatabase->remove(dir);
+        remove(keyId);
         return error;
     }
     return WP::kOk;
@@ -248,15 +238,13 @@ WP::err KeyStore::writeSymmetricKey(const SecureArray &key, const QByteArray &iv
 
 WP::err KeyStore::readSymmetricKey(const QString &keyId, SecureArray &key, QByteArray &iv)
 {
-    const QString dir = getDirectory(keyId);
-
     QByteArray encryptedKey;
-    QString path = dir + "/" + kPathSymmetricKey;
-    WP::err error = fDatabase->read(dir, encryptedKey);
+    QString path = keyId + "/" + kPathSymmetricKey;
+    WP::err error = read(path, encryptedKey);
     if (error != WP::kOk)
         return error;
-    path = dir + "/" + kPathSymmetricIV;
-    error = fDatabase->read(dir, iv);
+    path = keyId + "/" + kPathSymmetricIV;
+    error = read(path, iv);
     if (error != WP::kOk)
         return error;
     return fCrypto->decryptSymmetric(encryptedKey, key, fMasterKey, fMasterKeyIV);
@@ -282,21 +270,20 @@ WP::err KeyStore::writeAsymmetricKey(const QString &certificate, const QString &
         return error;
 
     keyId = fCrypto->toHex(fCrypto->sha1Hash(encryptedPublic));
-    const QString dir = getDirectory(keyId);
-    QString path = dir + "/" + kPathPrivateKey;
-    error = fDatabase->write(path, encryptedPrivate);
+    QString path = keyId + "/" + kPathPrivateKey;
+    error = write(path, encryptedPrivate);
     if (error != WP::kOk)
         return error;
-    path = dir + "/" + kPathPublicKey;
-    error = fDatabase->write(path, encryptedPublic);
+    path = keyId + "/" + kPathPublicKey;
+    error = write(path, encryptedPublic);
     if (error != WP::kOk) {
-        fDatabase->remove(dir);
+        remove(keyId);
         return error;
     }
-    path = dir + "/" + kPathCertificate;
-    error = fDatabase->write(path, encryptedCertificate);
+    path = keyId + "/" + kPathCertificate;
+    error = write(path, encryptedCertificate);
     if (error != WP::kOk) {
-        fDatabase->remove(dir);
+        remove(keyId);
         return error;
     }
     return WP::kOk;
@@ -305,21 +292,19 @@ WP::err KeyStore::writeAsymmetricKey(const QString &certificate, const QString &
 
 WP::err KeyStore::readAsymmetricKey(const QString &keyId, QString &certificate, QString &publicKey, QString &privateKey)
 {
-    const QString dir = getDirectory(keyId);
-
-    QString path = dir + "/" + kPathPrivateKey;
+    QString path = keyId + "/" + kPathPrivateKey;
     QByteArray encryptedPrivate;
-    WP::err error = fDatabase->read(path, encryptedPrivate);
+    WP::err error = read(path, encryptedPrivate);
     if (error != WP::kOk)
         return error;
-    path = dir + "/" + kPathPublicKey;
+    path = keyId + "/" + kPathPublicKey;
     QByteArray encryptedPublic;
-    error = fDatabase->read(path, encryptedPublic);
+    error = read(path, encryptedPublic);
     if (error != WP::kOk)
         return error;
-    path = dir + "/" + kPathCertificate;
+    path = keyId + "/" + kPathCertificate;
     QByteArray encryptedCertificate;
-    error = fDatabase->read(path, encryptedCertificate);
+    error = read(path, encryptedCertificate);
     if (error != WP::kOk)
         return error;
 
@@ -353,21 +338,15 @@ DatabaseInterface *KeyStore::getDatabaseInterface()
     return fDatabase;
 }
 
-QString KeyStore::getDirectory(const QString &keyId)
-{
-    QString dir = "";
-    if (fDatabaseBaseDir != "")
-        dir += fDatabaseBaseDir + "/";
-    dir += keyId;
-    return dir;
-}
-
-
 const char *kPathKeyStoreID = "key_store_id";
 const char *kPathDefaultKeyID = "default_key_id";
-const char *kPathKeyStorePath = "key_store_path";
-const char *kPathKeyStoreBranch = "key_store_branch";
 
+EncryptedUserData::EncryptedUserData(const EncryptedUserData &data) :
+    fKeyStore(data.getKeyStore()),
+    fDefaultKeyId(data.getDefaultKeyId())
+{
+    setToDatabase(data.getDatabaseBranch(), data.getDatabaseBaseDir());
+}
 
 EncryptedUserData::EncryptedUserData() :
     fKeyStore(NULL)
@@ -378,23 +357,50 @@ EncryptedUserData::~EncryptedUserData()
 {
 }
 
-WP::err EncryptedUserData::initCheck()
+void EncryptedUserData::setTo(EncryptedUserData *database, const QString &baseDir)
 {
-    WP::err status = UserData::initCheck();
-    if (status != WP::kOk)
-        return status;
-    if (fKeyStore == NULL)
-        return WP::kNoKeyStore;
-    return WP::kOk;
+    fKeyStore = database->getKeyStore();
+    fDefaultKeyId = database->getDefaultKeyId();
+    setToDatabase(database->getDatabaseBranch(), baseDir);
 }
 
-WP::err EncryptedUserData::readKeyStoreId(QString &keyStoreId) const
+WP::err EncryptedUserData::writeConfig()
+{
+    if (fKeyStore == NULL)
+        return WP::kNotInit;
+
+    WP::err error = UserData::writeConfig();
+    if (error != WP::kOk)
+        return error;
+
+    error = write(kPathKeyStoreID, fKeyStore->getUid());
+    if (error != WP::kOk)
+        return error;
+
+    error = write(kPathDefaultKeyID, fDefaultKeyId);
+    return error;
+}
+
+WP::err EncryptedUserData::readKeyStore(KeyStoreFinder *keyStoreFinder)
 {
     if (fDatabase == NULL)
-        return WP::kUninit;
+        return WP::kNotInit;
 
-    QString path = prependBaseDir(kPathKeyStoreID);
-    return fDatabase->read(path, keyStoreId);
+    QString keyStoreId;
+    WP::err error = read(kPathKeyStoreID, keyStoreId);
+    if (error != WP::kOk)
+        return error;
+    fKeyStore = keyStoreFinder->find(keyStoreId);
+    if (fKeyStore == NULL)
+        return WP::kEntryNotFound;
+
+    error = read(kPathDefaultKeyID, fDefaultKeyId);
+    return error;
+}
+
+KeyStore *EncryptedUserData::getKeyStore() const
+{
+    return fKeyStore;
 }
 
 WP::err EncryptedUserData::writeSafe(const QString &path, const QByteArray &data)
@@ -405,6 +411,22 @@ WP::err EncryptedUserData::writeSafe(const QString &path, const QByteArray &data
 WP::err EncryptedUserData::readSafe(const QString &path, QByteArray &data) const
 {
     return readSafe(path, data, fDefaultKeyId);
+}
+
+WP::err EncryptedUserData::writeSafe(const QString &path, const QString &data)
+{
+    return writeSafe(path, data, fDefaultKeyId);
+}
+
+WP::err EncryptedUserData::readSafe(const QString &path, QString &data) const
+{
+    return readSafe(path, data, fDefaultKeyId);
+}
+
+WP::err EncryptedUserData::writeSafe(const QString &path, const QString &data, const QString &keyId)
+{
+    QByteArray arrayData = data.toLatin1();
+    return writeSafe(path, arrayData, keyId);
 }
 
 WP::err EncryptedUserData::writeSafe(const QString &path, const QByteArray &data, const QString &keyId)
@@ -422,6 +444,14 @@ WP::err EncryptedUserData::writeSafe(const QString &path, const QByteArray &data
     return write(path, encrypted);
 }
 
+WP::err EncryptedUserData::readSafe(const QString &path, QString &data, const QString &keyId) const
+{
+    QByteArray arrayData;
+    WP::err error = readSafe(path, arrayData, keyId);
+    data = arrayData;
+    return error;
+}
+
 WP::err EncryptedUserData::readSafe(const QString &path, QByteArray &data, const QString &keyId) const
 {
     SecureArray key;
@@ -437,17 +467,9 @@ WP::err EncryptedUserData::readSafe(const QString &path, QByteArray &data, const
     return fCrypto->decryptSymmetric(encrypted, data, key, iv);
 }
 
-WP::err EncryptedUserData::writeKeyStoreId()
-{
-    QString path = prependBaseDir(kPathKeyStoreID);
-    return write(path, fKeyStore->getUid());
-}
-
-
-WP::err EncryptedUserData::setKeyStore(KeyStore *keyStore)
+void EncryptedUserData::setKeyStore(KeyStore *keyStore)
 {
     fKeyStore = keyStore;
-    return WP::kOk;
 }
 
 QString EncryptedUserData::getDefaultKeyId() const
@@ -455,11 +477,153 @@ QString EncryptedUserData::getDefaultKeyId() const
     return fDefaultKeyId;
 }
 
-WP::err EncryptedUserData::setDefaultKeyId(const QString &keyId)
+void EncryptedUserData::setDefaultKeyId(const QString &keyId)
 {
-    WP::err error = write(prependBaseDir(kPathDefaultKeyID), keyId);
-    if (error != WP::kOk)
-        return error;
     fDefaultKeyId = keyId;
+}
+
+/*
+StorageDirectory::StorageDirectory(EncryptedUserData *database, const QString &directory) :
+    fDatabase(database),
+    fDirectory(directory)
+{
+}
+
+WP::err StorageDirectory::write(const QString &path, const QByteArray &data)
+{
+    return fDatabase->write(fDirectory + "/" + path, data);
+}
+
+WP::err StorageDirectory::write(const QString &path, const QString &data)
+{
+    return fDatabase->write(fDirectory + "/" + path, data);
+}
+
+WP::err StorageDirectory::read(const QString &path, QByteArray &data) const
+{
+    return fDatabase->read(fDirectory + "/" + path, data);
+}
+
+WP::err StorageDirectory::read(const QString &path, QString &data) const
+{
+    return fDatabase->read(fDirectory + "/" + path, data);
+}
+
+WP::err StorageDirectory::writeSafe(const QString &path, const QString &data)
+{
+    return fDatabase->writeSafe(fDirectory + "/" + path, data);
+}
+
+WP::err StorageDirectory::writeSafe(const QString &path, const QByteArray &data)
+{
+    return fDatabase->writeSafe(fDirectory + "/" + path, data);
+}
+
+WP::err StorageDirectory::writeSafe(const QString &path, const QByteArray &data, const QString &keyId)
+{
+    return fDatabase->writeSafe(fDirectory + "/" + path, data, keyId);
+}
+
+WP::err StorageDirectory::readSafe(const QString &path, QString &data) const
+{
+    return fDatabase->readSafe(fDirectory + "/" + path, data);
+}
+
+WP::err StorageDirectory::readSafe(const QString &path, QByteArray &data, const QString &keyId) const
+{
+    return fDatabase->readSafe(fDirectory + "/" + path, data, keyId);
+}
+
+WP::err StorageDirectory::readSafe(const QString &path, QByteArray &data) const
+{
+    return fDatabase->readSafe(fDirectory + "/" + path, data);
+}
+
+WP::err StorageDirectory::remove(const QString &path)
+{
+    return fDatabase->getDatabase()->remove(fDirectory + "/" + path);
+}
+
+const QString &StorageDirectory::directory()
+{
+    return fDirectory;
+}
+
+*/
+
+
+RemoteDataStorage::RemoteDataStorage() :
+    fConnection(NULL)
+{
+}
+
+RemoteDataStorage::RemoteDataStorage(const DatabaseBranch *database, const QString &baseDir) :
+    fConnection(NULL)
+{
+    setToDatabase(database, baseDir);
+}
+
+
+
+DatabaseBranch::DatabaseBranch(const QString &database, const QString &branch) :
+    fDatabasePath(database),
+    fBranch(branch)
+{
+    DatabaseFactory::open(database, branch, &fDatabase);
+}
+
+DatabaseBranch::~DatabaseBranch()
+{
+    delete fDatabase;
+}
+
+void DatabaseBranch::setTo(const QString &database, const QString &branch)
+{
+    fDatabasePath = database;
+    fBranch = branch;
+}
+
+const QString &DatabaseBranch::getDatabasePath() const
+{
+    return fDatabasePath;
+}
+
+const QString &DatabaseBranch::getBranch() const
+{
+    return fBranch;
+}
+
+QString DatabaseBranch::databaseHash() const
+{
+    CryptoInterface *crypto = CryptoInterfaceSingleton::getCryptoInterface();
+    QByteArray hashResult = crypto->sha1Hash(fDatabasePath.toLatin1());
+    return crypto->toHex(hashResult);
+}
+
+DatabaseInterface *DatabaseBranch::getDatabase() const
+{
+    return fDatabase;
+}
+
+WP::err DatabaseBranch::commit()
+{
+    if (fDatabase == NULL)
+        return WP::kNotInit;
+    return fDatabase->commit();
+}
+
+int DatabaseBranch::countRemotes() const
+{
+    return fRemotes.count();
+}
+
+RemoteDataStorage *DatabaseBranch::remoteAt(int i) const
+{
+    return fRemotes.at(i);
+}
+
+WP::err DatabaseBranch::addRemote(RemoteDataStorage *data)
+{
+    fRemotes.append(data);
     return WP::kOk;
 }

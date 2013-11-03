@@ -5,9 +5,9 @@
 #include "cryptointerface.h"
 
 
-UserIdentity::UserIdentity(const QString &path, const QString &branch, const QString &baseDir)
+UserIdentity::UserIdentity(const DatabaseBranch *branch, const QString &baseDir)
 {
-    setToDatabase(path, branch, baseDir);
+    setToDatabase(branch, baseDir);
 }
 
 UserIdentity::~UserIdentity()
@@ -36,17 +36,14 @@ WP::err UserIdentity::createNewIdentity(bool addUidToBaseDir)
         (fDatabaseBaseDir == "") ? newBaseDir = uid : newBaseDir = fDatabaseBaseDir + "/" + uid;
         setBaseDir(newBaseDir);
     }
-    // write uid
     setUid(uid);
 
-    error = setUid(uid);
+    error = EncryptedUserData::writeConfig();
     if (error != WP::kOk)
         return error;
-
-    QString path = prependBaseDir("key_store_id");
-    write(path, fKeyStore->getUid().toLatin1());
-    path = prependBaseDir("identity_key");
-    write(path, keyId.toLatin1());
+    error = write("identity_key", keyId);
+    if (error != WP::kOk)
+        return error;
 
     // test data
     QByteArray testData("Hello id");
@@ -55,17 +52,19 @@ WP::err UserIdentity::createNewIdentity(bool addUidToBaseDir)
     if (error != WP::kOk)
         return error;
 
-    path = prependBaseDir("test_data");
-    write(path, encyptedTestData);
+    write("test_data", encyptedTestData);
 
     return error;
 }
 
-WP::err UserIdentity::open()
+WP::err UserIdentity::open(KeyStoreFinder *keyStoreFinder)
 {
+    WP::err error = EncryptedUserData::readKeyStore(keyStoreFinder);
+    if (error != WP::kOk)
+        return error;
+
     QByteArray identityKeyArray;
-    QString path = prependBaseDir("identity_key");
-    read(path, identityKeyArray);
+    read("identity_key", identityKeyArray);
     fIdentityKey = identityKeyArray;
 
     // test
@@ -76,10 +75,9 @@ WP::err UserIdentity::open()
 
     // test data
     QByteArray encyptedTestData;
-    path = prependBaseDir("test_data");
-    read(path, encyptedTestData);
+    read("test_data", encyptedTestData);
     QByteArray testData;
-    WP::err error = fCrypto->decryptAsymmetric(encyptedTestData, testData, privateKey, "", certificate);
+    error = fCrypto->decryptAsymmetric(encyptedTestData, testData, privateKey, "", certificate);
 
     printf("test %s\n", testData.data());
 

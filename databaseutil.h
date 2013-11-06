@@ -36,7 +36,7 @@ protected:
 */
 
 class RemoteDataStorage;
-
+class RemoteConnection;
 
 class DatabaseBranch {
 public:
@@ -51,7 +51,8 @@ public:
 
     WP::err commit();
     int countRemotes() const;
-    RemoteDataStorage *remoteAt(int i) const;
+    RemoteDataStorage *getRemoteAt(int i) const;
+    RemoteConnection *getRemoteConnectionAt(int i) const;
     WP::err addRemote(RemoteDataStorage* data);
 private:
     QString fDatabasePath;
@@ -167,8 +168,6 @@ protected:
 };
 
 
-class RemoteConnection;
-
 class RemoteDataStorage : public EncryptedUserData {
 public:
     RemoteDataStorage();
@@ -178,7 +177,7 @@ public:
     RemoteConnection *getRemoteConnection();
 
     virtual QString type() const = 0;
-
+    virtual WP::err open(KeyStoreFinder *keyStoreFinder) = 0;
 protected:
     RemoteConnection *fConnection;
 };

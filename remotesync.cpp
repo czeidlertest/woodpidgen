@@ -3,27 +3,6 @@
 #include "protocolparser.h"
 
 
-class SyncRemoteReply : public RemoteConnectionReply
-{
-public:
-    SyncRemoteReply(RemoteSync *sync) :
-        fRemoteSync(sync)
-    {
-
-    }
-
-    ~SyncRemoteReply() {}
-
-public slots:
-    void received(const QByteArray &data)
-    {
-
-    }
-private:
-    RemoteSync *fRemoteSync;
-};
-
-
 class SyncOutStanza : public OutStanza {
 public:
     SyncOutStanza(const QString &branch, const QString &tipCommit) :
@@ -40,12 +19,10 @@ RemoteSync::RemoteSync(DatabaseInterface *database, RemoteConnection *connection
     fDatabase(database),
     fRemoteConnection(connection)
 {
-    fSyncReply = new SyncRemoteReply(this);
 }
 
 RemoteSync::~RemoteSync()
 {
-    fSyncReply->deleteLater();
 }
 
 WP::err RemoteSync::sync()
@@ -76,7 +53,8 @@ void RemoteSync::syncConnected(QNetworkReply::NetworkError code)
 
     outStream.flush();
 
-    fRemoteConnection->send(fSyncReply, outData);
+    // TODO!!! connect
+    //fRemoteConnection->send(outData);
 }
 
 void RemoteSync::syncReply(QNetworkReply::NetworkError code)

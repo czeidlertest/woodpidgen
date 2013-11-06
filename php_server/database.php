@@ -271,7 +271,7 @@ class PackManager {
 		}
 
 		// update tip
-		return fDatabase->updateTip(last);
+		return $fDatabase->updateTip(last);
 	}
 
 	private function writeFile($hashHex, $data)
@@ -292,8 +292,8 @@ class PackManager {
     
 	private function readTill($in, &$out, $start, $stopChar) {
 		$pos = start;
-		while ($pos < length(in) && in[$pos] != $stopChar) {
-			out[] = in[$pos];
+		while ($pos < length(in) && $in[$pos] != $stopChar) {
+			$out[] = $in[$pos];
 			$pos++;
 		}
 		$pos++;

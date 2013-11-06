@@ -20,7 +20,7 @@ public:
 private:
     DatabaseInterface *fDatabase;
     RemoteConnection *fRemoteConnection;
-    RemoteConnectionReply *fSyncReply;
+
 signals:
     void syncFinished(WP::err status);
 

@@ -58,6 +58,7 @@ public:
 
     EncryptedUserData* findStorageDirectory(UserData *userData);
 
+    QList<DatabaseBranch*> &getBranches();
 private:
     void clear();
 

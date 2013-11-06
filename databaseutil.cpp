@@ -571,6 +571,10 @@ RemoteDataStorage::RemoteDataStorage(const DatabaseBranch *database, const QStri
     setToDatabase(database, baseDir);
 }
 
+RemoteConnection *RemoteDataStorage::getRemoteConnection()
+{
+    return fConnection;
+}
 
 
 DatabaseBranch::DatabaseBranch(const QString &database, const QString &branch) :
@@ -625,9 +629,14 @@ int DatabaseBranch::countRemotes() const
     return fRemotes.count();
 }
 
-RemoteDataStorage *DatabaseBranch::remoteAt(int i) const
+RemoteDataStorage *DatabaseBranch::getRemoteAt(int i) const
 {
     return fRemotes.at(i);
+}
+
+RemoteConnection *DatabaseBranch::getRemoteConnectionAt(int i) const
+{
+    return fRemotes.at(i)->getRemoteConnection();
 }
 
 WP::err DatabaseBranch::addRemote(RemoteDataStorage *data)

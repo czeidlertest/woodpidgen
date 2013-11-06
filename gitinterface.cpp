@@ -5,8 +5,6 @@
 #include <QFile>
 #include <QTextStream>
 
-#include "serverconnection.h"
-
 
 class PackManager {
 public:
@@ -558,7 +556,6 @@ QString GitInterface::getTip() const
     git_strarray ref_list;
     git_reference_list(&ref_list, fRepository);
 
-    git_reference *ref;
     for (unsigned int i = 0; i < ref_list.count; ++i) {
         const char *name = ref_list.strings[i];
         if (refName != name)

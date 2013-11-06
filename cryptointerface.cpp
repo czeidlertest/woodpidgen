@@ -315,8 +315,6 @@ SecureArray CryptoInterface::sharedDHKey(const QString &prime, const QString &ba
     BigUnsigned secretNumber = stringToBigUnsigned(secret.toStdString());
     BigUnsigned result = modexp(baseNumber, secretNumber, primeNumber);
 
-    std::string resultString = bigUnsignedToString(result);
-
     QByteArray key;
 
     BigUnsigned result2(result);

@@ -204,7 +204,7 @@ WP::err Profile::loadRemotes()
             continue;
         RemoteDataStorage *remote = entry->getUserData();
         Profile::ProfileKeyStoreFinder keyStoreFinder(fMapOfKeyStores);
-        WP::err error = remote->readKeyStore(&keyStoreFinder);
+        WP::err error = remote->open(&keyStoreFinder);
         if (error != WP::kOk){
             delete entry;
             continue;
@@ -266,7 +266,7 @@ WP::err Profile::writeDatabaseBranch(DatabaseBranch *databaseBranch)
     path += databaseBranch->getBranch();
     path += "/remotes/";
     for (int i = 0; i < databaseBranch->countRemotes(); i++) {
-        RemoteDataStorage *remote = databaseBranch->remoteAt(i);
+        RemoteDataStorage *remote = databaseBranch->getRemoteAt(i);
         QString remotePath = path;
         remotePath += remote->getUid();
         remotePath += "/id";
@@ -279,8 +279,8 @@ WP::err Profile::writeDatabaseBranch(DatabaseBranch *databaseBranch)
 
 WP::err Profile::loadDatabaseBranches()
 {
-    QString path = "remote_branches/";
-    QStringList databases = listDirectories("remote_branches/");
+    QString path = "remote_branches";
+    QStringList databases = listDirectories(path);
     for (int i = 0; i < databases.count(); i++) {
         QString subPath = path + "/" + databases.at(i);
         QString databasePath;
@@ -289,16 +289,20 @@ WP::err Profile::loadDatabaseBranches()
             continue;
         QStringList branches = listDirectories(subPath);
         for (int a = 0; a < branches.count(); a++) {
-            DatabaseBranch *databaseBranch = databaseBranchFor(databasePath, branches.at(i));
+            DatabaseBranch *databaseBranch = databaseBranchFor(databasePath, branches.at(a));
 
-            QString branchPath = subPath + "/" + branches.at(i);
-            QString remoteId;
-            WP::err error = readSafe(branchPath + "/remotes/id", remoteId);
-            if (error != WP::kOk)
-                continue;
-
-            RemoteDataStorage *remote = findRemote(remoteId);
-            connectRemote(databaseBranch, remote);
+            QString remotePath = subPath + "/" + branches.at(a) + "/remotes";
+            QStringList remotes = listDirectories(remotePath);
+            for (int r = 0; r < remotes.count(); r++) {
+                QString remoteId;
+                error = readSafe(remotePath + "/" + remotes.at(r) + "/id", remoteId);
+                if (error != WP::kOk)
+                    continue;
+                RemoteDataStorage *remote = findRemote(remoteId);
+                error = connectRemote(databaseBranch, remote);
+                if (error != WP::kOk)
+                    continue;
+            }
         }
     }
     return WP::kOk;
@@ -315,6 +319,11 @@ EncryptedUserData *Profile::findStorageDirectory(UserData *userData)
     if (it == fConfigIndex.end())
         return NULL;
     return it.value();
+}
+
+QList<DatabaseBranch *> &Profile::getBranches()
+{
+    return fBranches;
 }
 
 void Profile::clear()

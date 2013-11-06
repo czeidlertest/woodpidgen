@@ -36,7 +36,6 @@ SOURCES += main.cpp \
     databaseinterface.cpp \
     remotesync.cpp \
     protocolparser.cpp \
-    connectionmanager.cpp \
     phpremotestorage.cpp
 
 # Installation path
@@ -64,7 +63,6 @@ HEADERS += \
     error_codes.h \
     remotesync.h \
     protocolparser.h \
-    connectionmanager.h \
     phpremotestorage.h
 
 FORMS += \

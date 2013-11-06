@@ -122,12 +122,13 @@ else {
 // get data
 $request = $gPortal->receiveData($request);
 
-$XMLHandler = new XMLHandler($response);
+writeToOutput($request." pong");
 
-$response = $XMLHandler->handle();
+//$XMLHandler = new XMLHandler($response);
+//$response = $XMLHandler->handle();
 
 // start working
-writeToOutput($response);
+//writeToOutput($response);
 finished();
 
 ?>

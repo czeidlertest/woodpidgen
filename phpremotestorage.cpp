@@ -31,7 +31,7 @@ WP::err PHPRemoteStorage::open(KeyStoreFinder *keyStoreFinder)
         return error;
 
     fConnection = sPHPConnectionManager.connectionFor(fUrl);
-    if (fConnection != NULL)
+    if (fConnection == NULL)
         return WP::kError;
 
     setUid(hash());
@@ -63,7 +63,7 @@ EncryptedPHPConnection *PHPConnectionManager::connectionFor(const QString &url)
 {
     EncryptedPHPConnection *connection = NULL;
     QMap<QString, EncryptedPHPConnection*>::iterator it = fConnections.find(url);
-    if (it == fConnections.end()) {
+    if (it != fConnections.end()) {
         connection = it.value();
     } else {
         connection = new EncryptedPHPConnection(QUrl(url));

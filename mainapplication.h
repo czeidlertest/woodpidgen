@@ -13,12 +13,13 @@ class DatabaseInterface;
 
 #include <serverconnection.h>
 #include <QDebug>
-class PingRCReply : public RemoteConnectionReply
+
+class PingRCCommand : public QObject
 {
 Q_OBJECT
 public:
-    PingRCReply(NetworkConnection *connection, QObject *parent = NULL) :
-        RemoteConnectionReply(parent),
+    PingRCCommand(RemoteConnection *connection, QObject *parent = NULL) :
+        QObject(parent),
         fNetworkConnection(connection)
     {
     }
@@ -30,16 +31,19 @@ public slots:
             return;
 
         QByteArray data("ping");
-        fNetworkConnection->send(this, data);
+        fReply = fNetworkConnection->send(data);
+        connect(fReply, SIGNAL(finished()), this, SLOT(received()));
     }
 
-    virtual void received(const QByteArray &data)
+    virtual void received()
     {
+        QByteArray data = fReply->readAll();
         qDebug() << data << endl;
     }
 
 private:
-    NetworkConnection* fNetworkConnection;
+    RemoteConnection* fNetworkConnection;
+    RemoteConnectionReply *fReply;
 };
 
 
@@ -51,9 +55,6 @@ public:
     ~MainApplication();
 
     QNetworkAccessManager* getNetworkAccessManager();
-
-public slots:
-    void connectionAttemptFinished(QNetworkReply::NetworkError);
 
 private:
     WP::err createNewProfile();

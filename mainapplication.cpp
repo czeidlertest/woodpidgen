@@ -13,6 +13,7 @@
 #include "protocolparser.h"
 #include <QBuffer>
 #include "remotesync.h"
+#include <QDebug>
 
 class TestHandler : public InStanzaHandler {
 public:
@@ -42,20 +43,6 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
     fMainWindow = new MainWindow(fProfile);
     fMainWindow->show();
 
-
-    CryptoInterface *crypto = CryptoInterfaceSingleton::getCryptoInterface();
-
-    QByteArray iv = crypto->generateInitalizationVector(256);
-    SecureArray symKey = crypto->generateSymetricKey(256);
-
-    QByteArray dataIn = "test";
-    QByteArray encrypted;
-    crypto->encryptSymmetric(dataIn, encrypted, symKey, iv);
-    SecureArray decrypted;
-    crypto->decryptSymmetric(encrypted, decrypted, symKey, iv);
-
-
-
     SecureArray password("test_password");
     if (fProfile->open(password) != WP::kOk) {
         PHPRemoteStorage* remote = new PHPRemoteStorage("http://localhost/php_server/portal.php");
@@ -65,9 +52,11 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
             QMessageBox::information(NULL, "Error", "Unable to create or load a profile!");
             quit();
         }
-        //fProfile->commit();
     }
 
+    DatabaseBranch *branch = fProfile->getBranches().at(0);
+    RemoteSync *sync = new RemoteSync(branch->getDatabase(), branch->getRemoteConnectionAt(0), this);
+    //sync->sync();
 
     QByteArray data;
     ProtocolOutStream outStream(&data);
@@ -89,9 +78,7 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
     EncryptedPHPConnection *encryptedPHPConnection = new EncryptedPHPConnection(QUrl("http://localhost/php_server/portal.php"), this);
     encryptedPHPConnection->connectToServer();
 
-    connect(encryptedPHPConnection, SIGNAL(connectionAttemptFinished(QNetworkReply::NetworkError)), this, SLOT(connectionAttemptFinished(QNetworkReply::NetworkError)));
-
-    PingRCReply *replyTest = new PingRCReply(encryptedPHPConnection, this);
+    PingRCCommand *replyTest = new PingRCCommand(encryptedPHPConnection, this);
     connect(encryptedPHPConnection, SIGNAL(connectionAttemptFinished(QNetworkReply::NetworkError)), replyTest, SLOT(connectionAttemptFinished(QNetworkReply::NetworkError)));
 
     /*
@@ -114,10 +101,4 @@ MainApplication::~MainApplication()
 QNetworkAccessManager *MainApplication::getNetworkAccessManager()
 {
     return fNetworkAccessManager;
-}
-
-void MainApplication::connectionAttemptFinished(QNetworkReply::NetworkError)
-{
-    //RemoteSync *syncer = new RemoteSync(fProfile->getDatabase(), encryptedPHPConnection);
-    //syncer->sync();
 }

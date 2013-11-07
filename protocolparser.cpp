@@ -68,6 +68,15 @@ ProtocolOutStream::ProtocolOutStream(QByteArray *data) :
     fXMLWriter.writeStartDocument();
 }
 
+ProtocolOutStream::~ProtocolOutStream()
+{
+    while (fCurrentStanza != NULL) {
+        OutStanza *parent = fCurrentStanza->parent();
+        delete fCurrentStanza;
+        fCurrentStanza = parent;
+    }
+}
+
 void ProtocolOutStream::pushStanza(OutStanza *stanza)
 {
     if (fCurrentStanza != NULL)
@@ -143,7 +152,7 @@ void ProtocolInStream::parse()
         switch (fXMLReader.readNext()) {
         case QXmlStreamReader::EndElement: {
             handler_tree *parent = fCurrentHandlerTree->parent;
-            delete fCurrentHandlerTree;
+//            delete fCurrentHandlerTree;
             fCurrentHandlerTree = parent;
 
             // update handler list
@@ -216,11 +225,11 @@ bool InStanzaHandler::isTextRequired() const
     return fTextRequired;
 }
 
-void InStanzaHandler::handleStanza(const QXmlStreamAttributes &attributes)
+void InStanzaHandler::handleStanza(const QXmlStreamAttributes &/*attributes*/)
 {
 }
 
-void InStanzaHandler::handleText(const QStringRef &text)
+void InStanzaHandler::handleText(const QStringRef &/*text*/)
 {
 }
 
@@ -257,8 +266,6 @@ ProtocolInStream::handler_tree::~handler_tree()
 }
 
 
-
-
 IqOutStanza::IqOutStanza(IqType type) :
     OutStanza("iq"),
     fType(type)
@@ -278,7 +285,7 @@ QString IqOutStanza::toString(IqType type)
     case kGet:
         return "get";
     case kSet:
-        return "set;";
+        return "set";
     case kResult:
         return "result";
     case kError:
@@ -289,7 +296,25 @@ QString IqOutStanza::toString(IqType type)
     return "";
 }
 
-IqType IqOutStanza::fromString(const QString &string)
+
+IqInStanzaHandler::IqInStanzaHandler() :
+    InStanzaHandler("iq"),
+    fType(kBadType)
+{
+}
+
+IqType IqInStanzaHandler::type()
+{
+    return fType;
+}
+
+void IqInStanzaHandler::handleStanza(const QXmlStreamAttributes &attributes)
+{
+    if (attributes.hasAttribute("type"))
+        fType = fromString(attributes.value("type").toString());
+}
+
+IqType IqInStanzaHandler::fromString(const QString &string)
 {
     if (string.compare("get", Qt::CaseInsensitive) == 0)
         return kGet;

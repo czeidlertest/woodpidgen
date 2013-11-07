@@ -63,11 +63,11 @@ class OutStanza {
     }
 
     public function addAttributeNS($namespaceUri, $name, $value) {
-        $this->attibutes[] = new XMLAttribute($namespaceUri, $name, $value);
+        $this->attributes[] = new XMLAttribute($namespaceUri, $name, $value);
     }
 
     public function addAttribute($name, $value) {
-        $this->attibutes[] = new XMLAttribute("", $name, $value);
+        $this->attributes[] = new XMLAttribute("", $name, $value);
     }
 
     public function setParent($parent) {
@@ -88,16 +88,16 @@ class ProtocolOutStream {
     public function pushStanza($stanza) {
         if ($this->currentStanza != NULL)
             $this->xml->endElement();
-        writeStanze($stanza);
+        $this->writeStanza($stanza);
 
         if ($this->currentStanza != NULL)
             $stanza->setParent($this->currentStanza->parent());
 
-        $this->currentStanza = stanza;
+        $this->currentStanza = $stanza;
     }
 
     public function pushChildStanza($stanza) {
-        writeStanze($stanza);
+        $this->writeStanza($stanza);
 
         $stanza->setParent($this->currentStanza);
         $this->currentStanza = $stanza;
@@ -119,9 +119,8 @@ class ProtocolOutStream {
         return $this->xml->outputMemory();
     }
 
-    private function writeStanze($stanza) {
+    private function writeStanza($stanza) {
         $this->xml->startElement($stanza->name());
-
         foreach ($stanza->attributes() as $attribute) {
             if ($attribute->namespace != "")
                 $this->xml->writeAttributeNs("", $attribute->name, $attribute->namespace, $attribute->value);
@@ -248,6 +247,8 @@ class XMLHandler {
 						if ($type != NULL) {
 							if (strcasecmp($type, "get") == 0)
 								$this->handleIqGet();
+							if (strcasecmp($type, "set") == 0)
+								$this->handleIqSet();
 						}
 					}
 				break;
@@ -266,6 +267,20 @@ class XMLHandler {
 						$this->handleIqGetQuery();
 					if (strcasecmp($this->xml->name, "sync_pull") == 0)
 						$this->handleIqGetSync();
+					
+				break;
+			}
+		} 
+	}
+	
+	public function handleIqSet() {
+		while ($this->xml->read()) { 
+			switch ($this->xml->nodeType) { 
+				case XMLReader::END_ELEMENT: 
+					return;
+				case XMLReader::ELEMENT:
+					if (strcasecmp($this->xml->name, "sync_push") == 0)
+						$this->handleIqSetSync();
 				break;
 			}
 		} 
@@ -295,7 +310,7 @@ class XMLHandler {
 			}
 		} 
 	}
-	
+
 	public function handleIqGetSync() {
         $branch = $this->xml->getAttribute("branch");
         $tip = $this->xml->getAttribute("tip");
@@ -303,19 +318,61 @@ class XMLHandler {
             return;
 
         $packManager = new PackManager($this->database);
+        $pack = "";
+        try {
         $localTip = $this->database->getTip($branch);
         $pack = $packManager->exportPack($branch, sha1_bin($tip), $localTip, -1);
+        } catch (Exception $e) {
+            $localTip = "";
+        }
 
         // produce output
-        $outStream = ProtocolOutStream();
+        $outStream = new ProtocolOutStream();
         $outStream->pushStanza(new IqOutStanza(IqType::$kResult));
 
         $stanza = new OutStanza("sync_pull");
         $stanza->addAttribute("branch", $branch);
         $stanza->addAttribute("tip", $localTip);
-
         $outStream->pushChildStanza($stanza);
+        
+        $packStanza = new OutStanza("pack");
+        $packStanza->setText(base64_encode($pack));
+        $outStream->pushChildStanza($packStanza);
+        
         $this->response = $outStream->flush();
+	}
+
+	public function handleIqSetSync() {
+		$branch = $this->xml->getAttribute("branch");
+		$startCommit = $this->xml->getAttribute("start_commit");
+		$lastCommit = $this->xml->getAttribute("last_commit");
+
+		while ($this->xml->read()) { 
+			switch ($this->xml->nodeType) { 
+				case XMLReader::END_ELEMENT: 
+					return;
+				case XMLReader::ELEMENT:
+					if (strcasecmp($this->xml->name, "pack") == 0) {
+						$pack = base64_decode($this->xml->readString());
+						$packManager = new PackManager($this->database);
+						$packManager->importPack($branch, $pack, $startCommit, $lastCommit);
+						
+						// produce output
+						$outStream = new ProtocolOutStream();
+						$outStream->pushStanza(new IqOutStanza(IqType::$kResult));
+
+						$stanza = new OutStanza("sync_push");
+						$stanza->addAttribute("branch", $branch);
+						$localTip = $this->database->getTip($branch);
+						$stanza->addAttribute("tip", $localTip);
+						$outStream->pushChildStanza($stanza);
+
+						$this->response = $outStream->flush();
+						
+					}
+				break;
+			}
+		} 
 	}
 }
 

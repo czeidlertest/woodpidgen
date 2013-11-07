@@ -23,6 +23,7 @@ signals:
 private slots:
     void syncConnected(QNetworkReply::NetworkError code);
     void syncReply();
+    void syncPushReply();
 
 private:
     DatabaseInterface *fDatabase;

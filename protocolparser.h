@@ -85,6 +85,7 @@ class ProtocolOutStream {
 public:
     ProtocolOutStream(QIODevice* device);
     ProtocolOutStream(QByteArray* data);
+    ~ProtocolOutStream();
 
     void pushStanza(OutStanza *stanza);
     void pushChildStanza(OutStanza *stanza);
@@ -118,10 +119,21 @@ public:
 
 private:
     static QString toString(IqType type);
-    static IqType fromString(const QString &string);
 
     IqType fType;
 };
 
+class IqInStanzaHandler : public InStanzaHandler {
+public:
+    IqInStanzaHandler();
+
+    IqType type();
+    virtual void handleStanza(const QXmlStreamAttributes &attributes);
+
+private:
+    static IqType fromString(const QString &string);
+
+    IqType fType;
+};
 
 #endif // PROTOCOLPARSER_H

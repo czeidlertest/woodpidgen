@@ -272,23 +272,21 @@ class PackManager {
 	}
 
 	public function importPack($branch, $pack, $startCommit, $endCommit, $format = -1) {
-		$text = base64_encode($pack);
-
 		$objectStart = 0;
-		while ($objectStart < length(text)) {
+		while ($objectStart < strlen($pack)) {
 			$hash = "";
 			$size = "";
-			$objectEnd = readTill($text, $hash, $objectStart, ' ');
-			$objectEnd = readTill($text, $size, $objectEnd, '\0');
+			$objectEnd = readTill($pack, $hash, $objectStart, ' ');
+			$objectEnd = readTill($pack, $size, $objectEnd, '\0');
 			$blobStart = $objectEnd;
 			$objectEnd += $size;
 
-			writeFile($hash, substr($text, $blobStart, $objectEnd - $blobStart));
+			writeFile($hash, substr($pack, $blobStart, $objectEnd - $blobStart));
 			$objectStart = $objectEnd;
 		}
 
 		// update tip
-        $currentTip = $this->getBranchTip($branch);
+        $currentTip = $this->repository->getBranchTip($branch);
         if ($currentTip == "")
             return $this->repository->setBranchTip($branch, $endCommit);
         // check if all commit objects are in place

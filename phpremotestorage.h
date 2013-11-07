@@ -5,32 +5,68 @@
 #include "serverconnection.h"
 
 
-class PHPConnectionManager
+template<class Type>
+class ConnectionManager
 {
 public:
-    EncryptedPHPConnection *connectionFor(const QString &url);
+    Type *connectionFor(const QString &url) {
+        Type *connection = NULL;
+        typename QMap<QString, Type*>::iterator it = fConnections.find(url);
+        if (it != fConnections.end()) {
+            connection = it.value();
+        } else {
+            connection = new Type(QUrl(url));
+        if (connection == NULL)
+            return NULL;
+            fConnections[url] = connection;
+        }
+        return connection;
+    }
 
 private:
-    QMap<QString, EncryptedPHPConnection*> fConnections;
+    QMap<QString, Type*> fConnections;
 };
 
-
-class PHPRemoteStorage : public RemoteDataStorage
+class URLRemoteStorage : public RemoteDataStorage
 {
 public:
-    PHPRemoteStorage(const QString &url);
-    PHPRemoteStorage(const DatabaseBranch *database, const QString &baseDir);
+    URLRemoteStorage(const QString &url);
+    URLRemoteStorage(const DatabaseBranch *database, const QString &baseDir);
 
-    virtual QString type() const;
     virtual WP::err writeConfig();
     virtual WP::err open(KeyStoreFinder *keyStoreFinder);
 
-private:
-    QString hash();
-
-    static PHPConnectionManager sPHPConnectionManager;
-
+protected:
+    virtual QString hash();
     QString fUrl;
+};
+
+
+class HTTPRemoteStorage : public URLRemoteStorage
+{
+public:
+    HTTPRemoteStorage(const QString &url);
+    HTTPRemoteStorage(const DatabaseBranch *database, const QString &baseDir);
+
+    virtual QString type() const;
+    virtual WP::err open(KeyStoreFinder *keyStoreFinder);
+
+private:
+    static ConnectionManager<HTTPConnection> sHTTPConnectionManager;
+};
+
+
+class PHPEncryptedRemoteStorage : public URLRemoteStorage
+{
+public:
+    PHPEncryptedRemoteStorage(const QString &url);
+    PHPEncryptedRemoteStorage(const DatabaseBranch *database, const QString &baseDir);
+
+    virtual QString type() const;
+    virtual WP::err open(KeyStoreFinder *keyStoreFinder);
+
+private:
+    static ConnectionManager<EncryptedPHPConnection> sPHPConnectionManager;
 };
 
 #endif // PHPREMOTESTORAGE_H

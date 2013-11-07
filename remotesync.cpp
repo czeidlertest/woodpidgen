@@ -6,7 +6,7 @@
 class SyncOutStanza : public OutStanza {
 public:
     SyncOutStanza(const QString &branch, const QString &tipCommit) :
-        OutStanza("sync")
+        OutStanza("sync_pull")
     {
         addAttribute("branch", branch);
         addAttribute("tip", tipCommit);
@@ -17,7 +17,8 @@ public:
 RemoteSync::RemoteSync(DatabaseInterface *database, RemoteConnection *connection, QObject *parent) :
     QObject(parent),
     fDatabase(database),
-    fRemoteConnection(connection)
+    fRemoteConnection(connection),
+    fServerReply(NULL)
 {
 }
 
@@ -30,15 +31,18 @@ WP::err RemoteSync::sync()
     if (fRemoteConnection->isConnected())
         syncConnected(QNetworkReply::NoError);
     else {
-        fRemoteConnection->connectToServer();
         connect(fRemoteConnection, SIGNAL(connectionAttemptFinished(QNetworkReply::NetworkError)),
                 this, SLOT(syncConnected(QNetworkReply::NetworkError)));
+        fRemoteConnection->connectToServer();
     }
     return WP::kOk;
 }
 
 void RemoteSync::syncConnected(QNetworkReply::NetworkError code)
 {
+    if (code != QNetworkReply::NoError)
+        return;
+
     QString branch = fDatabase->branch();
     QString tipCommit = fDatabase->getTip();
 
@@ -53,16 +57,14 @@ void RemoteSync::syncConnected(QNetworkReply::NetworkError code)
 
     outStream.flush();
 
-    // TODO!!! connect
-    //fRemoteConnection->send(outData);
+    if (fServerReply != NULL)
+        fServerReply->disconnect();
+    fServerReply = fRemoteConnection->send(outData);
+    connect(fServerReply, SIGNAL(finished()), this, SLOT(syncReply()));
 }
 
-void RemoteSync::syncReply(QNetworkReply::NetworkError code)
+void RemoteSync::syncReply()
 {
-
-}
-
-void RemoteSync::syncResponse(const QByteArray &data)
-{
-
+    qDebug(fServerReply->readAll());
+    fServerReply = NULL;
 }

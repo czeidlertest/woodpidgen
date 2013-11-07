@@ -12,7 +12,9 @@
 class ProfileEntryKeyStore;
 class ProfileEntryRemote;
 class ProfileEntryIdentity;
+class RemoteConnection;
 class UserIdentity;
+
 
 class IdentityListModel : public QAbstractListModel {
 public:

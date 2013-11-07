@@ -559,24 +559,6 @@ const QString &StorageDirectory::directory()
 
 */
 
-
-RemoteDataStorage::RemoteDataStorage() :
-    fConnection(NULL)
-{
-}
-
-RemoteDataStorage::RemoteDataStorage(const DatabaseBranch *database, const QString &baseDir) :
-    fConnection(NULL)
-{
-    setToDatabase(database, baseDir);
-}
-
-RemoteConnection *RemoteDataStorage::getRemoteConnection()
-{
-    return fConnection;
-}
-
-
 DatabaseBranch::DatabaseBranch(const QString &database, const QString &branch) :
     fDatabasePath(database),
     fBranch(branch)
@@ -644,3 +626,22 @@ WP::err DatabaseBranch::addRemote(RemoteDataStorage *data)
     fRemotes.append(data);
     return WP::kOk;
 }
+
+
+
+RemoteDataStorage::RemoteDataStorage() :
+    fConnection(NULL)
+{
+}
+
+RemoteDataStorage::RemoteDataStorage(const DatabaseBranch *database, const QString &baseDir) :
+    fConnection(NULL)
+{
+    setToDatabase(database, baseDir);
+}
+
+RemoteConnection *RemoteDataStorage::getRemoteConnection()
+{
+    return fConnection;
+}
+

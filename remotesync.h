@@ -17,19 +17,17 @@ public:
 
     WP::err sync();
 
-private:
-    DatabaseInterface *fDatabase;
-    RemoteConnection *fRemoteConnection;
-
 signals:
     void syncFinished(WP::err status);
 
 private slots:
     void syncConnected(QNetworkReply::NetworkError code);
-    void syncReply(QNetworkReply::NetworkError code);
+    void syncReply();
 
-private slots:
-    void syncResponse(const QByteArray &data);
+private:
+    DatabaseInterface *fDatabase;
+    RemoteConnection *fRemoteConnection;
+    RemoteConnectionReply *fServerReply;
 };
 
 #endif // REMOTESYNC_H

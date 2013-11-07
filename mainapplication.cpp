@@ -45,7 +45,8 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
 
     SecureArray password("test_password");
     if (fProfile->open(password) != WP::kOk) {
-        PHPRemoteStorage* remote = new PHPRemoteStorage("http://localhost/php_server/portal.php");
+        RemoteDataStorage* remote = new HTTPRemoteStorage("http://localhost/php_server/portal.php");
+        //RemoteDataStorage* remote = new PHPEncryptedRemoteStorage("http://localhost/php_server/portal.php");
         WP::err error = fProfile->createNewProfile(password, remote);
         if (error != WP::kOk) {
             delete remote;
@@ -56,7 +57,7 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
 
     DatabaseBranch *branch = fProfile->getBranches().at(0);
     RemoteSync *sync = new RemoteSync(branch->getDatabase(), branch->getRemoteConnectionAt(0), this);
-    //sync->sync();
+    sync->sync();
 
     QByteArray data;
     ProtocolOutStream outStream(&data);
@@ -75,12 +76,13 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
     inStream.parse();
 
     //EncryptedPHPConnection *encryptedPHPConnection = new EncryptedPHPConnection(QUrl("http://clemens-zeidler.de/woodpidgin/portal.php"), this);
+    /*
     EncryptedPHPConnection *encryptedPHPConnection = new EncryptedPHPConnection(QUrl("http://localhost/php_server/portal.php"), this);
     encryptedPHPConnection->connectToServer();
 
     PingRCCommand *replyTest = new PingRCCommand(encryptedPHPConnection, this);
     connect(encryptedPHPConnection, SIGNAL(connectionAttemptFinished(QNetworkReply::NetworkError)), replyTest, SLOT(connectionAttemptFinished(QNetworkReply::NetworkError)));
-
+    */
     /*
     MessageReceiver receiver(&gitInterface);
     QDeclarativeView view;

@@ -93,17 +93,16 @@ class TreeBuilder {
 }
 
 
-class GitDatabase {
-	public $repository;
+class GitDatabase extends Git {
 	public $dir;
 
 	public function __construct($repoPath) {
-		$this->dir = $repoPath;
+        $this->dir = $repoPath;
 		$this->init();
-		$this->repository = new Git($repoPath);
-	}
+        Git::__construct($repoPath);
+    }
 
-	public function init() {
+	private function init() {
 		if (file_exists($this->dir))
 			return false;
 		mkdir($this->dir);
@@ -153,6 +152,7 @@ class GitDatabase {
 
 			throw new Exception(sprintf('no such branch with tip: %s', $tiphex));
 		}
+        return "";
 	}
 
 	/*! Returns true if $head is a branch name else $head is the hex id of the detached head. */
@@ -176,6 +176,18 @@ class GitDatabase {
 		fwrite($f, sha1_hex($commit));
 		fclose($f);
 	}
+
+    //! \return hex tip commit
+    public function getBranchTip($branchName) {
+        $f = fopen($this->dir."/refs/heads/$branchName", 'r');
+        flock($f, LOCK_SH);
+        if (($line = fgets($f)) == FALSE)
+            throw new Exception('No entry in HEAD');
+        if (!preg_match('#^ref: refs/heads/(.*)$#', $line, $tip))
+            $tip = "";
+        fclose($f);
+        return $tip;
+    }
 
 	public function setHead($commitHex) {
 		if (!file_exists($this->dir."/HEAD"))
@@ -207,17 +219,17 @@ class GitDatabase {
 	public function getRootTree($branch) {
 		$rootTree = NULL;
 		try {
-			$tip = $this->repository->getTip($branch);
-			$rootCommit = $this->repository->getObject($tip);
+			$tip = $this->getTip($branch);
+			$rootCommit = $this->getObject($tip);
 			$rootTree = clone $rootCommit->tree;
 		} catch (Exception $e) {
-			$rootTree = new GitTree($this->repository);
+			$rootTree = new GitTree($this);
 		}
 		return $rootTree;
 	}
 
 	private function writeBlob($data) {
-		$object = new GitBlob($this->repository);
+		$object = new GitBlob($this);
 		$object->data = $data;
 		$object->rehash();
 		$object->write();
@@ -225,7 +237,7 @@ class GitDatabase {
 	}
 
 	public function printObject($name) {
-		$object = $this->repository->getObject($name);
+		$object = $this->getObject($name);
 		if ($object->getType() == Git::OBJ_TREE) {
 			echo "Object Tree: ".sha1_hex($object->getName())."<br>";
 			foreach ($object->nodes as $node)
@@ -246,6 +258,11 @@ class PackManager {
 		$this->repository = $repository;
 	}
 
+    /*
+     * @param $branch (string) branch name
+     * @param $commitOldest (string) start commit binary sha1
+     * @param $commitLatest (string) end commit binary sha1
+     */
 	public function exportPack($branch, $commitOldest, &$commitLatest, $type) {
 		if ($commitLatest == NULL)
 			$commitLatest = $this->repository->getTip($branch);
@@ -259,8 +276,8 @@ class PackManager {
 
 		$objectStart = 0;
 		while ($objectStart < length(text)) {
-			$hash;
-			$size;
+			$hash = "";
+			$size = "";
 			$objectEnd = readTill($text, $hash, $objectStart, ' ');
 			$objectEnd = readTill($text, $size, $objectEnd, '\0');
 			$blobStart = $objectEnd;
@@ -271,8 +288,36 @@ class PackManager {
 		}
 
 		// update tip
-		return $fDatabase->updateTip(last);
+        $currentTip = $this->getBranchTip($branch);
+        if ($currentTip == "")
+            return $this->repository->setBranchTip($branch, $endCommit);
+        // check if all commit objects are in place
+        if (!$this-isAncestorCommit($endCommit, $currentTip))
+            return false;
+        // TODO also check if all blobs for the new commits are in place
+        return $this->repository->setBranchTip($branch, $endCommit);
 	}
+
+    private function isAncestorCommit($child, $ancestor) {
+        $handledCommits = array();
+        // list of unhandled commits
+        $commits[] = $child;
+        while (true) {
+            $currentCommit = array_pop($commits);
+            if ($currentCommit == NULL)
+                break;
+            if ($currentCommit == $ancestor)
+                true;
+            if (in_array($currentCommit, $handledCommits))
+                continue;
+            $handledCommits[] = $currentCommit;
+
+            $commitObject = $this->repository->getObject($currentCommit);
+            $commits[] = $commitObject->parents;
+        }
+
+        return false;
+    }
 
 	private function writeFile($hashHex, $data)
     {
@@ -301,7 +346,7 @@ class PackManager {
 	}
 
 	private function packObjects($objects) {
-		$pack;
+        $pack = '';
 		foreach ($objects as $object) {
 			list($type, $data) = $this->repository->getRawObject($object);
 			$blob = Git::getTypeName($type).' '.strlen($data)."\0".$data;
@@ -313,7 +358,7 @@ class PackManager {
 		return base64_encode($pack);
 	}
 
-	private function listTreeOjects($treeName) {
+	private function listTreeObjects($treeName) {
 		$objects = array();
 		$objects[] = $treeName;
 		$treesQueue = array();
@@ -369,12 +414,36 @@ class PackManager {
 		return $missing;
     }
 
-    
+    /*! Collect all ancestors including the start $commit.
+    */
+    private function collectAncestorCommits($commit) {
+        $handledCommits = array();
+        // list of unhandled commits
+        $commits[] = $commit;
+        while (true) {
+            $currentCommit = array_pop($commits);
+            if ($currentCommit == NULL)
+                break;
+            if (in_array($currentCommit, $handledCommits))
+                continue;
+            $handledCommits[] = $currentCommit;
+
+            $commitObject = $this->repository->getObject($currentCommit);
+            $commits[] = $commitObject->parents;
+        }
+
+        return $handledCommits;
+    }
+
 	private function collectMissingBlobs($commitStop, $commitLast, $type = -1) {
 		$blobs = array();
 		$handledCommits = array();
 		$commits = array();
+        // list of unhandled commits
 		$commits[] = $commitLast;
+        // we don't have to calculate the ancestors till we encountered the first commit with more than one parent
+        $stopAncestorCommits = array();
+        $stopAncestorsCalculated = false;
 		while (true) {
 			$currentCommit = array_pop($commits);
 			if ($currentCommit == NULL)
@@ -383,10 +452,16 @@ class PackManager {
 				continue;
 			if (in_array($currentCommit, $handledCommits))
 				continue;
+            if (in_array($currentCommit, $stopAncestorCommits))
+                continue;
 			$handledCommits[] = $currentCommit;
 
 			$commitObject = $this->repository->getObject($currentCommit);
 			$parents = $commitObject->parents;
+            if (!$stopAncestorsCalculated && count(parents) > 1) {
+                $stopAncestorCommits = collectAncestorCommits($commitStop);
+                $stopAncestorsCalculated = true;
+            }
 			foreach ($parents as $parent) {
 				$parentObject = $this->repository->getObject($parent);
 				

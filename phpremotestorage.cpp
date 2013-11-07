@@ -1,45 +1,25 @@
 #include "phpremotestorage.h"
 
 
-PHPConnectionManager PHPRemoteStorage::sPHPConnectionManager;
-
-PHPRemoteStorage::PHPRemoteStorage(const QString &url) :
+URLRemoteStorage::URLRemoteStorage(const QString &url) :
     fUrl(url)
 {
     setUid(hash());
 }
 
-PHPRemoteStorage::PHPRemoteStorage(const DatabaseBranch *database, const QString &baseDir) :
+URLRemoteStorage::URLRemoteStorage(const DatabaseBranch *database, const QString &baseDir) :
     RemoteDataStorage(database, baseDir)
 {
 }
 
-
-QString PHPRemoteStorage::type() const
+QString URLRemoteStorage::hash()
 {
-    return "PHPRemoteStorage";
+    QByteArray hashResult = fCrypto->sha1Hash(fUrl.toLatin1());
+    QString uid = fCrypto->toHex(hashResult);
+    return uid;
 }
 
-WP::err PHPRemoteStorage::open(KeyStoreFinder *keyStoreFinder)
-{
-    WP::err error = RemoteDataStorage::readKeyStore(keyStoreFinder);
-    if (error != WP::kOk)
-        return error;
-
-    error = readSafe("url", fUrl);
-    if (error != WP::kOk)
-        return error;
-
-    fConnection = sPHPConnectionManager.connectionFor(fUrl);
-    if (fConnection == NULL)
-        return WP::kError;
-
-    setUid(hash());
-
-    return WP::kOk;
-}
-
-WP::err PHPRemoteStorage::writeConfig()
+WP::err URLRemoteStorage::writeConfig()
 {
     WP::err error = RemoteDataStorage::writeConfig();
     if (error != WP::kOk)
@@ -52,24 +32,83 @@ WP::err PHPRemoteStorage::writeConfig()
     return error;
 }
 
-QString PHPRemoteStorage::hash()
+WP::err URLRemoteStorage::open(KeyStoreFinder *keyStoreFinder)
 {
-    QByteArray hashResult = fCrypto->sha1Hash(fUrl.toLatin1());
-    QString uid = fCrypto->toHex(hashResult);
-    return uid;
+    WP::err error = RemoteDataStorage::readKeyStore(keyStoreFinder);
+    if (error != WP::kOk)
+        return error;
+
+    error = readSafe("url", fUrl);
+    if (error != WP::kOk)
+        return error;
+    return error;
 }
 
-EncryptedPHPConnection *PHPConnectionManager::connectionFor(const QString &url)
+
+ConnectionManager<HTTPConnection> HTTPRemoteStorage::sHTTPConnectionManager;
+
+HTTPRemoteStorage::HTTPRemoteStorage(const QString &url) :
+    URLRemoteStorage(url)
 {
-    EncryptedPHPConnection *connection = NULL;
-    QMap<QString, EncryptedPHPConnection*>::iterator it = fConnections.find(url);
-    if (it != fConnections.end()) {
-        connection = it.value();
-    } else {
-        connection = new EncryptedPHPConnection(QUrl(url));
-        if (connection == NULL)
-            return NULL;
-        fConnections[url] = connection;
-    }
-    return connection;
+    fConnection = sHTTPConnectionManager.connectionFor(fUrl);
+}
+
+HTTPRemoteStorage::HTTPRemoteStorage(const DatabaseBranch *database, const QString &baseDir) :
+    URLRemoteStorage(database, baseDir)
+{
+
+}
+
+QString HTTPRemoteStorage::type() const
+{
+    return "HTTPRemoteStorage";
+}
+
+WP::err HTTPRemoteStorage::open(KeyStoreFinder *keyStoreFinder)
+{
+    WP::err error = URLRemoteStorage::open(keyStoreFinder);
+    if (error != WP::kOk)
+        return error;
+
+    fConnection = sHTTPConnectionManager.connectionFor(fUrl);
+    if (fConnection == NULL)
+        return WP::kError;
+
+    setUid(hash());
+
+    return WP::kOk;
+}
+
+ConnectionManager<EncryptedPHPConnection> PHPEncryptedRemoteStorage::sPHPConnectionManager;
+
+PHPEncryptedRemoteStorage::PHPEncryptedRemoteStorage(const QString &url) :
+    URLRemoteStorage(url)
+{
+    fConnection = sPHPConnectionManager.connectionFor(fUrl);
+}
+
+PHPEncryptedRemoteStorage::PHPEncryptedRemoteStorage(const DatabaseBranch *database, const QString &baseDir) :
+    URLRemoteStorage(database, baseDir)
+{
+}
+
+
+QString PHPEncryptedRemoteStorage::type() const
+{
+    return "PHPEncryptedRemoteStorage";
+}
+
+WP::err PHPEncryptedRemoteStorage::open(KeyStoreFinder *keyStoreFinder)
+{
+    WP::err error = URLRemoteStorage::open(keyStoreFinder);
+    if (error != WP::kOk)
+        return error;
+
+    fConnection = sPHPConnectionManager.connectionFor(fUrl);
+    if (fConnection == NULL)
+        return WP::kError;
+
+    setUid(hash());
+
+    return WP::kOk;
 }

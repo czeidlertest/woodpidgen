@@ -75,10 +75,15 @@ public:
 
     static QNetworkAccessManager *getNetworkAccessManager();
 
-    virtual RemoteConnectionReply *send(const QByteArray& data) = 0;
+    WP::err connectToServer();
+    WP::err disconnect();
+    virtual RemoteConnectionReply *send(const QByteArray& data);
 
 signals:
     void connectionAttemptFinished(QNetworkReply::NetworkError code);
+
+protected slots:
+    void replyFinished(QNetworkReply *reply);
 
 protected:
     QUrl fUrl;
@@ -122,7 +127,6 @@ public:
     virtual RemoteConnectionReply *send(const QByteArray& data);
 
 private slots:
-    void replyFinished(QNetworkReply *reply);
     void handleConnectionAttemptReply();
     void networkRequestError(QNetworkReply::NetworkError code);
 

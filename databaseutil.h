@@ -182,5 +182,4 @@ protected:
     RemoteConnection *fConnection;
 };
 
-
 #endif // DATABASEUTIL_H

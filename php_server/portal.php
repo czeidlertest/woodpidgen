@@ -114,21 +114,21 @@ if ($request == "neqotiate_dh_key") {
 // check if we use an encrypted connection and set portal accordantly
 if (isset($_SESSION['dh_private_key']) && isset($_SESSION['encrypt_iv']))
 	$gPortal = new EncryptedPortal(base64_decode($_SESSION['dh_private_key']), base64_decode($_SESSION['encrypt_iv']));
-else {
-	writeToOutput("php encryption required");
-	finished();
-}
+// TODO enable again
+//else {
+//	writeToOutput("php encryption required");
+//	finished();
+//}
 
 // get data
 $request = $gPortal->receiveData($request);
 
-writeToOutput($request." pong");
 
-//$XMLHandler = new XMLHandler($response);
-//$response = $XMLHandler->handle();
+$XMLHandler = new XMLHandler($request);
+$response = $XMLHandler->handle();
 
 // start working
-//writeToOutput($response);
+writeToOutput($response);
 finished();
 
 ?>

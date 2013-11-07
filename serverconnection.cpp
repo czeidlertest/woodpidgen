@@ -116,6 +116,51 @@ QNetworkAccessManager* HTTPConnection::getNetworkAccessManager()
     return ((MainApplication*)qApp)->getNetworkAccessManager();
 }
 
+WP::err HTTPConnection::connectToServer()
+{
+    setConnected();
+    emit connectionAttemptFinished(QNetworkReply::NoError);
+    return WP::kOk;
+}
+
+WP::err HTTPConnection::disconnect()
+{
+    setDisconnected();
+    return WP::kOk;
+}
+
+RemoteConnectionReply *HTTPConnection::send(const QByteArray &data)
+{
+    QNetworkRequest request;
+    request.setUrl(fUrl);
+    request.setHeader(QNetworkRequest::ContentTypeHeader,"application/x-www-form-urlencoded");
+
+    QNetworkAccessManager *manager = getNetworkAccessManager();
+    QByteArray outgoing = data;
+    outgoing.prepend("request=");
+    QNetworkReply *reply = manager->post(request, outgoing);
+    if (reply == NULL)
+        return NULL;
+
+    connect(manager, SIGNAL(finished(QNetworkReply*)), this, SLOT(replyFinished(QNetworkReply*)));
+    //connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(replyError(QNetworkReply::NetworkError)));
+
+    RemoteConnectionReply *remoteConnectionReply = new HTTPConnectionReply(reply, reply, this);
+    fReplyMap.insert(reply, remoteConnectionReply);
+    return remoteConnectionReply;
+}
+
+void HTTPConnection::replyFinished(QNetworkReply *reply)
+{
+    QMap<QNetworkReply*, RemoteConnectionReply*>::iterator it = fReplyMap.find(reply);
+    if (it == fReplyMap.end())
+        return;
+
+    RemoteConnectionReply* receiver = it.value();
+    receiver->deleteLater();
+    fReplyMap.remove(reply);
+}
+
 EncryptedPHPConnection::EncryptedPHPConnection(QUrl url, QObject *parent) :
     HTTPConnection(url, parent),
     fEncryption(NULL)
@@ -176,8 +221,6 @@ RemoteConnectionReply *EncryptedPHPConnection::send(const QByteArray &data)
         fEncryption->sendFilter(data, outgoing);
         outgoing.prepend("request=");
         reply = manager->post(request, outgoing);
-    } else {
-        reply = manager->post(request, data);
     }
     if (reply == NULL)
         return NULL;
@@ -188,17 +231,6 @@ RemoteConnectionReply *EncryptedPHPConnection::send(const QByteArray &data)
     RemoteConnectionReply *remoteConnectionReply = new EncryptedPHPConnectionReply(fEncryption, reply, this);
     fReplyMap.insert(reply, remoteConnectionReply);
     return remoteConnectionReply;
-}
-
-void EncryptedPHPConnection::replyFinished(QNetworkReply *reply)
-{
-    QMap<QNetworkReply*, RemoteConnectionReply*>::iterator it = fReplyMap.find(reply);
-    if (it == fReplyMap.end())
-        return;
-
-    RemoteConnectionReply* receiver = it.value();
-    receiver->deleteLater();
-    fReplyMap.remove(reply);
 }
 
 void EncryptedPHPConnection::handleConnectionAttemptReply()
@@ -263,7 +295,6 @@ PHPEncryptionFilter::PHPEncryptionFilter(CryptoInterface *crypto,
 
 void PHPEncryptionFilter::sendFilter(const QByteArray &in, QByteArray &out)
 {
-    qDebug() << "Key: " << fCipherKey.toBase64().data() << " iv: " << fIV.toBase64().data() << endl;
     fCrypto->encryptSymmetric(in, out, fCipherKey, fIV, "aes128");
     out = out.toBase64();
 }

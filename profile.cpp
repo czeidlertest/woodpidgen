@@ -5,6 +5,7 @@
 #include "useridentity.h"
 #include "phpremotestorage.h"
 
+
 IdentityListModel::IdentityListModel(QObject * parent)
     :
       QAbstractListModel(parent)
@@ -97,10 +98,12 @@ WP::err Profile::createNewProfile(const SecureArray &password, RemoteDataStorage
         QString path = "remotes/";
         path += remote->getUid();
         remote->setTo(this, path);
+        error = addRemoteDataStorage(remote);
+        if (error != WP::kOk)
+            return error;
         error = remote->writeConfig();
         if (error != WP::kOk)
             return error;
-        addRemoteDataStorage(remote);
         for (int i = 0; i < fBranches.count(); i++) {
             DatabaseBranch *branch = fBranches.at(i);
             connectRemote(branch, remote);
@@ -194,11 +197,11 @@ void Profile::addUserIdentity(ProfileEntryIdentity *entry)
 
 WP::err Profile::loadRemotes()
 {
-    QStringList identityList = listDirectories("remotes");
+    QStringList remotesList = listDirectories("remotes");
 
-    for (int i = 0; i < identityList.count(); i++) {
+    for (int i = 0; i < remotesList.count(); i++) {
         ProfileEntryRemote *entry
-            = new ProfileEntryRemote(this, prependBaseDir("remotes/" + identityList.at(i)), NULL);
+            = new ProfileEntryRemote(this, prependBaseDir("remotes/" + remotesList.at(i)), NULL);
         entry->setTo(this, entry->getDatabaseBaseDir());
         if (entry->load(this) != WP::kOk)
             continue;
@@ -299,6 +302,8 @@ WP::err Profile::loadDatabaseBranches()
                 if (error != WP::kOk)
                     continue;
                 RemoteDataStorage *remote = findRemote(remoteId);
+                if (remote == NULL)
+                    continue;
                 error = connectRemote(databaseBranch, remote);
                 if (error != WP::kOk)
                     continue;
@@ -472,8 +477,10 @@ RemoteDataStorage *ProfileEntryRemote::instanciate()
     error = readSafe("type", type);
     if (error != WP::kOk)
         return NULL;
-    if (type == "PHPRemoteStorage")
-        return new PHPRemoteStorage(fDatabaseBranch, fDatabaseBaseDir);
+    if (type == "PHPEncryptedRemoteStorage")
+        return new PHPEncryptedRemoteStorage(fDatabaseBranch, fDatabaseBaseDir);
+    if (type == "HTTPRemoteStorage")
+        return new HTTPRemoteStorage(fDatabaseBranch, fDatabaseBaseDir);
     return NULL;
 }
 

@@ -14,9 +14,11 @@ public:
     WP::err importPack(const QByteArray &data, const QString &first, const QString &last);
 
 private:
-    int readTill(QByteArray &in, QString &out, int start, char stopChar);
+    int readTill(const QByteArray &in, QString &out, int start, char stopChar);
 
     void findMissingObjects(QList<QString> &listOld, QList<QString> &listNew, QList<QString> &missing) const;
+    //! Collect all ancestors including the start $commit.
+    WP::err collectAncestorCommits(const QString &commit, QList<QString> &ancestors) const;
     WP::err collectMissingBlobs(const QString &commitStop, const QString &commitLast, QList<QString> &blobs, int type = -1) const;
     WP::err packObjects(const QList<QString> &objects, QByteArray &out) const;
     WP::err listTreeOjects(const git_oid *treeId, QList<QString> &objects) const;
@@ -50,21 +52,19 @@ PackManager::PackManager(GitInterface *gitInterface, git_repository *repository,
 
 WP::err PackManager::importPack(const QByteArray& data, const QString &first, const QString &last)
 {
-    QByteArray text = QByteArray::fromBase64(data);
-
     int objectStart = 0;
-    while (objectStart < text.length()) {
+    while (objectStart < data.length()) {
         QString hash;
         QString size;
         int objectEnd = objectStart;
-        objectEnd = readTill(text, hash, objectEnd, ' ');
+        objectEnd = readTill(data, hash, objectEnd, ' ');
         printf("hash %s\n", hash.toStdString().c_str());
-        objectEnd = readTill(text, size, objectEnd, '\0');
+        objectEnd = readTill(data, size, objectEnd, '\0');
         int blobStart = objectEnd;
         printf("size %i\n", size.toInt());
         objectEnd += size.toInt();
 
-        const char* dataPointer = text.data() + blobStart;
+        const char* dataPointer = data.data() + blobStart;
         WP::err error = fDatabase->writeFile(hash, dataPointer, objectEnd - blobStart);
         if (error != WP::kOk)
             return error;
@@ -76,7 +76,7 @@ WP::err PackManager::importPack(const QByteArray& data, const QString &first, co
     return fDatabase->updateTip(last);
 }
 
-int PackManager::readTill(QByteArray& in, QString &out, int start, char stopChar)
+int PackManager::readTill(const QByteArray& in, QString &out, int start, char stopChar)
 {
     int pos = start;
     while (pos < in.length() && in.at(pos) != stopChar) {
@@ -112,7 +112,94 @@ void PackManager::findMissingObjects(QList<QString> &listOld, QList<QString>& li
     }
 }
 
+WP::err PackManager::collectAncestorCommits(const QString &commit, QList<QString> &ancestors) const {
+    QList<QString> commits;
+    commits.append(commit);
+    while (commits.count() > 0) {
+        QString currentCommit = commits.takeFirst();
+        if (ancestors.contains(currentCommit))
+            continue;
+        ancestors.append(currentCommit);
+
+        // collect parents
+        git_commit *commitObject;
+        git_oid currentCommitOid;
+        oidFromQString(&currentCommitOid, currentCommit);
+        if (git_commit_lookup(&commitObject, fRepository, &currentCommitOid) != 0)
+            return WP::kError;
+        for (unsigned int i = 0; i < git_commit_parentcount(commitObject); i++) {
+            const git_oid *parent = git_commit_parent_id(commitObject, i);
+
+            QString parentString = oidToQString(parent);
+            commits.append(parentString);
+        }
+        git_commit_free(commitObject);
+    }
+    return WP::kOk;
+}
+
 WP::err PackManager::collectMissingBlobs(const QString &commitStop, const QString &commitLast, QList<QString> &blobs, int type) const {
+    QList<QString> commits;
+    QList<QString> newObjects;
+    commits.append(commitLast);
+    QList<QString> stopAncestorCommits;
+    bool stopAncestorsCalculated = false;
+    while (commits.count() > 0) {
+        QString currentCommit = commits.takeFirst();
+        if (currentCommit == commitStop)
+            continue;
+        if (newObjects.contains(currentCommit))
+            continue;
+        newObjects.append(currentCommit);
+
+        // collect tree objects
+        git_commit *commitObject;
+        git_oid currentCommitOid;
+        oidFromQString(&currentCommitOid, currentCommit);
+        if (git_commit_lookup(&commitObject, fRepository, &currentCommitOid) != 0)
+            return WP::kError;
+        WP::err status = listTreeOjects(git_commit_tree_id(commitObject), newObjects);
+        if (status != WP::kOk) {
+            git_commit_free(commitObject);
+            return WP::kError;
+        }
+
+        // collect parents
+        unsigned int parentCount = git_commit_parentcount(commitObject);
+        if (parentCount > 1 && !stopAncestorsCalculated) {
+            collectAncestorCommits(commitStop, stopAncestorCommits);
+            stopAncestorsCalculated = true;
+        }
+        for (unsigned int i = 0; i < parentCount; i++) {
+            const git_oid *parent = git_commit_parent_id(commitObject, i);
+
+            QString parentString = oidToQString(parent);
+            // if we reachted the ancestor commits tree we are done
+            if (!stopAncestorCommits.contains(parentString))
+                commits.append(parentString);
+        }
+        git_commit_free(commitObject);
+    }
+
+    // get stop commit object tree
+    QList<QString> stopCommitObjects;
+    if (commitStop != "") {
+        git_commit *stopCommitObject;
+        git_oid stopCommitOid;
+        oidFromQString(&stopCommitOid, commitStop);
+        if (git_commit_lookup(&stopCommitObject, fRepository, &stopCommitOid) != 0)
+            return WP::kError;
+        WP::err status = listTreeOjects(git_commit_tree_id(stopCommitObject), stopCommitObjects);
+        git_commit_free(stopCommitObject);
+        if (status != WP::kOk)
+            return WP::kError;
+    }
+
+    // calculate the missing objects
+    findMissingObjects(stopCommitObjects, newObjects, blobs);
+    return WP::kOk;
+
+/*
     QList<QString> handledCommits;
     QList<QString> commits;
     commits.append(commitLast);
@@ -120,7 +207,7 @@ WP::err PackManager::collectMissingBlobs(const QString &commitStop, const QStrin
         if (commits.count() == 0)
             break;
         QString currentCommit = commits.takeLast();
-        if (currentCommit == commitStop)
+        if (currentCommit == commitStop && handledCommits.contains(currentCommit))
             continue;
         if (handledCommits.contains(currentCommit))
             continue;
@@ -178,12 +265,63 @@ WP::err PackManager::collectMissingBlobs(const QString &commitStop, const QStrin
     }
 
     blobs.append(handledCommits);
-    return WP::kOk;
+    return WP::kOk;*/
+}
+
+#include "zlib.h"
+#include <QBuffer>
+#define CHUNK 16384
+
+int gzcompress(QByteArray &source, QByteArray &outArray)
+{
+    QBuffer sourceBuffer(&source);
+    sourceBuffer.open(QIODevice::ReadOnly);
+    QBuffer outBuffer(&outArray);
+    outBuffer.open(QIODevice::WriteOnly);
+
+    int ret, flush;
+    unsigned have;
+    z_stream strm;
+    unsigned char in[CHUNK];
+    unsigned char out[CHUNK];
+
+    /* allocate deflate state */
+    strm.zalloc = Z_NULL;
+    strm.zfree = Z_NULL;
+    strm.opaque = Z_NULL;
+    ret = deflateInit(&strm, Z_DEFAULT_COMPRESSION);
+    if (ret != Z_OK)
+        return ret;
+
+    /* compress until end of file */
+    do {
+        strm.avail_in = sourceBuffer.read((char*)in, CHUNK);
+        flush = sourceBuffer.atEnd() ? Z_FINISH : Z_NO_FLUSH;
+        strm.next_in = in;
+
+        /* run deflate() on input until output buffer not full, finish
+           compression if all of source has been read in */
+        do {
+            strm.avail_out = CHUNK;
+            strm.next_out = out;
+            ret = deflate(&strm, flush);    /* no bad return value */
+            have = CHUNK - strm.avail_out;
+            if (outBuffer.write((char*)out, have) != have) {
+                (void)deflateEnd(&strm);
+                return Z_ERRNO;
+            }
+        } while (strm.avail_out == 0);
+
+        /* done when last data in file processed */
+    } while (flush != Z_FINISH);
+
+    /* clean up and return */
+    (void)deflateEnd(&strm);
+    return Z_OK;
 }
 
 WP::err PackManager::packObjects(const QList<QString> &objects, QByteArray &out) const
 {
-    QByteArray pack;
     for (int i = 0; i < objects.count(); i++) {
         git_odb_object *object;
         git_oid objectOid;
@@ -197,20 +335,23 @@ WP::err PackManager::packObjects(const QList<QString> &objects, QByteArray &out)
         QString sizeString;
         QTextStream(&sizeString) << git_odb_object_size(object);
         blob.append(sizeString);
-        blob.append("\0");
+        blob.append('\0');
         blob.append((char*)git_odb_object_data(object), git_odb_object_size(object));
-        blob = qCompress(blob);
+        //blob = qCompress(blob);
 
-        pack.append(objects[i]);
-        pack.append(' ');
+        QByteArray blobCompressed;
+        int error = gzcompress(blob, blobCompressed);
+        blob = blobCompressed;
+
+        out.append(objects[i]);
+        out.append(' ');
         QString blobSize;
         QTextStream(&blobSize) << blob.count();
-        pack.append(blobSize);
-        pack.append("\0");
-        pack.append(blob);
+        out.append(blobSize);
+        out.append('\0');
+        out.append(blob);
     }
 
-    out = pack.toBase64();
     return WP::kOk;
 }
 
@@ -231,18 +372,22 @@ WP::err PackManager::listTreeOjects(const git_oid *treeId, QList<QString> &objec
     int error = git_tree_lookup(&tree, fRepository, treeId);
     if (error != 0)
         return WP::kError;
-    objects.append(oidToQString(treeId));
+    QString treeOidString = oidToQString(treeId);
+    if (!objects.contains(treeOidString))
+        objects.append(treeOidString);
     QList<git_tree*> treesQueue;
     treesQueue.append(tree);
 
     while (error == 0) {
-        git_tree *currentTree = treesQueue.takeFirst();
-        if (currentTree == NULL)
+        if (treesQueue.count() < 1)
             break;
+        git_tree *currentTree = treesQueue.takeFirst();
 
         for (unsigned int i = 0; i < git_tree_entrycount(currentTree); i++) {
             const git_tree_entry *entry = git_tree_entry_byindex(currentTree, i);
-            objects.append(oidToQString(git_tree_entry_id(entry)));
+            QString objectOidString = oidToQString(git_tree_entry_id(entry));
+            if (!objects.contains(objectOidString))
+                objects.append(objectOidString);
             if (git_tree_entry_type(entry) == GIT_OBJ_TREE) {
                 git_tree *subTree;
                 error = git_tree_lookup(&subTree, fRepository, git_tree_entry_id(entry));

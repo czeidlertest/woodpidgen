@@ -105,7 +105,7 @@ void RemoteSync::syncReply()
 {
     QByteArray data = fServerReply->readAll();
     fServerReply = NULL;
-
+ qDebug(data);
     IqInStanzaHandler iqHandler;
     SyncPullHandler *syncPullHandler = new SyncPullHandler();
     SyncPullPackHandler *syncPullPackHandler = new SyncPullPackHandler();
@@ -140,7 +140,7 @@ void RemoteSync::syncReply()
     }
     // we are ahead of the server: push changes to the server
     QByteArray pack;
-    WP::err error = fDatabase->exportPack(pack, localTipCommit, syncPullHandler->tip);
+    WP::err error = fDatabase->exportPack(pack, syncPullHandler->tip, localTipCommit);
     if (error != WP::kOk) {
         emit syncFinished(error);
         return;

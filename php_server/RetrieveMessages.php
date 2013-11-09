@@ -223,6 +223,11 @@ class XMLResponse {
 	}
 }
 
+function url_decode($data) {
+	$data = str_replace(" ", "+", $data);
+	return base64_decode($data);
+}
+
 class XMLHandler {
 	private $xml;
 	private $response;
@@ -353,7 +358,8 @@ class XMLHandler {
 					return;
 				case XMLReader::ELEMENT:
 					if (strcasecmp($this->xml->name, "pack") == 0) {
-						$pack = base64_decode($this->xml->readString());
+						$pack = url_decode($this->xml->readString());
+
 						$packManager = new PackManager($this->database);
 						$packManager->importPack($branch, $pack, $startCommit, $lastCommit);
 						
@@ -363,7 +369,7 @@ class XMLHandler {
 
 						$stanza = new OutStanza("sync_push");
 						$stanza->addAttribute("branch", $branch);
-						$localTip = $this->database->getTip($branch);
+						$localTip = sha1_hex($this->database->getTip($branch));
 						$stanza->addAttribute("tip", $localTip);
 						$outStream->pushChildStanza($stanza);
 

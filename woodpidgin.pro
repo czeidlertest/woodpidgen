@@ -68,7 +68,7 @@ HEADERS += \
 FORMS += \
     mainwindow.ui
 
-unix: LIBS += -L$$PWD/../libgit2/build -lgit2
+unix: LIBS += -L$$PWD/../libgit2/build -lgit2 -lz
 
 INCLUDEPATH += $$PWD/../libgit2/include
 DEPENDPATH += $$PWD/../libgit2

@@ -19,7 +19,7 @@ class PlainTextPortal implements IPortalInterface{
 		return $data;
 	}
 
-    public function sendData($data) {
+	public function sendData($data) {
 		echo $data;
     }
 };

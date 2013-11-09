@@ -169,24 +169,28 @@ class GitDatabase extends Git {
 		return false;
 	}
 
-	public function setBranchTip($branchName, $commit) {
+	public function setBranchTip($branchName, $commitHex) {
 		$f = fopen($this->dir."/refs/heads/$branchName", 'cb');
 		flock($f, LOCK_SH);
 		ftruncate($f, 0);
-		fwrite($f, sha1_hex($commit));
+		fwrite($f, $commitHex);
 		fclose($f);
 	}
 
     //! \return hex tip commit
     public function getBranchTip($branchName) {
-        $f = fopen($this->dir."/refs/heads/$branchName", 'r');
-        flock($f, LOCK_SH);
-        if (($line = fgets($f)) == FALSE)
-            throw new Exception('No entry in HEAD');
-        if (!preg_match('#^ref: refs/heads/(.*)$#', $line, $tip))
-            $tip = "";
-        fclose($f);
-        return $tip;
+		if (!file_exists($this->dir."/refs/heads/$branchName"))
+			return "";
+		$f = fopen($this->dir."/refs/heads/$branchName", 'r');
+		if (!$f)
+			return "";
+		flock($f, LOCK_SH);
+		if (($line = fgets($f)) == FALSE)
+			return "";
+		if (!preg_match('#^ref: refs/heads/(.*)$#', $line, $tip))
+			$tip = "";
+		fclose($f);
+		return $tip;
     }
 
 	public function setHead($commitHex) {
@@ -275,16 +279,14 @@ class PackManager {
 		$objectStart = 0;
 		while ($objectStart < strlen($pack)) {
 			$hash = "";
-			$size = "";
-			$objectEnd = readTill($pack, $hash, $objectStart, ' ');
-			$objectEnd = readTill($pack, $size, $objectEnd, '\0');
-			$blobStart = $objectEnd;
-			$objectEnd += $size;
-
-			writeFile($hash, substr($pack, $blobStart, $objectEnd - $blobStart));
-			$objectStart = $objectEnd;
+			$sizeString = "";
+			$objectStart = $this->readTill($pack, $hash, $objectStart, " ");
+			$objectStart = $this->readTill($pack, $sizeString, $objectStart, "\0");
+			$size = (int)$sizeString;
+			$this->writeFile($hash, substr($pack, $objectStart, $size));
+			$objectStart += $size;
 		}
-
+       
 		// update tip
         $currentTip = $this->repository->getBranchTip($branch);
         if ($currentTip == "")
@@ -296,29 +298,40 @@ class PackManager {
         return $this->repository->setBranchTip($branch, $endCommit);
 	}
 
-    private function isAncestorCommit($child, $ancestor) {
-        $handledCommits = array();
-        // list of unhandled commits
-        $commits[] = $child;
-        while (true) {
-            $currentCommit = array_pop($commits);
-            if ($currentCommit == NULL)
-                break;
-            if ($currentCommit == $ancestor)
-                true;
-            if (in_array($currentCommit, $handledCommits))
-                continue;
-            $handledCommits[] = $currentCommit;
+	private function readTill($in, &$out, $start, $stopChar)
+	{
+		$pos = $start;
+		while ($pos < strlen($in) && $in[$pos] != $stopChar) {
+			$out = $out.$in[$pos];
+			$pos++;
+		}
+		$pos++;
+		return $pos;
+	}
 
-            $commitObject = $this->repository->getObject($currentCommit);
-            $commits[] = $commitObject->parents;
-        }
+	private function isAncestorCommit($child, $ancestor) {
+		$handledCommits = array();
+		// list of unhandled commits
+		$commits[] = $child;
+		while (true) {
+			$currentCommit = array_pop($commits);
+			if ($currentCommit == NULL)
+				break;
+			if ($currentCommit == $ancestor)
+				true;
+			if (in_array($currentCommit, $handledCommits))
+				continue;
+			$handledCommits[] = $currentCommit;
 
-        return false;
-    }
+			$commitObject = $this->repository->getObject($currentCommit);
+			$commits[] = $commitObject->parents;
+		}
+
+		return false;
+	}
 
 	private function writeFile($hashHex, $data)
-    {
+	{
 		$path = sprintf('%s/objects/%s/%s', $this->repository->dir, substr($hashHex, 0, 2), substr($hashHex, 2));
 		if (file_exists($path))
 			return false;
@@ -332,17 +345,7 @@ class PackManager {
 		fclose($f);
 		return true;
     }
-    
-	private function readTill($in, &$out, $start, $stopChar) {
-		$pos = start;
-		while ($pos < length(in) && $in[$pos] != $stopChar) {
-			$out[] = $in[$pos];
-			$pos++;
-		}
-		$pos++;
-		return $pos;
-	}
-
+   
 	private function packObjects($objects) {
         $pack = '';
 		foreach ($objects as $object) {

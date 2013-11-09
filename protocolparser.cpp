@@ -261,8 +261,6 @@ ProtocolInStream::handler_tree::handler_tree(ProtocolInStream::handler_tree *p) 
 
 ProtocolInStream::handler_tree::~handler_tree()
 {
-    for (int i = 0; i < handlers.count(); i++)
-        delete handlers.at(i);
 }
 
 

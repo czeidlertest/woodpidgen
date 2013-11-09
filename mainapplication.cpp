@@ -58,7 +58,7 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
     DatabaseBranch *branch = fProfile->getBranches().at(0);
     RemoteSync *sync = new RemoteSync(branch->getDatabase(), branch->getRemoteConnectionAt(0), this);
     sync->sync();
-
+/*
     QByteArray data;
     ProtocolOutStream outStream(&data);
     outStream.pushStanza(new IqOutStanza(kGet));
@@ -76,7 +76,7 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
     inStream.parse();
 
     //EncryptedPHPConnection *encryptedPHPConnection = new EncryptedPHPConnection(QUrl("http://clemens-zeidler.de/woodpidgin/portal.php"), this);
-    /*
+
     EncryptedPHPConnection *encryptedPHPConnection = new EncryptedPHPConnection(QUrl("http://localhost/php_server/portal.php"), this);
     encryptedPHPConnection->connectToServer();
 

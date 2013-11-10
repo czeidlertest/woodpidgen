@@ -21,7 +21,7 @@ private:
     WP::err collectAncestorCommits(const QString &commit, QList<QString> &ancestors) const;
     WP::err collectMissingBlobs(const QString &commitStop, const QString &commitLast, QList<QString> &blobs, int type = -1) const;
     WP::err packObjects(const QList<QString> &objects, QByteArray &out) const;
-    WP::err listTreeOjects(const git_oid *treeId, QList<QString> &objects) const;
+    WP::err listTreeObjects(const git_oid *treeId, QList<QString> &objects) const;
 
 private:
     GitInterface *fDatabase;
@@ -58,10 +58,8 @@ WP::err PackManager::importPack(const QByteArray& data, const QString &first, co
         QString size;
         int objectEnd = objectStart;
         objectEnd = readTill(data, hash, objectEnd, ' ');
-        printf("hash %s\n", hash.toStdString().c_str());
         objectEnd = readTill(data, size, objectEnd, '\0');
         int blobStart = objectEnd;
-        printf("size %i\n", size.toInt());
         objectEnd += size.toInt();
 
         const char* dataPointer = data.data() + blobStart;
@@ -158,7 +156,7 @@ WP::err PackManager::collectMissingBlobs(const QString &commitStop, const QStrin
         oidFromQString(&currentCommitOid, currentCommit);
         if (git_commit_lookup(&commitObject, fRepository, &currentCommitOid) != 0)
             return WP::kError;
-        WP::err status = listTreeOjects(git_commit_tree_id(commitObject), newObjects);
+        WP::err status = listTreeObjects(git_commit_tree_id(commitObject), newObjects);
         if (status != WP::kOk) {
             git_commit_free(commitObject);
             return WP::kError;
@@ -189,7 +187,7 @@ WP::err PackManager::collectMissingBlobs(const QString &commitStop, const QStrin
         oidFromQString(&stopCommitOid, commitStop);
         if (git_commit_lookup(&stopCommitObject, fRepository, &stopCommitOid) != 0)
             return WP::kError;
-        WP::err status = listTreeOjects(git_commit_tree_id(stopCommitObject), stopCommitObjects);
+        WP::err status = listTreeObjects(git_commit_tree_id(stopCommitObject), stopCommitObjects);
         git_commit_free(stopCommitObject);
         if (status != WP::kOk)
             return WP::kError;
@@ -279,44 +277,37 @@ int gzcompress(QByteArray &source, QByteArray &outArray)
     QBuffer outBuffer(&outArray);
     outBuffer.open(QIODevice::WriteOnly);
 
-    int ret, flush;
-    unsigned have;
-    z_stream strm;
+    z_stream stream;
+    stream.zalloc = Z_NULL;
+    stream.zfree = Z_NULL;
+    stream.opaque = Z_NULL;
+    int status = deflateInit(&stream, Z_DEFAULT_COMPRESSION);
+    if (status != Z_OK)
+        return status;
+
     unsigned char in[CHUNK];
     unsigned char out[CHUNK];
-
-    /* allocate deflate state */
-    strm.zalloc = Z_NULL;
-    strm.zfree = Z_NULL;
-    strm.opaque = Z_NULL;
-    ret = deflateInit(&strm, Z_DEFAULT_COMPRESSION);
-    if (ret != Z_OK)
-        return ret;
-
-    /* compress until end of file */
-    do {
-        strm.avail_in = sourceBuffer.read((char*)in, CHUNK);
+    int flush = Z_NO_FLUSH ;
+    while (flush != Z_FINISH) {
+        stream.avail_in = sourceBuffer.read((char*)in, CHUNK);
         flush = sourceBuffer.atEnd() ? Z_FINISH : Z_NO_FLUSH;
-        strm.next_in = in;
+        stream.next_in = in;
 
-        /* run deflate() on input until output buffer not full, finish
-           compression if all of source has been read in */
+        unsigned have;
+        // deflate() till output buffer is full or we are done
         do {
-            strm.avail_out = CHUNK;
-            strm.next_out = out;
-            ret = deflate(&strm, flush);    /* no bad return value */
-            have = CHUNK - strm.avail_out;
+            stream.avail_out = CHUNK;
+            stream.next_out = out;
+            status = deflate(&stream, flush); // no bad return value
+            have = CHUNK - stream.avail_out;
             if (outBuffer.write((char*)out, have) != have) {
-                (void)deflateEnd(&strm);
+                (void)deflateEnd(&stream);
                 return Z_ERRNO;
             }
-        } while (strm.avail_out == 0);
+        } while (stream.avail_out == 0);
+    }
 
-        /* done when last data in file processed */
-    } while (flush != Z_FINISH);
-
-    /* clean up and return */
-    (void)deflateEnd(&strm);
+    deflateEnd(&stream);
     return Z_OK;
 }
 
@@ -341,15 +332,16 @@ WP::err PackManager::packObjects(const QList<QString> &objects, QByteArray &out)
 
         QByteArray blobCompressed;
         int error = gzcompress(blob, blobCompressed);
-        blob = blobCompressed;
+        if (error != Z_OK)
+            return WP::kError;
 
         out.append(objects[i]);
         out.append(' ');
         QString blobSize;
-        QTextStream(&blobSize) << blob.count();
+        QTextStream(&blobSize) << blobCompressed.count();
         out.append(blobSize);
         out.append('\0');
-        out.append(blob);
+        out.append(blobCompressed);
     }
 
     return WP::kOk;
@@ -360,13 +352,15 @@ WP::err PackManager::exportPack(QByteArray &pack, const QString &commitOldest, c
     QString commitEnd(commitLatest);
     if (commitLatest == "")
         commitEnd = fDatabase->getTip();
+    if (commitEnd == "")
+        return WP::kNotInit;
 
     QList<QString> blobs;
     collectMissingBlobs(commitOldest, commitEnd, blobs);
     return packObjects(blobs, pack);
 }
 
-WP::err PackManager::listTreeOjects(const git_oid *treeId, QList<QString> &objects) const
+WP::err PackManager::listTreeObjects(const git_oid *treeId, QList<QString> &objects) const
 {
     git_tree *tree;
     int error = git_tree_lookup(&tree, fRepository, treeId);
@@ -684,7 +678,7 @@ WP::err GitInterface::writeFile(const QString &hash, const char *data, int size)
     path += hashHex.substr(2).c_str();
     QFile file(path);
     if (file.exists())
-        return WP::kError;
+        return WP::kOk;
 
     file.open(QIODevice::WriteOnly | QIODevice::Truncate);
     if (file.write(data, size) < 0)
@@ -738,8 +732,7 @@ QString GitInterface::getTip() const
 
 WP::err GitInterface::updateTip(const QString &commit)
 {
-    QString refPath = fRepositoryPath;
-    refPath += "/refs/heads/";
+    QString refPath = "refs/heads/";
     refPath += fCurrentBranch;
     git_oid id;
     git_oid_fromstr(&id, commit.toLatin1().data());

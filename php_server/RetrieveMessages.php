@@ -317,34 +317,39 @@ class XMLHandler {
 	}
 
 	public function handleIqGetSync() {
-        $branch = $this->xml->getAttribute("branch");
-        $tip = $this->xml->getAttribute("tip");
-        if ($branch == NULL || $tip == NULL)
-            return;
+		$branch = $this->xml->getAttribute("branch");
+		$remoteTip = $this->xml->getAttribute("tip");
+		if ($branch === NULL || $remoteTip === NULL)
+			return;
+		if (strlen($remoteTip) == 40)
+		$remoteTip = sha1_bin($remoteTip);
 
-        $packManager = new PackManager($this->database);
-        $pack = "";
-        try {
-        $localTip = $this->database->getTip($branch);
-        $pack = $packManager->exportPack($branch, sha1_bin($tip), $localTip, -1);
-        } catch (Exception $e) {
-            $localTip = "";
-        }
+		$packManager = new PackManager($this->database);
+		$pack = "";
+		try {
+			$localTip = $this->database->getTip($branch);
+			$pack = $packManager->exportPack($branch, $remoteTip, $localTip, -1);
+		} catch (Exception $e) {
+			$localTip = "";
+		}
 
-        // produce output
-        $outStream = new ProtocolOutStream();
-        $outStream->pushStanza(new IqOutStanza(IqType::$kResult));
+		// produce output
+		$outStream = new ProtocolOutStream();
+		$outStream->pushStanza(new IqOutStanza(IqType::$kResult));
 
-        $stanza = new OutStanza("sync_pull");
-        $stanza->addAttribute("branch", $branch);
-        $stanza->addAttribute("tip", $localTip);
-        $outStream->pushChildStanza($stanza);
-        
-        $packStanza = new OutStanza("pack");
-        $packStanza->setText(base64_encode($pack));
-        $outStream->pushChildStanza($packStanza);
-        
-        $this->response = $outStream->flush();
+		$stanza = new OutStanza("sync_pull");
+		$stanza->addAttribute("branch", $branch);
+		$localTipHex = "";
+		if (strlen($localTip) == 20)
+			$localTipHex = sha1_hex($localTip);
+		$stanza->addAttribute("tip", $localTipHex);
+		$outStream->pushChildStanza($stanza);
+		
+		$packStanza = new OutStanza("pack");
+		$packStanza->setText(base64_encode($pack));
+		$outStream->pushChildStanza($packStanza);
+		
+		$this->response = $outStream->flush();
 	}
 
 	public function handleIqSetSync() {

@@ -110,7 +110,7 @@ void RemoteSync::syncReply()
     SyncPullHandler *syncPullHandler = new SyncPullHandler();
     SyncPullPackHandler *syncPullPackHandler = new SyncPullPackHandler();
     iqHandler.addChildHandler(syncPullHandler);
-    iqHandler.addChildHandler(syncPullPackHandler);
+    syncPullHandler->addChildHandler(syncPullPackHandler);
 
     ProtocolInStream inStream(data);
     inStream.addHandler(&iqHandler);
@@ -170,4 +170,5 @@ void RemoteSync::syncPushReply()
 {
     QByteArray data = fServerReply->readAll();
     qDebug(data);
+    emit syncFinished(WP::kOk);
 }

@@ -3,6 +3,18 @@
 include 'glip/lib/glip.php'; 
 
 
+function isSHA1Bin($string) {
+	if (strlen($string) == 20)
+		return true;
+	return false;
+}
+
+function isSHA1Hex($string) {
+	if (strlen($string) == 40)
+		return true;
+	return false;
+}
+
 class TreeBuilder {
 	private $rootTree;
 	private $repo;
@@ -276,6 +288,8 @@ class PackManager {
 	}
 
 	public function importPack($branch, $pack, $startCommit, $endCommit, $format = -1) {
+		if (!isSHA1Hex($endCommit))
+			return false;
 		$objectStart = 0;
 		while ($objectStart < strlen($pack)) {
 			$hash = "";
@@ -355,13 +369,12 @@ class PackManager {
 			$blob = sha1_hex($object).' '.strlen($blob)."\0".$blob;
 			$pack = $pack.$blob;
 		}
-		//return $pack;
-		return base64_encode($pack);
+		return $pack;
 	}
 
-	private function listTreeObjects($treeName) {
-		$objects = array();
-		$objects[] = $treeName;
+	private function listTreeObjects($treeName, &$objects) {
+		if (!in_array($treeName, $objects))
+			$objects[] = $treeName;
 		$treesQueue = array();
 		$treesQueue[] = $treeName;
 		while (true) {
@@ -371,7 +384,8 @@ class PackManager {
 			$treeObject = $this->repository->getObject($currentTree);
 			foreach ($treeObject->nodes as $node)
 			{
-				$objects[] = $node->object;
+				if (!in_array($node->object, $objects))
+					$objects[] = $node->object;
 				if ($node->is_dir)
 					$treesQueue[] = $node->object;
 			}
@@ -380,7 +394,7 @@ class PackManager {
 		/*echo "List:<br>";
 		foreach ($objects as $object)
 			$this->printObject($object);*/
-		return $objects;
+		return true;
     }
 
 	private function findMissingObjects($listOld, $listNew) {
@@ -415,7 +429,7 @@ class PackManager {
 		return $missing;
     }
 
-    /*! Collect all ancestors including the start $commit.
+    /*! Collect all ancestors including the start $commit (binary SHA1).
     */
     private function collectAncestorCommits($commit) {
         $handledCommits = array();
@@ -436,6 +450,51 @@ class PackManager {
         return $handledCommits;
     }
 
+    // takes (binary SHA1)
+	private function collectMissingBlobs($commitStop, $commitLast, $type = -1) {
+		$commits = array();
+		$newObjects = array();
+		$commits[] = $commitLast;
+		$stopAncestorCommits = array();
+		$stopAncestorsCalculated = false;
+		while (count($commits) > 0) {
+			$currentCommit = array_pop($commits);
+			if ($currentCommit == $commitStop)
+				continue;
+			if (in_array($currentCommit, $newObjects))
+				continue;
+			$newObjects[] = $currentCommit;
+
+			// collect tree objects
+			$commitObject = $this->repository->getObject($currentCommit);
+			$this->listTreeObjects($commitObject->tree, $newObjects);
+
+			$parents = $commitObject->parents;
+            if (!$stopAncestorsCalculated && count($parents) > 1) {
+                $stopAncestorCommits = collectAncestorCommits($commitStop);
+                $stopAncestorsCalculated = true;
+            }
+			foreach ($parents as $parent) {
+				if (!in_array($parent, $stopAncestorCommits))
+					$commits[] = $parent;
+			}
+		}
+
+		// get stop commit object tree
+		$stopCommitObjects = array();
+		if ($commitStop != "") {
+			$stopCommitObject = $this->repository->getObject($commitStop);
+			if ($stopCommitObject === NULL)
+				return array();
+			
+			$this->listTreeObjects($stopCommitObject->tree, $stopCommitObjects);
+		}
+
+		// calculate the missing objects
+		return $this->findMissingObjects($stopCommitObjects, $newObjects);
+	}
+    /*
+    // takes (binary SHA1)
 	private function collectMissingBlobs($commitStop, $commitLast, $type = -1) {
 		$blobs = array();
 		$handledCommits = array();
@@ -459,7 +518,7 @@ class PackManager {
 
 			$commitObject = $this->repository->getObject($currentCommit);
 			$parents = $commitObject->parents;
-            if (!$stopAncestorsCalculated && count(parents) > 1) {
+            if (!$stopAncestorsCalculated && count($parents) > 1) {
                 $stopAncestorCommits = collectAncestorCommits($commitStop);
                 $stopAncestorsCalculated = true;
             }
@@ -484,6 +543,7 @@ class PackManager {
 
 		return $blobs;
 	}
+	*/
 }
 
 ?>

@@ -166,14 +166,17 @@ void ProtocolInStream::parse()
         }
 
         case QXmlStreamReader::StartElement: {
+            QString name = fXMLReader.name().toString();
             handler_tree *handlerTree = new handler_tree(fCurrentHandlerTree);
 
             for (int i = 0; i < fCurrentHandlerTree->handlers.count(); i++) {
                 InStanzaHandler *handler = fCurrentHandlerTree->handlers.at(i);
-                if (handler->stanzaName() == fXMLReader.name()) {
+                if (handler->stanzaName() == name) {
                     handler->handleStanza(fXMLReader.attributes());
                     for (int a = 0; a < handler->childs().count(); a++)
                         handlerTree->handlers.append(handler->childs().at(a));
+                    if (handler->isTextRequired())
+                        handlerTree->handlers.append(handler);
                 }
             }
             fCurrentHandlerTree = handlerTree;

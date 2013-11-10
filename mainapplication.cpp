@@ -42,7 +42,15 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
 
     fMainWindow = new MainWindow(fProfile);
     fMainWindow->show();
-
+/*
+    // pull test
+    DatabaseInterface *syncDatabase;
+    DatabaseFactory::open(".git", "profile", &syncDatabase);
+    RemoteConnection *connection = new HTTPConnection(QUrl("http://localhost/php_server/portal.php"));
+    RemoteSync *pullSync = new RemoteSync(syncDatabase, connection, this);
+    pullSync->sync();
+    return;
+*/
     SecureArray password("test_password");
     if (fProfile->open(password) != WP::kOk) {
         RemoteDataStorage* remote = new HTTPRemoteStorage("http://localhost/php_server/portal.php");

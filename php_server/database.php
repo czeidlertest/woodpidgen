@@ -187,6 +187,7 @@ class GitDatabase extends Git {
 		ftruncate($f, 0);
 		fwrite($f, $commitHex);
 		fclose($f);
+		return true;
 	}
 
     //! \return hex tip commit

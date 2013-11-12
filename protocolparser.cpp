@@ -156,9 +156,9 @@ void ProtocolInStream::parse()
             fCurrentHandlerTree = parent;
 
             // update handler list
-            fCurrentHandlerTree->handlers.clear();
             handler_tree *parentHandler = fCurrentHandlerTree->parent;
             if (parentHandler != NULL) {
+                fCurrentHandlerTree->handlers.clear();
                 for (int i = 0; i < parentHandler->handlers.count(); i++)
                     fCurrentHandlerTree->handlers.append(parentHandler->handlers.at(i));
             }

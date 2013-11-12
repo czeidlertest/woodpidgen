@@ -10,13 +10,6 @@
 
 include_once './database.php';
 
-#$repoPath = 'test.git';
-#$repository = new Git($repoPath);
-#$syncManager = new MessageSyncManager($repository);
-
-#$XMLHandler = new XMLHandler($_POST["request"], $syncManager);
-#$XMLHandler->handle();
-
 
 class XMLAttribute {
     public function __construct($namespaceUri, $name, $value) {
@@ -173,54 +166,193 @@ class IqOutStanza extends OutStanza {
 };
 
 
-class XMLResponse {
-	static public function qsGetQueryCommit($data, $branch, $first, $last) {
-		$xml = new XMLWriter;
-		$xml->openMemory();
-		$xml->startDocument();
-		$xml->startElement("iq");
-		$xml->writeAttribute("type", "result");
-		$xml->startElement("query");
-		$xml->writeAttribute("xmlns", "git:transfer");
-		$xml->startElement("pack");
-		$xml->writeAttribute("branch", $branch);
-		$xml->writeAttribute("first", $first);
-		$xml->writeAttribute("last", $last);
-		$xml->text($data);
-		$xml->endElement();
-		$xml->endElement();
-		$xml->endElement();
-		$xml->endDocument();
-
-		return $xml->outputMemory();
-	}
-
-    static public function error($code, $message) {
-		$xml = new XMLWriter;
-		$xml->openMemory();
-		$xml->startDocument();
-		$xml->startElement("error");
-		$xml->writeAttribute("code", $code);
-		$xml->text($message);
-		$xml->endElement();
-		$xml->endDocument();
-
-		return $xml->outputMemory();
+class IqErrorOutStanza extends IqOutStanza {
+	public function __construct($details = "") {
+		IqOutStanza::__construct(IqType::$kError);
+		if ($details != "")
+			$this->addAttribute("details", $details);
 	}
 	
-	static public  function diffieHellmanPublicKey($prime, $base, $publicKey) {
-		$xml = new XMLWriter;
-		$xml->openMemory();
-		$xml->startDocument();
-		$xml->startElement("neqotiated_dh_key");
-		$xml->writeAttribute("dh_prime", $prime);
-		$xml->writeAttribute("dh_base", $base);
-		$xml->writeAttribute("dh_public_key", $publicKey);
-		$xml->endElement();
-		$xml->endDocument();
-
-		return $xml->outputMemory();
+	public static function makeErrorMessage($details) {
+		$outStream = new ProtocolOutStream();
+		$outStream->pushStanza(new IqErrorOutStanza($details));
+		return $outStream->flush();
 	}
+}
+
+
+class InStanzaHandler {
+	private $name;
+	private $optional;
+	private $hasBeenHandled;
+	private $childHandlers;
+
+	public function __construct($name) {
+		$this->name = $name;
+		$this->optional = false;
+		$this->hasBeenHandled = false;
+		$this->childHandlers = array();
+	}
+
+	public function getName() {
+		return $this->name;
+	}
+
+	public function isOptional() {
+		return $this->optional;
+	}
+
+	public function setOptional($optional) {
+		$this->optional = $optional;
+	}
+
+	public function handleStanza($attributes) {
+		return false;
+	}
+	
+	public function handleText($text) {
+		return false;
+	}
+
+	public function finished() {
+	}
+
+	public function setHandled($handled = true) {
+		$this->hasBeenHandled = $handled;
+	}
+
+	public function hasBeenHandled() {
+		if (!$this->hasBeenHandled)
+			return false;
+		
+		foreach ($this->childHandlers as $child) {
+			if (!$child->isOptional() && !$child->hasBeenHandled())
+				return false;
+		}
+		return true;
+	}
+
+	public function addChild($child, $optional = false) {
+		$child->optional = $optional;
+		$this->childHandlers[] = $child;
+	}
+
+	public function getChildHandlers() {
+		return $this->childHandlers;
+	}
+};
+
+
+class handler_tree {
+	public $parentTree;
+	public $handlers;
+	
+	public function __construct($parent) {
+		$this->parentTree = $parent;
+		$this->handlers = array();
+	}
+};
+    
+    
+class ProtocolInStream {
+	private $currentHandler = array();
+	private $xml;
+	private $currentHandlerTree;
+	private $root;
+	private $response;
+	
+	public function __construct($input) {
+		$this->xml = new XMLReader;
+		$this->xml->xml(str_replace("\\\"", "'", $input));
+		$this->root = new handler_tree(null);
+		$this->currentHandlerTree = $this->root;
+	}
+
+	public function appendResponse($response) {
+		$this->response = $this->response.$response;
+	}
+
+	public function parse() {
+		while ($this->xml->read()) { 
+			switch ($this->xml->nodeType) {
+				case XMLReader::END_ELEMENT:
+					foreach ($this->currentHandlerTree->handlers as $handler) {
+						if ($handler->hasBeenHandled())
+							$handler->finished();
+					}
+
+					$parent = $this->currentHandlerTree->parentTree;
+					$this->currentHandlerTree = $parent;
+
+					// update handler list
+					$parentHandler = $this->currentHandlerTree->parentTree;
+					if ($parentHandler != null) {
+						$this->currentHandlerTree->handlers = array();
+						foreach ($parentHandler->handlers as $handler) {
+							$this->currentHandlerTree->handlers = array_merge(
+								$this->currentHandlerTree->handlers, $handler->getChildHandlers());
+						}
+					}
+					break;
+
+				case XMLReader::ELEMENT:
+					$handlerTree = new handler_tree($this->currentHandlerTree);
+					foreach ($this->currentHandlerTree->handlers as $handler) {
+						if ($handler->getName() == $this->xml->name) {
+							$handeled = $handler->handleStanza($this->xml);
+							$handler->setHandled($handeled);
+							if (!$handeled && !$handler->isOptional())
+								continue;
+							foreach ($handler->getChildHandlers() as $child)
+								$handlerTree->handlers[] = $child;
+						}
+					}
+					$this->currentHandlerTree = $handlerTree;
+					break;
+			}
+		}
+		return $this->response;
+	}
+
+	public function addHandler($handler, $optional = true) {
+		$handler->setOptional($optional);
+		$this->root->handlers[] = $handler;
+	}
+}
+
+
+class InIqStanzaHandler extends InStanzaHandler {
+	private $type;
+	public function __construct($type) {
+		InStanzaHandler::__construct("iq");
+		$this->type = $type;
+	}
+
+	public function getType() {
+		return $this->type;
+	}
+
+	public function handleStanza($xml) {
+		$typeString = $xml->getAttribute("type");
+		if ($typeString === null)
+			return false;
+		$type = $this->fromString($typeString);
+		if ($this->type != $type)
+			return false;
+		return true;
+	}
+
+	private function fromString($type) {
+		if (strcasecmp($type, "get") == 0)
+			return IqType::$kGet;
+		if (strcasecmp($type, "set") == 0)
+			return IqType::$kSet;
+		if (strcasecmp($type, "result") == 0)
+			return IqType::$kResult;
+		if (strcasecmp($type, "error") == 0)
+			return IqType::$kError;
+		return IqType::$kBadType;
+    }
 }
 
 function url_decode($data) {
@@ -228,18 +360,159 @@ function url_decode($data) {
 	return base64_decode($data);
 }
 
-class XMLHandler {
-	private $xml;
-	private $response;
+// sync handler
 
-    private $database;
+
+class SyncPullStanzaHandler extends InStanzaHandler {
+	private $inStreamReader;
+	private $database;
+	public function __construct($inStreamReader, $database) {
+		InStanzaHandler::__construct("sync_pull");
+		$this->inStreamReader = $inStreamReader;
+		$this->database = $database;
+	}
+
+	public function getType() {
+		return $this->type;
+	}
+
+	public function handleStanza($xml) {
+		$branch = $xml->getAttribute("branch");
+		$remoteTip = $xml->getAttribute("tip");
+		if ($branch === null || $remoteTip === null)
+			return;
+		if (isSHA1Hex($remoteTip))
+			$remoteTip = sha1_bin($remoteTip);
+
+		$packManager = new PackManager($this->database);
+		$pack = "";
+		try {
+			$localTip = $this->database->getTip($branch);
+			$pack = $packManager->exportPack($branch, $remoteTip, $localTip, -1);
+		} catch (Exception $e) {
+			$localTip = "";
+		}
+
+		// produce output
+		$outStream = new ProtocolOutStream();
+		$outStream->pushStanza(new IqOutStanza(IqType::$kResult));
+
+		$stanza = new OutStanza("sync_pull");
+		$stanza->addAttribute("branch", $branch);
+		$localTipHex = "";
+		if (strlen($localTip) == 20)
+			$localTipHex = sha1_hex($localTip);
+		$stanza->addAttribute("tip", $localTipHex);
+		$outStream->pushChildStanza($stanza);
+		
+		$packStanza = new OutStanza("pack");
+		$packStanza->setText(base64_encode($pack));
+		$outStream->pushChildStanza($packStanza);
+		
+		$this->inStreamReader->appendResponse($outStream->flush());
+		return true;
+	}
+}
+
+class SyncPushPackHandler extends InStanzaHandler {
+	private $pack;
+
+	public function __construct() {
+		InStanzaHandler::__construct("pack");
+	}
+	
+	public function handleStanza($xml) {
+		$this->pack = url_decode($xml->readString());
+		return true;
+	}
+	
+	public function getPack() {
+		return $this->pack;
+	}
+}
+
+class SyncPushStanzaHandler extends InStanzaHandler {
+	private $inStreamReader;
+	private $database;
+	private $packHandler;
+	
+	private $branch;
+	private $startCommit;
+	private $lastCommit;
+
+	public function __construct($inStreamReader, $database) {
+		InStanzaHandler::__construct("sync_push");
+		$this->inStreamReader = $inStreamReader;
+		$this->database = $database;
+	}
+
+	public function getType() {
+		return $this->type;
+	}
+
+	public function handleStanza($xml) {
+		$this->branch = $xml->getAttribute("branch");
+		$this->startCommit = $xml->getAttribute("start_commit");
+		$this->lastCommit = $xml->getAttribute("last_commit");
+		$this->packHandler = new SyncPushPackHandler();
+		$this->addChild($this->packHandler);
+		return true;
+	}
+	
+	public function finished() {
+		$pack = $this->packHandler->getPack();
+		
+		$packManager = new PackManager($this->database);
+		if (!$packManager->importPack($this->branch, $pack, $this->startCommit, $this->lastCommit)) {
+			$this->inStreamReader->appendResponse(IqErrorOutStanza::makeErrorMessage("Push: unable to import pack."));
+			return;
+		}
+		
+		// produce output
+		$outStream = new ProtocolOutStream();
+		$outStream->pushStanza(new IqOutStanza(IqType::$kResult));
+
+		$stanza = new OutStanza("sync_push");
+		$stanza->addAttribute("branch", $this->branch);
+		$localTip = sha1_hex($this->database->getTip($this->branch));
+		$stanza->addAttribute("tip", $localTip);
+		$outStream->pushChildStanza($stanza);
+
+		$this->inStreamReader->appendResponse($outStream->flush());
+	}
+}
+
+class XMLHandler {
+	private $inStream;
+	private $response;
+	private $database;
 
 	public function __construct($input) {
-		$this->xml = new XMLReader;
-		$this->xml->xml(str_replace("\\\"", "'", $input));
-
-        $this->database = new GitDatabase(".git");
+		$this->inStream = new ProtocolInStream($input);
+		$this->database = new GitDatabase(".git");
+		$this->initPrivateHandlers();
 	}
+	
+	public function initPrivateHandlers() {
+		// pull
+		$pullIqGetHandler = new InIqStanzaHandler(IqType::$kGet);
+		$pullHandler = new SyncPullStanzaHandler($this->inStream, $this->database);
+		$pullIqGetHandler->addChild($pullHandler);
+		$this->inStream->addHandler($pullIqGetHandler);
+		
+		// push
+		$pushIqGetHandler = new InIqStanzaHandler(IqType::$kSet);
+		$pushHandler = new SyncPushStanzaHandler($this->inStream, $this->database);
+		$pushIqGetHandler->addChild($pushHandler);
+		$this->inStream->addHandler($pushIqGetHandler);
+	}
+
+	public function handle() {
+		return $this->inStream->parse();
+	}
+}
+/*
+
 
 	public function handle() {
 		while ($this->xml->read()) { 
@@ -386,6 +659,6 @@ class XMLHandler {
 		} 
 	}
 }
-
+*/
 
 ?>

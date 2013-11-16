@@ -6,10 +6,10 @@
 #include <messagereceiver.h>
 
 #include <useridentity.h>
-#include "phpremotestorage.h"
+#include "remotestorage.h"
 
 // test
-#include <serverconnection.h>
+#include <remoteconnection.h>
 #include "protocolparser.h"
 #include <QBuffer>
 #include "remotesync.h"
@@ -42,7 +42,7 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
 
     fMainWindow = new MainWindow(fProfile);
     fMainWindow->show();
-
+/*
     // pull test
     DatabaseInterface *syncDatabase;
     DatabaseFactory::open(".git", "profile", &syncDatabase);
@@ -50,21 +50,27 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
     RemoteSync *pullSync = new RemoteSync(syncDatabase, connection, this);
     pullSync->sync();
     return;
-
+*/
     SecureArray password("test_password");
     if (fProfile->open(password) != WP::kOk) {
-        RemoteDataStorage* remote = new HTTPRemoteStorage("http://localhost/php_server/portal.php");
+        //RemoteDataStorage* remote = new HTTPRemoteStorage("http://localhost/php_server/portal.php");
         //RemoteDataStorage* remote = new PHPEncryptedRemoteStorage("http://localhost/php_server/portal.php");
-        WP::err error = fProfile->createNewProfile(password, remote);
+        WP::err error = fProfile->createNewProfile(password);
         if (error != WP::kOk) {
-            delete remote;
             QMessageBox::information(NULL, "Error", "Unable to create or load a profile!");
             quit();
         }
+        RemoteDataStorage *remote = fProfile->addHTTPRemote("http://localhost/php_server/portal.php");
+        UserIdentity *mainIdentity = fProfile->getIdentityList()->identityAt(0);
+        fProfile->setSignatureAuth(remote, "cle", mainIdentity->getKeyStore()->getUid(), mainIdentity->getIdentityKey());
+
+        fProfile->connectFreeBranches(remote);
+        fProfile->commit();
     }
 
     DatabaseBranch *branch = fProfile->getBranches().at(0);
-    RemoteSync *sync = new RemoteSync(branch->getDatabase(), branch->getRemoteConnectionAt(0), this);
+
+    RemoteSync *sync = new RemoteSync(branch->getDatabase(), branch->getRemoteAuthAt(0), fProfile, this);
     sync->sync();
 /*
     QByteArray data;
@@ -89,7 +95,7 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
     encryptedPHPConnection->connectToServer();
 
     PingRCCommand *replyTest = new PingRCCommand(encryptedPHPConnection, this);
-    connect(encryptedPHPConnection, SIGNAL(connectionAttemptFinished(QNetworkReply::NetworkError)), replyTest, SLOT(connectionAttemptFinished(QNetworkReply::NetworkError)));
+    connect(encryptedPHPConnection, SIGNAL(connectionAttemptFinished(WP::err)), replyTest, SLOT(connectionAttemptFinished(WP::err)));
     */
     /*
     MessageReceiver receiver(&gitInterface);

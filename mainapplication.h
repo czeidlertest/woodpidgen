@@ -11,7 +11,7 @@
 
 class DatabaseInterface;
 
-#include <serverconnection.h>
+#include <remoteconnection.h>
 #include <QDebug>
 
 class PingRCCommand : public QObject
@@ -25,9 +25,9 @@ public:
     }
 
 public slots:
-    void connectionAttemptFinished(QNetworkReply::NetworkError code)
+    void connectionAttemptFinished(WP::err code)
     {
-        if (code != QNetworkReply::NoError)
+        if (code != WP::kOk)
             return;
 
         QByteArray data("ping");

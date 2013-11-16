@@ -14,11 +14,14 @@ public:
 };
 
 
-RemoteSync::RemoteSync(DatabaseInterface *database, RemoteConnection *connection, QObject *parent) :
+RemoteSync::RemoteSync(DatabaseInterface *database, RemoteAuthentication *remoteAuth,
+                       Profile *profile, QObject *parent) :
     QObject(parent),
     fDatabase(database),
-    fRemoteConnection(connection),
-    fServerReply(NULL)
+    fAuthentication(remoteAuth),
+    fRemoteConnection(remoteAuth->getConnection()),
+    fServerReply(NULL),
+    fProfile(profile)
 {
 }
 
@@ -28,19 +31,19 @@ RemoteSync::~RemoteSync()
 
 WP::err RemoteSync::sync()
 {
-    if (fRemoteConnection->isConnected())
-        syncConnected(QNetworkReply::NoError);
+    if (fAuthentication->verified())
+        syncConnected(WP::kOk);
     else {
-        connect(fRemoteConnection, SIGNAL(connectionAttemptFinished(QNetworkReply::NetworkError)),
-                this, SLOT(syncConnected(QNetworkReply::NetworkError)));
-        fRemoteConnection->connectToServer();
+        connect(fAuthentication, SIGNAL(authenticationAttemptFinished(WP::err)),
+                this, SLOT(syncConnected(WP::err)));
+        fAuthentication->login(fProfile);
     }
     return WP::kOk;
 }
 
-void RemoteSync::syncConnected(QNetworkReply::NetworkError code)
+void RemoteSync::syncConnected(WP::err code)
 {
-    if (code != QNetworkReply::NoError)
+    if (code != WP::kOk)
         return;
 
     QString branch = fDatabase->branch();

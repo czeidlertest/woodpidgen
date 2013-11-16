@@ -3,7 +3,7 @@
 #include <QStringList>
 
 #include "useridentity.h"
-#include "phpremotestorage.h"
+#include "remotestorage.h"
 
 
 IdentityListModel::IdentityListModel(QObject * parent)
@@ -50,6 +50,11 @@ ProfileEntryIdentity *IdentityListModel::removeIdentityAt(int index)
     return entry;
 }
 
+UserIdentity *IdentityListModel::identityAt(int index)
+{
+    return fIdentities.at(index)->getUserData();
+}
+
 Profile::Profile(const QString &path, const QString &branchName)
 {
     DatabaseBranch *databaseBranch = databaseBranchFor(path, branchName);
@@ -61,7 +66,7 @@ Profile::~Profile()
     clear();
 }
 
-WP::err Profile::createNewProfile(const SecureArray &password, RemoteDataStorage *remote)
+WP::err Profile::createNewProfile(const SecureArray &password)
 {
     QByteArray uid = fCrypto->generateInitalizationVector(512);
     setUid(fCrypto->toHex(fCrypto->sha1Hash(uid)));
@@ -93,29 +98,18 @@ WP::err Profile::createNewProfile(const SecureArray &password, RemoteDataStorage
     if (error != WP::kOk)
         return error;
 
-    // connect all branches to the remote
-    if (remote != NULL) {
-        QString path = "remotes/";
-        path += remote->getUid();
-        remote->setTo(this, path);
-        error = addRemoteDataStorage(remote);
-        if (error != WP::kOk)
-            return error;
-        error = remote->writeConfig();
-        if (error != WP::kOk)
-            return error;
-        for (int i = 0; i < fBranches.count(); i++) {
-            DatabaseBranch *branch = fBranches.at(i);
-            connectRemote(branch, remote);
-        }
-    }
+    return WP::kOk;
+}
 
-    // commit all branches
+WP::err Profile::commit()
+{
+    // just commit all branches
     for (int i = 0; i < fBranches.count(); i++) {
         DatabaseBranch *branch = fBranches.at(i);
-        branch->commit();
+        WP::err error = branch->commit();
+        if (error != WP::kOk)
+            return error;
     }
-
     return WP::kOk;
 }
 
@@ -192,7 +186,6 @@ WP::err Profile::loadUserIdentities()
 void Profile::addUserIdentity(ProfileEntryIdentity *entry)
 {
     fIdentities.addIdentity(entry);
-    addUserData(entry->getUserData(), entry);
 }
 
 WP::err Profile::loadRemotes()
@@ -200,27 +193,22 @@ WP::err Profile::loadRemotes()
     QStringList remotesList = listDirectories("remotes");
 
     for (int i = 0; i < remotesList.count(); i++) {
-        ProfileEntryRemote *entry
-            = new ProfileEntryRemote(this, prependBaseDir("remotes/" + remotesList.at(i)), NULL);
-        entry->setTo(this, entry->getDatabaseBaseDir());
-        if (entry->load(this) != WP::kOk)
+        RemoteDataStorage *remote
+            = new RemoteDataStorage();
+        StorageDirectory dir(this, prependBaseDir("remotes/" + remotesList.at(i)));
+        if (remote->load(dir) != WP::kOk)
             continue;
-        RemoteDataStorage *remote = entry->getUserData();
-        Profile::ProfileKeyStoreFinder keyStoreFinder(fMapOfKeyStores);
-        WP::err error = remote->open(&keyStoreFinder);
-        if (error != WP::kOk){
-            delete entry;
-            continue;
-        }
-        addRemote(entry);
+        fMapOfRemotes[remote->getUid()] = remote;
     }
     return WP::kOk;
 }
 
-void Profile::addRemote(ProfileEntryRemote *entry)
+RemoteDataStorage *Profile::findRemoteDataStorage(const QString &id)
 {
-    fMapOfRemotes[entry->getUserData()->getUid()] = entry;
-    addUserData(entry->getUserData(), entry);
+    QMap<QString, RemoteDataStorage*>::iterator it = fMapOfRemotes.find(id);
+    if (it == fMapOfRemotes.end())
+        return NULL;
+    return it.value();
 }
 
 WP::err Profile::createNewKeyStore(const SecureArray &password, DatabaseBranch *branch, KeyStore **keyStoreOut)
@@ -249,11 +237,6 @@ WP::err Profile::createNewUserIdentity(KeyStore *keyStore, DatabaseBranch *branc
         return error;
     *userIdentityOut = identity;
     return WP::kOk;
-}
-
-void Profile::addUserData(UserData *data, EncryptedUserData *configDir)
-{
-    fConfigIndex[data] = configDir;
 }
 
 WP::err Profile::writeDatabaseBranch(DatabaseBranch *databaseBranch)
@@ -318,13 +301,6 @@ IdentityListModel *Profile::getIdentityList()
     return &fIdentities;
 }
 
-EncryptedUserData *Profile::findStorageDirectory(UserData *userData)
-{
-    QMap<UserData*, EncryptedUserData*>::iterator it = fConfigIndex.find(userData);
-    if (it == fConfigIndex.end())
-        return NULL;
-    return it.value();
-}
 
 QList<DatabaseBranch *> &Profile::getBranches()
 {
@@ -383,17 +359,55 @@ DatabaseBranch *Profile::databaseBranchFor(const QString &database, const QStrin
     return databaseBranch;
 }
 
+RemoteDataStorage *Profile::addPHPRemote(const QString &url)
+{
+    RemoteDataStorage *remoteDataStorage = new RemoteDataStorage();
+    remoteDataStorage->setPHPEncryptedRemoteConnection(url);
+
+    WP::err error = addRemoteDataStorage(remoteDataStorage);
+    if (error != WP::kOk) {
+        delete remoteDataStorage;
+        return NULL;
+    }
+    return remoteDataStorage;
+}
+
+RemoteDataStorage *Profile::addHTTPRemote(const QString &url)
+{
+    RemoteDataStorage *remoteDataStorage = new RemoteDataStorage();
+    remoteDataStorage->setHTTPRemoteConnection(url);
+
+    WP::err error = addRemoteDataStorage(remoteDataStorage);
+    if (error != WP::kOk) {
+        delete remoteDataStorage;
+        return NULL;
+    }
+    return remoteDataStorage;
+}
+
+WP::err Profile::setSignatureAuth(RemoteDataStorage *remote, const QString &userName,
+                                  const QString &keyStoreId, const QString &keyId)
+{
+    RemoteDataStorage *inListRemote = findRemoteDataStorage(remote->getUid());
+    if (inListRemote == NULL || inListRemote != remote)
+        return WP::kEntryNotFound;
+
+    remote->setSignatureAuth(userName, keyStoreId, keyId);
+    StorageDirectory dir(this, prependBaseDir("remotes/" + remote->getUid()));
+    return remote->write(dir);
+}
+
 WP::err Profile::addRemoteDataStorage(RemoteDataStorage *remote)
 {
-    QString dir = "remotes/";
-    dir += remote->getUid();
+    // already exist?
+    if (findRemoteDataStorage(remote->getUid()) !=  NULL)
+        return WP::kEntryExist;
 
-    ProfileEntryRemote *entry = new ProfileEntryRemote(this, dir, remote);
-    entry->setTo(this, entry->getDatabaseBaseDir());
-    WP::err error = entry->writeEntry();
+    StorageDirectory dir(this, prependBaseDir("remotes/" + remote->getUid()));
+    WP::err error = remote->write(dir);
     if (error != WP::kOk)
         return error;
-    addRemote(entry);
+    fMapOfRemotes[remote->getUid()] = remote;
     return WP::kOk;
 }
 
@@ -405,11 +419,24 @@ WP::err Profile::connectRemote(DatabaseBranch *branch, RemoteDataStorage *remote
 
 RemoteDataStorage *Profile::findRemote(const QString &remoteId)
 {
-    QMap<QString, ProfileEntryRemote*>::iterator it;
+    QMap<QString, RemoteDataStorage*>::iterator it;
     it = fMapOfRemotes.find(remoteId);
     if (it == fMapOfRemotes.end())
         return NULL;
-    return it.value()->getUserData();
+    return it.value();
+}
+
+WP::err Profile::connectFreeBranches(RemoteDataStorage *remote)
+{
+    // already exist?
+    if (findRemoteDataStorage(remote->getUid()) ==  NULL)
+        return WP::kEntryNotFound;
+
+    for (int i = 0; i < fBranches.count(); i++) {
+        DatabaseBranch *branch = fBranches.at(i);
+        connectRemote(branch, remote);
+    }
+    return WP::kOk;
 }
 
 WP::err Profile::addKeyStore(KeyStore *keyStore)
@@ -428,7 +455,6 @@ WP::err Profile::addKeyStore(KeyStore *keyStore)
 void Profile::addKeyStore(ProfileEntryKeyStore *entry)
 {
     fMapOfKeyStores[entry->getUserData()->getUid()] = entry;
-    addUserData(entry->getUserData(), entry);
 }
 
 ProfileEntryIdentity::ProfileEntryIdentity(EncryptedUserData *database, const QString &path,
@@ -452,38 +478,6 @@ KeyStore *ProfileEntryKeyStore::instanciate()
 {
     return new KeyStore(fDatabaseBranch, fDatabaseBaseDir);
 }
-
-
-ProfileEntryRemote::ProfileEntryRemote(EncryptedUserData *database, const QString &path, RemoteDataStorage *remote) :
-    ProfileEntry<RemoteDataStorage>(database, path, remote)
-{
-
-}
-
-WP::err ProfileEntryRemote::writeEntry()
-{
-    WP::err error = ProfileEntry<RemoteDataStorage>::writeEntry();
-    if (error != WP::kOk)
-        return error;
-
-    error = writeSafe("type", fUserData->type());
-    return error;
-}
-
-RemoteDataStorage *ProfileEntryRemote::instanciate()
-{
-    WP::err error = WP::kError;
-    QString type;
-    error = readSafe("type", type);
-    if (error != WP::kOk)
-        return NULL;
-    if (type == "PHPEncryptedRemoteStorage")
-        return new PHPEncryptedRemoteStorage(fDatabaseBranch, fDatabaseBaseDir);
-    if (type == "HTTPRemoteStorage")
-        return new HTTPRemoteStorage(fDatabaseBranch, fDatabaseBaseDir);
-    return NULL;
-}
-
 
 Profile::ProfileKeyStoreFinder::ProfileKeyStoreFinder(QMap<QString, ProfileEntryKeyStore *> &map) :
     fMapOfKeyStores(map)

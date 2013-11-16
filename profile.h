@@ -26,6 +26,7 @@ public:
     void addIdentity(ProfileEntryIdentity *identity);
     void removeIdentity(ProfileEntryIdentity *identity);
     ProfileEntryIdentity *removeIdentityAt(int index);
+    UserIdentity *identityAt(int index);
 private:
     QList<ProfileEntryIdentity*> fIdentities;
 };
@@ -38,7 +39,9 @@ public:
     ~Profile();
 
     /*! create a new profile and adds a new KeyStore with \par password. */
-    WP::err createNewProfile(const SecureArray &password, RemoteDataStorage *remote = NULL);
+    WP::err createNewProfile(const SecureArray &password);
+
+    WP::err commit();
 
     //! adds an external key store to the profile
     WP::err addKeyStore(KeyStore *keyStore);
@@ -50,9 +53,12 @@ public:
 
     DatabaseBranch* databaseBranchFor(const QString &database, const QString &branch);
 
-    WP::err addRemoteDataStorage(RemoteDataStorage *remote);
+    RemoteDataStorage *addPHPRemote(const QString &url);
+    RemoteDataStorage *addHTTPRemote(const QString &url);
+    WP::err setSignatureAuth(RemoteDataStorage *remote, const QString &userName, const QString &keyStoreId, const QString &keyId);
     WP::err connectRemote(DatabaseBranch *branch, RemoteDataStorage *remote);
     RemoteDataStorage *findRemote(const QString &remoteId);
+    WP::err connectFreeBranches(RemoteDataStorage *remote);
 
     WP::err open(const SecureArray &password);
 
@@ -69,13 +75,12 @@ private:
     WP::err loadUserIdentities();
     void addUserIdentity(ProfileEntryIdentity *entry);
     WP::err loadRemotes();
-    void addRemote(ProfileEntryRemote *entry);
+    WP::err addRemoteDataStorage(RemoteDataStorage *remote);
+    void addRemote(RemoteDataStorage *remote);
+    RemoteDataStorage *findRemoteDataStorage(const QString &id);
 
     WP::err createNewKeyStore(const SecureArray &password, DatabaseBranch *branch, KeyStore **keyStoreOut);
     WP::err createNewUserIdentity(KeyStore *keyStore, DatabaseBranch *branch, UserIdentity **userIdentityOut);
-
-    void addUserData(UserData* data, EncryptedUserData* configDir);
-    void removeUserData(UserData* data);
 
     WP::err writeDatabaseBranch(DatabaseBranch *databaseBranch);
     WP::err loadDatabaseBranches();
@@ -91,11 +96,8 @@ private:
     IdentityListModel fIdentities;
 
     QMap<QString, ProfileEntryKeyStore*> fMapOfKeyStores;
-    QMap<QString, ProfileEntryRemote*> fMapOfRemotes;
+    QMap<QString, RemoteDataStorage*> fMapOfRemotes;
     
-    //! map points to where the UserData's config information is stored
-    QMap<UserData*, EncryptedUserData*> fConfigIndex;
-
     QList<DatabaseBranch*> fBranches;
 };
 
@@ -191,18 +193,6 @@ public:
     ProfileEntryIdentity(EncryptedUserData *database, const QString &path, UserIdentity *identity);
 protected:
     UserIdentity *instanciate();
-};
-
-
-class RemoteDataStorage;
-
-class ProfileEntryRemote : public ProfileEntry<RemoteDataStorage> {
-public:
-    ProfileEntryRemote(EncryptedUserData *database, const QString &path, RemoteDataStorage *identity);
-
-    WP::err writeEntry();
-protected:
-    RemoteDataStorage *instanciate();
 };
 
 

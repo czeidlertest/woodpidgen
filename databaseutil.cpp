@@ -4,6 +4,8 @@
 #include <QTextStream>
 #include <QUuid>
 
+#include <remotestorage.h>
+
 
 const char* kPathMasterKey = "master_key";
 const char* kPathMasterKeyIV = "master_key_iv";
@@ -490,11 +492,23 @@ void EncryptedUserData::setDefaultKeyId(const QString &keyId)
     fDefaultKeyId = keyId;
 }
 
-/*
+
 StorageDirectory::StorageDirectory(EncryptedUserData *database, const QString &directory) :
     fDatabase(database),
     fDirectory(directory)
 {
+}
+
+void StorageDirectory::setTo(EncryptedUserData *database, const QString &directory)
+{
+    fDatabase = database;
+    fDirectory = directory;
+}
+
+void StorageDirectory::setTo(StorageDirectory *storageDir)
+{
+    fDatabase = storageDir->fDatabase;
+    fDirectory = storageDir->fDirectory;
 }
 
 WP::err StorageDirectory::write(const QString &path, const QByteArray &data)
@@ -557,7 +571,6 @@ const QString &StorageDirectory::directory()
     return fDirectory;
 }
 
-*/
 
 DatabaseBranch::DatabaseBranch(const QString &database, const QString &branch) :
     fDatabasePath(database),
@@ -621,27 +634,13 @@ RemoteConnection *DatabaseBranch::getRemoteConnectionAt(int i) const
     return fRemotes.at(i)->getRemoteConnection();
 }
 
+RemoteAuthentication *DatabaseBranch::getRemoteAuthAt(int i) const
+{
+    return fRemotes.at(i)->getRemoteAuthentication();
+}
+
 WP::err DatabaseBranch::addRemote(RemoteDataStorage *data)
 {
     fRemotes.append(data);
     return WP::kOk;
 }
-
-
-
-RemoteDataStorage::RemoteDataStorage() :
-    fConnection(NULL)
-{
-}
-
-RemoteDataStorage::RemoteDataStorage(const DatabaseBranch *database, const QString &baseDir) :
-    fConnection(NULL)
-{
-    setToDatabase(database, baseDir);
-}
-
-RemoteConnection *RemoteDataStorage::getRemoteConnection()
-{
-    return fConnection;
-}
-

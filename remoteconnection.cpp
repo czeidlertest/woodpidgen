@@ -1,11 +1,12 @@
-#include "serverconnection.h"
+#include "remoteconnection.h"
 
 #include <QCoreApplication>
 #include <QDebug>
 #include <QXmlStreamAttributes>
 #include <QXmlStreamReader>
 
-#include <mainapplication.h>
+#include "profile.h"
+#include "mainapplication.h"
 
 
 class PHPEncryptionFilter {
@@ -87,12 +88,12 @@ HTTPConnectionReply::HTTPConnectionReply(QIODevice *device, QNetworkReply *reply
 
 void HTTPConnectionReply::finishedSlot()
 {
-    emit finished();
+    emit finished(WP::kOk);
 }
 
 void HTTPConnectionReply::errorSlot(QNetworkReply::NetworkError /*code*/)
 {
-    emit error(WP::kError);
+    emit finished(WP::kError);
 }
 
 HTTPConnection::HTTPConnection(const QUrl &url, QObject *parent) :
@@ -119,7 +120,7 @@ QNetworkAccessManager* HTTPConnection::getNetworkAccessManager()
 WP::err HTTPConnection::connectToServer()
 {
     setConnected();
-    emit connectionAttemptFinished(QNetworkReply::NoError);
+    emit connectionAttemptFinished(WP::kOk);
     return WP::kOk;
 }
 
@@ -273,14 +274,14 @@ void EncryptedPHPConnection::handleConnectionAttemptReply()
 
     fNetworkReply->deleteLater();
     setConnected();
-    emit connectionAttemptFinished(QNetworkReply::NoError);
+    emit connectionAttemptFinished(WP::kOk);
 }
 
 void EncryptedPHPConnection::networkRequestError(QNetworkReply::NetworkError code)
 {
     setDisconnected();
     fNetworkReply->deleteLater();
-    emit connectionAttemptFinished(code);
+    emit connectionAttemptFinished(WP::kError);
 }
 
 
@@ -336,4 +337,123 @@ EncryptedPHPConnectionReply::EncryptedPHPConnectionReply(PHPEncryptionFilter *en
 EncryptedPHPConnectionReply::~EncryptedPHPConnectionReply()
 {
     delete fDevice;
+}
+
+
+RemoteAuthentication::RemoteAuthentication(RemoteConnection *connection, const QString &userName, const QString &keyStoreId,
+                                           const QString &keyId) :
+    fConnection(connection),
+    fUserName(userName),
+    fKeyStoreId(keyStoreId),
+    fKeyId(keyId),
+    fProfile(NULL),
+    fAuthenticationReply(NULL),
+    fAuthenticationInProgress(false),
+    fVerified(false)
+{
+}
+
+RemoteConnection *RemoteAuthentication::getConnection()
+{
+    return fConnection;
+}
+
+WP::err RemoteAuthentication::login(Profile *profile)
+{
+    fProfile = profile;
+    if (fAuthenticationInProgress)
+        return WP::kOk;
+    if (fVerified) {
+        emit authenticationAttemptFinished(WP::kOk);
+    }
+
+    fAuthenticationInProgress = true;
+    if (fConnection->isConnected())
+        handleConnectionAttempt(WP::kOk);
+    else {
+        connect(fConnection, SIGNAL(connectionAttemptFinished(WP::err)), this, SLOT(handleConnectionAttempt(WP::err)));
+        fConnection->connectToServer();
+    }
+    return WP::kOk;
+}
+
+void RemoteAuthentication::logout()
+{
+    if (fAuthenticationInProgress)
+        return;
+    if (!fVerified)
+        return;
+
+    fVerified = false;
+    fAuthenticationInProgress = false;
+
+    QByteArray data;
+    getLogoutData(data);
+    fConnection->send(data);
+}
+
+bool RemoteAuthentication::verified()
+{
+    return fVerified;
+}
+
+void RemoteAuthentication::handleConnectionAttempt(WP::err code)
+{
+    if (code != WP::kOk) {
+        fAuthenticationInProgress = false;
+        emit authenticationAttemptFinished(code);
+        return;
+    }
+    QByteArray data;
+    getLoginRequestData(data);
+    fAuthenticationReply = fConnection->send(data);
+    connect(fAuthenticationReply, SIGNAL(finished(WP::err)), this, SLOT(handleAuthenticationRequest(WP::err)));
+}
+
+void RemoteAuthentication::handleAuthenticationRequest(WP::err code)
+{
+    if (code != WP::kOk) {
+        fAuthenticationInProgress = false;
+        emit authenticationAttemptFinished(code);
+        return;
+    }
+    QByteArray data;
+    getLoginData(data, fAuthenticationReply->readAll());
+    fAuthenticationReply = fConnection->send(data);
+    connect(fAuthenticationReply, SIGNAL(finished(WP::err)), this, SLOT(handleAuthenticationAttempt(WP::err)));
+}
+
+void RemoteAuthentication::handleAuthenticationAttempt(WP::err code)
+{
+    if (code != WP::kOk) {
+        fAuthenticationInProgress = false;
+        fAuthenticationReply = NULL;
+        emit authenticationAttemptFinished(code);
+        return;
+    }
+    fAuthenticationInProgress = false;
+    fVerified = true;
+    fAuthenticationReply = NULL;
+    emit authenticationAttemptFinished(WP::kOk);
+}
+
+
+SignatureAuthentication::SignatureAuthentication(RemoteConnection *connection, const QString &userName, const QString &keyStoreId, const QString &keyId) :
+    RemoteAuthentication(connection, userName, keyStoreId, keyId)
+{
+}
+
+void SignatureAuthentication::getLoginRequestData(QByteArray &data)
+{
+
+}
+
+void SignatureAuthentication::getLoginData(QByteArray &data, const QByteArray &serverRequest)
+{
+
+}
+
+void SignatureAuthentication::getLogoutData(QByteArray &data)
+{
+
 }

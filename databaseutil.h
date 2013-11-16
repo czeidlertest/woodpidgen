@@ -7,12 +7,15 @@
 #include "databaseinterface.h"
 #include "error_codes.h"
 
-/*
+
 class EncryptedUserData;
 
 class StorageDirectory {
 public:
     StorageDirectory(EncryptedUserData *database, const QString &directory);
+
+    void setTo(EncryptedUserData *database, const QString &directory);
+    void setTo(StorageDirectory *storageDir);
 
     WP::err write(const QString& path, const QByteArray& data);
     WP::err write(const QString& path, const QString& data);
@@ -33,10 +36,11 @@ protected:
     EncryptedUserData *fDatabase;
     QString fDirectory;
 };
-*/
+
 
 class RemoteDataStorage;
 class RemoteConnection;
+class RemoteAuthentication;
 
 class DatabaseBranch {
 public:
@@ -53,6 +57,7 @@ public:
     int countRemotes() const;
     RemoteDataStorage *getRemoteAt(int i) const;
     RemoteConnection *getRemoteConnectionAt(int i) const;
+    RemoteAuthentication *getRemoteAuthAt(int i) const;
     WP::err addRemote(RemoteDataStorage* data);
 private:
     QString fDatabasePath;
@@ -165,21 +170,6 @@ public:
 protected:
     KeyStore *fKeyStore;
     QString fDefaultKeyId;
-};
-
-
-class RemoteDataStorage : public EncryptedUserData {
-public:
-    RemoteDataStorage();
-    RemoteDataStorage(const DatabaseBranch *database, const QString &baseDir);
-    virtual ~RemoteDataStorage() {}
-
-    RemoteConnection *getRemoteConnection();
-
-    virtual QString type() const = 0;
-    virtual WP::err open(KeyStoreFinder *keyStoreFinder) = 0;
-protected:
-    RemoteConnection *fConnection;
 };
 
 #endif // DATABASEUTIL_H

@@ -5,14 +5,16 @@
 
 #include "databaseinterface.h"
 #include "error_codes.h"
-#include "serverconnection.h"
+#include "profile.h"
+#include "remoteconnection.h"
 
 
 class RemoteSync : public QObject
 {
     Q_OBJECT
 public:
-    explicit RemoteSync(DatabaseInterface *database, RemoteConnection* connection, QObject *parent = 0);
+    explicit RemoteSync(DatabaseInterface *database, RemoteAuthentication* remoteAuth,
+                        Profile *profile, QObject *parent = 0);
     ~RemoteSync();
 
     WP::err sync();
@@ -21,14 +23,16 @@ signals:
     void syncFinished(WP::err status);
 
 private slots:
-    void syncConnected(QNetworkReply::NetworkError code);
+    void syncConnected(WP::err code);
     void syncReply();
     void syncPushReply();
 
 private:
     DatabaseInterface *fDatabase;
+    RemoteAuthentication *fAuthentication;
     RemoteConnection *fRemoteConnection;
     RemoteConnectionReply *fServerReply;
+    Profile *fProfile;
 };
 
 #endif // REMOTESYNC_H

@@ -21,8 +21,7 @@ public:
     QByteArray readAll();
 
 signals:
-    void finished();
-    void error(WP::err error);
+    void finished(WP::err error);
 
 protected:
     QIODevice *fDevice;
@@ -43,6 +42,9 @@ public:
     bool isConnected();
     bool isConnecting();
 
+signals:
+    void connectionAttemptFinished(WP::err);
+
 protected:
     void setConnectionStarted();
     void setConnected();
@@ -50,6 +52,61 @@ protected:
 
     bool fConnected;
     bool fConnecting;
+};
+
+
+class Profile;
+
+class RemoteAuthentication : public QObject
+{
+Q_OBJECT
+public:
+    RemoteAuthentication(RemoteConnection *connection, const QString &userName,
+                         const QString &keyStoreId, const QString &keyId);
+    virtual ~RemoteAuthentication() {}
+
+    RemoteConnection *getConnection();
+
+    //! Establish a connection and login afterwards.
+    WP::err login(Profile *profile);
+    void logout();
+    bool verified();
+
+protected slots:
+    void handleConnectionAttempt(WP::err code);
+    void handleAuthenticationRequest(WP::err code);
+    void handleAuthenticationAttempt(WP::err code);
+
+signals:
+    void authenticationAttemptFinished(WP::err code);
+
+protected:
+    virtual void getLoginRequestData(QByteArray &data) = 0;
+    virtual void getLoginData(QByteArray &data, const QByteArray &serverRequest) = 0;
+    virtual void getLogoutData(QByteArray &data) = 0;
+
+    RemoteConnection *fConnection;
+    QString fUserName;
+    QString fKeyStoreId;
+    QString fKeyId;
+    Profile *fProfile;
+
+    RemoteConnectionReply *fAuthenticationReply;
+
+    bool fAuthenticationInProgress;
+    bool fVerified;
+};
+
+
+class SignatureAuthentication : public RemoteAuthentication {
+public:
+    SignatureAuthentication(RemoteConnection *connection, const QString &userName,
+                            const QString &keyStoreId, const QString &keyId);
+
+protected:
+    virtual void getLoginRequestData(QByteArray &data);
+    virtual void getLoginData(QByteArray &data, const QByteArray &serverRequest);
+    virtual void getLogoutData(QByteArray &data);
 };
 
 
@@ -78,9 +135,6 @@ public:
     WP::err connectToServer();
     WP::err disconnect();
     virtual RemoteConnectionReply *send(const QByteArray& data);
-
-signals:
-    void connectionAttemptFinished(QNetworkReply::NetworkError code);
 
 protected slots:
     void replyFinished(QNetworkReply *reply);

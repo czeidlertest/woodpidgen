@@ -1,5 +1,6 @@
 #include "useridentity.h"
 
+#include <QFile>
 #include <QStringList>
 
 #include "cryptointerface.h"
@@ -45,6 +46,9 @@ WP::err UserIdentity::createNewIdentity(bool addUidToBaseDir)
     if (error != WP::kOk)
         return error;
 
+    QString outPut("signature.pup");
+    writePublicSignature(outPut, publicKey);
+
     // test data
     QByteArray testData("Hello id");
     QByteArray encyptedTestData;
@@ -82,4 +86,20 @@ WP::err UserIdentity::open(KeyStoreFinder *keyStoreFinder)
     printf("test %s\n", testData.data());
 
     return error;
+}
+
+const QString &UserIdentity::getIdentityKey()
+{
+    return fIdentityKey;
+}
+
+WP::err UserIdentity::writePublicSignature(const QString &filename, const QString &publicKey)
+{
+    QFile file(filename);
+    file.open(QIODevice::WriteOnly | QIODevice::Truncate);
+    QByteArray data = publicKey.toLatin1();
+    int count = data.count();
+    if (file.write(data.data(), count) != count)
+        return WP::kError;
+    return WP::kOk;
 }

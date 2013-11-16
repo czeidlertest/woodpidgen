@@ -10,6 +10,7 @@ enum err {
     kOutOfRange,
     kOutOfMemory,
     kIsConnected,
+    kEntryExist,
 
     kError = -1,
     kOk = 0,

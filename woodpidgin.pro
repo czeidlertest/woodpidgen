@@ -27,7 +27,6 @@ SOURCES += main.cpp \
     profile.cpp \
     databaseutil.cpp \
     mainapplication.cpp \
-    serverconnection.cpp \
     BigInteger/BigUnsigned.cpp \
     BigInteger/BigIntegerUtils.cpp \
     BigInteger/BigIntegerAlgorithms.cpp \
@@ -36,7 +35,8 @@ SOURCES += main.cpp \
     databaseinterface.cpp \
     remotesync.cpp \
     protocolparser.cpp \
-    phpremotestorage.cpp
+    remotestorage.cpp \
+    remoteconnection.cpp
 
 # Installation path
 # target.path =
@@ -53,7 +53,6 @@ HEADERS += \
     profile.h \
     databaseutil.h \
     mainapplication.h \
-    serverconnection.h \
     BigInteger/BigUnsigned.hh \
     BigInteger/BigIntegerUtils.hh \
     BigInteger/BigIntegerAlgorithms.hh \
@@ -63,7 +62,8 @@ HEADERS += \
     error_codes.h \
     remotesync.h \
     protocolparser.h \
-    phpremotestorage.h
+    remotestorage.h \
+    remoteconnection.h
 
 FORMS += \
     mainwindow.ui

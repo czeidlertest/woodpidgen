@@ -38,6 +38,8 @@ public:
     WP::err createNewIdentity(bool addUidToBaseDir = true);
     WP::err open(KeyStoreFinder *keyStoreFinder);
 
+    const QString &getIdentityKey();
+
             //! discare changes and reload values from database
             int                 reload();
 
@@ -58,6 +60,8 @@ public:
             // channels
 
 private:
+    WP::err writePublicSignature(const QString &filename, const QString &publicKey);
+
     QString fIdentityKey;
 };
 

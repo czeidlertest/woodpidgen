@@ -9,14 +9,17 @@
 
 class InStanzaHandler {
 public:
-    InStanzaHandler(const QString &stanza, bool textRequired = false);
+    InStanzaHandler(const QString &stanza, bool optional = false);
     virtual ~InStanzaHandler();
 
     QString stanzaName() const;
-    bool isTextRequired() const;
+    bool isOptional() const;
+    bool hasBeenHandled() const;
+    void setHandled(bool handled);
 
-    virtual void handleStanza(const QXmlStreamAttributes &attributes);
-    virtual void handleText(const QStringRef &text);
+    virtual bool handleStanza(const QXmlStreamAttributes &attributes);
+    virtual bool handleText(const QStringRef &text);
+    virtual void finished();
 
     void addChildHandler(InStanzaHandler *handler);
 
@@ -27,7 +30,8 @@ private:
     void setParent(InStanzaHandler *parent);
 
     QString fName;
-    bool fTextRequired;
+    bool fIsOptional;
+    bool fHasBeenHandled;
 
     InStanzaHandler *fParent;
     QList<InStanzaHandler*> fChildHandlers;
@@ -38,6 +42,8 @@ class ProtocolInStream {
 public:
     ProtocolInStream(QIODevice *device);
     ProtocolInStream(const QByteArray &data);
+    ~ProtocolInStream();
+
     void parse();
 
     void addHandler(InStanzaHandler *handler);
@@ -53,6 +59,7 @@ private:
 
     QXmlStreamReader fXMLReader;
     handler_tree fRoot;
+    InStanzaHandler *fRootHandler;
     handler_tree *fCurrentHandlerTree;
 };
 
@@ -125,10 +132,10 @@ private:
 
 class IqInStanzaHandler : public InStanzaHandler {
 public:
-    IqInStanzaHandler();
+    IqInStanzaHandler(IqType type);
 
     IqType type();
-    virtual void handleStanza(const QXmlStreamAttributes &attributes);
+    virtual bool handleStanza(const QXmlStreamAttributes &attributes);
 
 private:
     static IqType fromString(const QString &string);

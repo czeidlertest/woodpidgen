@@ -25,8 +25,7 @@ WP::err UserIdentity::createNewIdentity(bool addUidToBaseDir)
     if (error != WP::kOk)
         return error;
 
-    QString keyId;
-    error = fKeyStore->writeAsymmetricKey(certificate, publicKey, privateKey, keyId);
+    error = fKeyStore->writeAsymmetricKey(certificate, publicKey, privateKey, fIdentityKey);
     if (error != WP::kOk)
         return error;
 
@@ -42,7 +41,7 @@ WP::err UserIdentity::createNewIdentity(bool addUidToBaseDir)
     error = EncryptedUserData::writeConfig();
     if (error != WP::kOk)
         return error;
-    error = write("identity_key", keyId);
+    error = write("identity_key", fIdentityKey);
     if (error != WP::kOk)
         return error;
 
@@ -99,7 +98,7 @@ WP::err UserIdentity::writePublicSignature(const QString &filename, const QStrin
     file.open(QIODevice::WriteOnly | QIODevice::Truncate);
     QByteArray data = publicKey.toLatin1();
     int count = data.count();
-    if (file.write(data.data(), count) != count)
+    if (file.write(data, count) != count)
         return WP::kError;
     return WP::kOk;
 }

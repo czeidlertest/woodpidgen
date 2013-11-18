@@ -1,5 +1,7 @@
 #include "remoteauthentication.h"
 
+#include "databaseutil.h"
+#include "profile.h"
 #include "protocolparser.h"
 
 
@@ -81,7 +83,13 @@ void RemoteAuthentication::handleAuthenticationRequest(WP::err code)
         return;
     }
     QByteArray data;
-    getLoginData(data, fAuthenticationReply->readAll());
+    WP::err error = getLoginData(data, fAuthenticationReply->readAll());
+    if (error != WP::kOk) {
+        fAuthenticationInProgress = false;
+        emit authenticationAttemptFinished(error);
+        return;
+    }
+
     fAuthenticationReply = fConnection->send(data);
     connect(fAuthenticationReply, SIGNAL(finished(WP::err)), this, SLOT(handleAuthenticationAttempt(WP::err)));
 }
@@ -94,6 +102,7 @@ void RemoteAuthentication::handleAuthenticationAttempt(WP::err code)
         emit authenticationAttemptFinished(code);
         return;
     }
+qDebug(fAuthenticationReply->readAll());
     fAuthenticationInProgress = false;
     fVerified = true;
     fAuthenticationReply = NULL;
@@ -121,19 +130,69 @@ void SignatureAuthentication::getLoginRequestData(QByteArray &data)
     outStream.flush();
 }
 
-void SignatureAuthentication::getLoginData(QByteArray &data, const QByteArray &serverRequest)
+class UserAuthHandler : public InStanzaHandler {
+public:
+    UserAuthHandler() :
+        InStanzaHandler("user_auth")
+    {
+    }
+
+    bool handleStanza(const QXmlStreamAttributes &attributes)
+    {
+        if (!attributes.hasAttribute("sign_token"))
+            return false;
+
+        signToken = attributes.value("sign_token").toString();
+        return true;
+    }
+
+public:
+    QString signToken;
+};
+
+WP::err SignatureAuthentication::getLoginData(QByteArray &data, const QByteArray &serverRequest)
 {
-    qDebug(serverRequest);
-    /*IqInStanzaHandler iqHandler;
-    SyncPullHandler *syncPullHandler = new SyncPullHandler();
-    SyncPullPackHandler *syncPullPackHandler = new SyncPullPackHandler();
-    iqHandler.addChildHandler(syncPullHandler);
-    syncPullHandler->addChildHandler(syncPullPackHandler);
+qDebug(serverRequest);
+    IqInStanzaHandler iqHandler(kResult);
+    UserAuthHandler *userAuthHandler = new UserAuthHandler();
+    iqHandler.addChildHandler(userAuthHandler);
 
-    ProtocolInStream inStream(data);
+    ProtocolInStream inStream(serverRequest);
     inStream.addHandler(&iqHandler);
+    inStream.parse();
 
-    inStream.parse();*/
+    if (!userAuthHandler->hasBeenHandled())
+        return WP::kError;
+
+    KeyStore *keyStore = fProfile->findKeyStore(fKeyStoreId);
+    if (keyStore == NULL)
+        return WP::kEntryNotFound;
+
+    QString certificate;
+    QString publicKey;
+    QString privateKey;
+    WP::err error = keyStore->readAsymmetricKey(fKeyId, certificate, publicKey, privateKey);
+    if (error != WP::kOk)
+        return error;
+
+    CryptoInterface *crypto = CryptoInterfaceSingleton::getCryptoInterface();
+    QByteArray signature;
+    SecureArray password = "";
+
+    error = crypto->sign(userAuthHandler->signToken.toLatin1(), signature, privateKey, password);
+    if (error != WP::kOk)
+        return error;
+    signature = signature.toBase64();
+
+    ProtocolOutStream outStream(&data);
+    IqOutStanza *iqStanza = new IqOutStanza(kSet);
+    outStream.pushStanza(iqStanza);
+    OutStanza *authStanza =  new OutStanza("user_auth_signed");
+    authStanza->addAttribute("signature", signature);
+    outStream.pushChildStanza(authStanza);
+    outStream.flush();
+
+    return WP::kOk;
 }
 
 void SignatureAuthentication::getLogoutData(QByteArray &data)

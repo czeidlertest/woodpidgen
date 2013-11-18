@@ -30,7 +30,7 @@ signals:
 
 protected:
     virtual void getLoginRequestData(QByteArray &data) = 0;
-    virtual void getLoginData(QByteArray &data, const QByteArray &serverRequest) = 0;
+    virtual WP::err getLoginData(QByteArray &data, const QByteArray &serverRequest) = 0;
     virtual void getLogoutData(QByteArray &data) = 0;
 
     RemoteConnection *fConnection;
@@ -53,7 +53,7 @@ public:
 
 protected:
     virtual void getLoginRequestData(QByteArray &data);
-    virtual void getLoginData(QByteArray &data, const QByteArray &serverRequest);
+    virtual WP::err getLoginData(QByteArray &data, const QByteArray &serverRequest);
     virtual void getLogoutData(QByteArray &data);
 };
 

@@ -250,7 +250,7 @@ QString CryptoInterface::toHex(const QByteArray &string) const
     return QCA::arrayToHex(string);
 }
 
-WP::err CryptoInterface::sign(const QByteArray &input, QByteArray &signatur,
+WP::err CryptoInterface::sign(const QByteArray &input, QByteArray &signature,
                           const QString &privateKeyString, const SecureArray &keyPassword)
 {
     QCA::PrivateKey privateKey;
@@ -266,11 +266,11 @@ WP::err CryptoInterface::sign(const QByteArray &input, QByteArray &signatur,
     }
     privateKey.startSign(QCA::EMSA3_MD5);
     privateKey.update(input); // just reuse the same message
-    signatur = privateKey.signature();
+    signature = privateKey.signature();
     return WP::kOk;
 }
 
-bool CryptoInterface::verifySignatur(const QByteArray &message, const QByteArray &signatur,
+bool CryptoInterface::verifySignatur(const QByteArray &message, const QByteArray &signature,
                                      const QString &publicKeyString)
 {
     QCA::PublicKey publicKey;
@@ -285,7 +285,7 @@ bool CryptoInterface::verifySignatur(const QByteArray &message, const QByteArray
     if(publicKey.canVerify()) {
         publicKey.startVerify(QCA::EMSA3_MD5);
         publicKey.update(message);
-        if (publicKey.validSignature(signatur) ) {
+        if (publicKey.validSignature(signature) ) {
             std::cout << "Signature is valid" << std::endl;
             return true;
         } else {

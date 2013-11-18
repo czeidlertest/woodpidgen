@@ -2,8 +2,8 @@
 
 session_start();
 
-require 'Crypt/DiffieHellman.php';
-require 'phpseclib0.3.5/Crypt/AES.php';
+include_once 'Crypt/DiffieHellman.php';
+include_once 'phpseclib0.3.5/Crypt/AES.php';
 
 include_once 'InitHandlers.php';
 include_once 'XMLProtocol.php'; 

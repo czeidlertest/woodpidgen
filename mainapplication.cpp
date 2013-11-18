@@ -23,9 +23,10 @@ public:
     {
     }
 
-    void handleStanza(const QXmlStreamAttributes &attributes)
+    bool handleStanza(const QXmlStreamAttributes &attributes)
     {
         qDebug() << fText << endl;
+        return true;
     }
 
 private:

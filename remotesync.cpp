@@ -74,12 +74,16 @@ public:
     {
     }
 
-    void handleStanza(const QXmlStreamAttributes &attributes)
+    bool handleStanza(const QXmlStreamAttributes &attributes)
     {
-        if (attributes.hasAttribute("branch"))
-            branch = attributes.value("branch").toString();
-        if (attributes.hasAttribute("tip"))
-            tip = attributes.value("tip").toString();
+        if (!attributes.hasAttribute("branch"))
+            return false;
+        if (!attributes.hasAttribute("tip"))
+            return false;
+
+        branch = attributes.value("branch").toString();
+        tip = attributes.value("tip").toString();
+        return true;
     }
 
 public:
@@ -91,13 +95,14 @@ public:
 class SyncPullPackHandler : public InStanzaHandler {
 public:
     SyncPullPackHandler() :
-        InStanzaHandler("pack", true)
+        InStanzaHandler("pack")
     {
     }
 
-    void handleText(const QStringRef &text)
+    bool handleText(const QStringRef &text)
     {
         pack = QByteArray::fromBase64(text.toLatin1());
+        return true;
     }
 
 public:
@@ -113,7 +118,7 @@ void RemoteSync::syncReply(WP::err code)
     QByteArray data = fServerReply->readAll();
     fServerReply = NULL;
  qDebug(data);
-    IqInStanzaHandler iqHandler;
+    IqInStanzaHandler iqHandler(kResult);
     SyncPullHandler *syncPullHandler = new SyncPullHandler();
     SyncPullPackHandler *syncPullPackHandler = new SyncPullPackHandler();
     iqHandler.addChildHandler(syncPullHandler);
@@ -127,7 +132,7 @@ void RemoteSync::syncReply(WP::err code)
     QString localBranch = fDatabase->branch();
     QString localTipCommit = fDatabase->getTip();
 
-    if (iqHandler.type() != kResult || syncPullHandler->branch != localBranch) {
+    if (!syncPullHandler->hasBeenHandled() || syncPullHandler->branch != localBranch) {
         // error occured, the server should at least send back the branch name
         // TODO better error message
         emit syncFinished(WP::kEntryNotFound);

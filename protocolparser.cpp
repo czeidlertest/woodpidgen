@@ -137,6 +137,8 @@ ProtocolInStream::ProtocolInStream(QIODevice *device) :
     fRoot(NULL)
 {
     fCurrentHandlerTree = &fRoot;
+    fRootHandler = new InStanzaHandler("root", true);
+    fRoot.handlers.append(fRootHandler);
 }
 
 ProtocolInStream::ProtocolInStream(const QByteArray &data) :
@@ -144,6 +146,12 @@ ProtocolInStream::ProtocolInStream(const QByteArray &data) :
     fRoot(NULL)
 {
     fCurrentHandlerTree = &fRoot;
+    fRootHandler = new InStanzaHandler("root", true);
+    fRoot.handlers.append(fRootHandler);
+}
+
+ProtocolInStream::~ProtocolInStream()
+{
 }
 
 void ProtocolInStream::parse()
@@ -151,44 +159,44 @@ void ProtocolInStream::parse()
     while (!fXMLReader.atEnd()) {
         switch (fXMLReader.readNext()) {
         case QXmlStreamReader::EndElement: {
-            handler_tree *parent = fCurrentHandlerTree->parent;
-//            delete fCurrentHandlerTree;
-            fCurrentHandlerTree = parent;
-
-            // update handler list
-            handler_tree *parentHandler = fCurrentHandlerTree->parent;
-            if (parentHandler != NULL) {
-                fCurrentHandlerTree->handlers.clear();
-                for (int i = 0; i < parentHandler->handlers.count(); i++)
-                    fCurrentHandlerTree->handlers.append(parentHandler->handlers.at(i));
+            foreach (InStanzaHandler *handler, fCurrentHandlerTree->handlers) {
+                if (handler->hasBeenHandled())
+                    handler->finished();
             }
+
+            handler_tree *parent = fCurrentHandlerTree->parent;
+            delete fCurrentHandlerTree;
+            fCurrentHandlerTree = parent;
             break;
         }
 
         case QXmlStreamReader::StartElement: {
             QString name = fXMLReader.name().toString();
-            handler_tree *handlerTree = new handler_tree(fCurrentHandlerTree);
 
-            for (int i = 0; i < fCurrentHandlerTree->handlers.count(); i++) {
-                InStanzaHandler *handler = fCurrentHandlerTree->handlers.at(i);
-                if (handler->stanzaName() == name) {
-                    handler->handleStanza(fXMLReader.attributes());
-                    for (int a = 0; a < handler->childs().count(); a++)
-                        handlerTree->handlers.append(handler->childs().at(a));
-                    if (handler->isTextRequired())
-                        handlerTree->handlers.append(handler);
-                }
+            handler_tree *handlerTree = new handler_tree(fCurrentHandlerTree);
+            foreach (InStanzaHandler *handler, fCurrentHandlerTree->handlers) {
+                foreach (InStanzaHandler *child, handler->childs())
+                    handlerTree->handlers.append(child);
             }
             fCurrentHandlerTree = handlerTree;
+
+            foreach (InStanzaHandler *handler, fCurrentHandlerTree->handlers) {
+               if (handler->stanzaName() == name) {
+                    bool handled = handler->handleStanza(fXMLReader.attributes());
+                    handler->setHandled(handled);
+                    if (!handled && ! handler->isOptional())
+                        continue;
+                }
+            }
             break;
         }
 
         case QXmlStreamReader::Characters: {
-            for (int i = 0; i < fCurrentHandlerTree->handlers.count(); i++) {
-                InStanzaHandler *handler = fCurrentHandlerTree->handlers.at(i);
-                if (handler->isTextRequired())
-                    handler->handleText(fXMLReader.text());
-
+            foreach (InStanzaHandler *handler, fCurrentHandlerTree->handlers) {
+               bool handled = handler->handleText(fXMLReader.text());
+               handler->setHandled(handled);
+               if (!handled && ! handler->isOptional())
+                 continue;
             }
             break;
         }
@@ -201,13 +209,14 @@ void ProtocolInStream::parse()
 
 void ProtocolInStream::addHandler(InStanzaHandler *handler)
 {
-    fRoot.handlers.append(handler);
+    fRootHandler->addChildHandler(handler);
 }
 
 
-InStanzaHandler::InStanzaHandler(const QString &stanza, bool textRequired) :
+InStanzaHandler::InStanzaHandler(const QString &stanza, bool optional) :
     fName(stanza),
-    fTextRequired(textRequired),
+    fIsOptional(optional),
+    fHasBeenHandled(false),
     fParent(NULL)
 {
 }
@@ -216,6 +225,7 @@ InStanzaHandler::~InStanzaHandler()
 {
     for (int i = 0; i < fChildHandlers.count(); i++)
         delete fChildHandlers.at(i);
+    fChildHandlers.clear();
 }
 
 QString InStanzaHandler::stanzaName() const
@@ -223,16 +233,32 @@ QString InStanzaHandler::stanzaName() const
     return fName;
 }
 
-bool InStanzaHandler::isTextRequired() const
+bool InStanzaHandler::isOptional() const
 {
-    return fTextRequired;
+    return fIsOptional;
 }
 
-void InStanzaHandler::handleStanza(const QXmlStreamAttributes &/*attributes*/)
+bool InStanzaHandler::hasBeenHandled() const
 {
+    return fHasBeenHandled;
 }
 
-void InStanzaHandler::handleText(const QStringRef &/*text*/)
+void InStanzaHandler::setHandled(bool handled)
+{
+    fHasBeenHandled = handled;
+}
+
+bool InStanzaHandler::handleStanza(const QXmlStreamAttributes &/*attributes*/)
+{
+    return false;
+}
+
+bool InStanzaHandler::handleText(const QStringRef &/*text*/)
+{
+    return false;
+}
+
+void InStanzaHandler::finished()
 {
 }
 
@@ -298,9 +324,9 @@ QString IqOutStanza::toString(IqType type)
 }
 
 
-IqInStanzaHandler::IqInStanzaHandler() :
+IqInStanzaHandler::IqInStanzaHandler(IqType type) :
     InStanzaHandler("iq"),
-    fType(kBadType)
+    fType(type)
 {
 }
 
@@ -309,10 +335,14 @@ IqType IqInStanzaHandler::type()
     return fType;
 }
 
-void IqInStanzaHandler::handleStanza(const QXmlStreamAttributes &attributes)
+bool IqInStanzaHandler::handleStanza(const QXmlStreamAttributes &attributes)
 {
-    if (attributes.hasAttribute("type"))
-        fType = fromString(attributes.value("type").toString());
+    if (!attributes.hasAttribute("type"))
+        return false;
+    IqType type = fromString(attributes.value("type").toString());
+    if (type != fType)
+        return false;
+    return true;
 }
 
 IqType IqInStanzaHandler::fromString(const QString &string)

@@ -40,9 +40,9 @@ public:
     QByteArray sha1Hash(const QByteArray &string) const;
     QString toHex(const QByteArray& string) const;
 
-    WP::err sign(const QByteArray& input, QByteArray &signatur, const QString &privateKeyString,
+    WP::err sign(const QByteArray& input, QByteArray &signature, const QString &privateKeyString,
                  const SecureArray &keyPassword);
-    bool verifySignatur(const QByteArray& message, const QByteArray &signatur, const QString &publicKeyString);
+    bool verifySignatur(const QByteArray& message, const QByteArray &signature, const QString &publicKeyString);
 
     void generateDHParam(QString &prime, QString &base, QString &secret, QString &pub);
     SecureArray sharedDHKey(const QString &prime, const QString &base, const QString &secret);

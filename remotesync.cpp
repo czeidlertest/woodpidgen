@@ -1,6 +1,7 @@
 #include "remotesync.h"
 
 #include "protocolparser.h"
+#include "remoteauthentication.h"
 
 
 class SyncOutStanza : public OutStanza {
@@ -63,7 +64,7 @@ void RemoteSync::syncConnected(WP::err code)
     if (fServerReply != NULL)
         fServerReply->disconnect();
     fServerReply = fRemoteConnection->send(outData);
-    connect(fServerReply, SIGNAL(finished()), this, SLOT(syncReply()));
+    connect(fServerReply, SIGNAL(finished(WP::err)), this, SLOT(syncReply(WP::err)));
 }
 
 class SyncPullHandler : public InStanzaHandler {
@@ -104,8 +105,11 @@ public:
 };
 
 
-void RemoteSync::syncReply()
+void RemoteSync::syncReply(WP::err code)
 {
+    if (code != WP::kOk)
+        return;
+
     QByteArray data = fServerReply->readAll();
     fServerReply = NULL;
  qDebug(data);
@@ -166,11 +170,14 @@ void RemoteSync::syncReply()
     outStream.flush();
 
     fServerReply = fRemoteConnection->send(outData);
-    connect(fServerReply, SIGNAL(finished()), this, SLOT(syncPushReply()));
+    connect(fServerReply, SIGNAL(finished(WP::err)), this, SLOT(syncPushReply(WP::err)));
 }
 
-void RemoteSync::syncPushReply()
+void RemoteSync::syncPushReply(WP::err code)
 {
+    if (code != WP::kOk)
+        return;
+
     QByteArray data = fServerReply->readAll();
     qDebug(data);
     emit syncFinished(WP::kOk);

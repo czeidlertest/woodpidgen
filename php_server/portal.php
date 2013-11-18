@@ -3,8 +3,10 @@
 session_start();
 
 require 'Crypt/DiffieHellman.php';
-require 'RetrieveMessages.php'; 
 require 'phpseclib0.3.5/Crypt/AES.php';
+
+include_once 'InitHandlers.php';
+include_once 'XMLProtocol.php'; 
 
 
 interface IPortalInterface
@@ -125,6 +127,7 @@ $request = $gPortal->receiveData($request);
 
 
 $XMLHandler = new XMLHandler($request);
+InitHandlers::initPrivateHandlers($XMLHandler);
 $response = $XMLHandler->handle();
 
 // start working

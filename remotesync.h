@@ -24,8 +24,8 @@ signals:
 
 private slots:
     void syncConnected(WP::err code);
-    void syncReply();
-    void syncPushReply();
+    void syncReply(WP::err code);
+    void syncPushReply(WP::err code);
 
 private:
     DatabaseInterface *fDatabase;

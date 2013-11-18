@@ -101,7 +101,7 @@ private:
     QList<DatabaseBranch*> fBranches;
 };
 
-
+// TODO rename it to ProfileUserDataRef
 template<class Type>
 class ProfileEntry : public EncryptedUserData {
 public:

@@ -36,7 +36,8 @@ SOURCES += main.cpp \
     remotesync.cpp \
     protocolparser.cpp \
     remotestorage.cpp \
-    remoteconnection.cpp
+    remoteconnection.cpp \
+    remoteauthentication.cpp
 
 # Installation path
 # target.path =
@@ -63,7 +64,8 @@ HEADERS += \
     remotesync.h \
     protocolparser.h \
     remotestorage.h \
-    remoteconnection.h
+    remoteconnection.h \
+    remoteauthentication.h
 
 FORMS += \
     mainwindow.ui

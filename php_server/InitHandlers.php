@@ -20,15 +20,19 @@ class InitHandlers {
 
 		// auth
 		$userAuthIqGetHandler = new InIqStanzaHandler(IqType::$kSet);
-		$userAuthHandler = new UserAuthStanzaHandler($XMLHandler->getInStream(), $XMLHandler->getDatabase());
+		$userAuthHandler = new UserAuthStanzaHandler($XMLHandler->getInStream());
 		$userAuthIqGetHandler->addChild($userAuthHandler);
 		$XMLHandler->addHandler($userAuthIqGetHandler);
 
 		$userAuthSignatureIqGetHandler = new InIqStanzaHandler(IqType::$kSet);
-		$userAuthSignatureHandler = new UserAuthSignedStanzaHandler($XMLHandler->getInStream(), $XMLHandler->getDatabase());
+		$userAuthSignatureHandler = new UserAuthSignedStanzaHandler($XMLHandler->getInStream());
 		$userAuthSignatureIqGetHandler->addChild($userAuthSignatureHandler);
 		$XMLHandler->addHandler($userAuthSignatureIqGetHandler);
 		
+		$logoutIqGetHandler = new InIqStanzaHandler(IqType::$kSet);
+		$logoutHandler = new LogoutStanzaHandler($XMLHandler->getInStream());
+		$logoutIqGetHandler->addChild($logoutHandler);
+		$XMLHandler->addHandler($logoutIqGetHandler);
 	}
 }
 

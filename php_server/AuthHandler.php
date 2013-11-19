@@ -8,15 +8,13 @@ include_once 'Crypt/RSA.php';
 
 class UserAuthStanzaHandler extends InStanzaHandler {
 	private $inStreamReader;
-	private $database;
 
 	private $authType;
 	private $userName;
 
-	public function __construct($inStreamReader, $database) {
+	public function __construct($inStreamReader) {
 		InStanzaHandler::__construct("user_auth");
 		$this->inStreamReader = $inStreamReader;
-		$this->database = $database;
 	}
 
 	public function handleStanza($xml) {
@@ -42,20 +40,19 @@ class UserAuthStanzaHandler extends InStanzaHandler {
 
 		$this->inStreamReader->appendResponse($outStream->flush());
 		$_SESSION['sign_token'] = $signToken;
+		$_SESSION['user'] = $this->userName;
 	}
 }
 
 
 class UserAuthSignedStanzaHandler extends InStanzaHandler {
 	private $inStreamReader;
-	private $database;
-
+	
 	private $signature;
 
-	public function __construct($inStreamReader, $database) {
+	public function __construct($inStreamReader) {
 		InStanzaHandler::__construct("user_auth_signed");
 		$this->inStreamReader = $inStreamReader;
-		$this->database = $database;
 	}
 
 	public function handleStanza($xml) {
@@ -69,30 +66,51 @@ class UserAuthSignedStanzaHandler extends InStanzaHandler {
 
 	public function finished() {
 		$publickey = file_get_contents("signature.pup");
-//$this->inStreamReader->appendResponse($this->signature);
 
 		$rsa = new Crypt_RSA();
 		$rsa->setSignatureMode(CRYPT_RSA_SIGNATURE_PKCS1);
 		$rsa->setHash('md5');
 		
 		$rsa->loadKey($publickey);
-		$verified = $rsa->verify($_SESSION['sign_token'], $this->signature);
-
-if ($verified)
-	$this->inStreamReader->appendResponse("verified\n");
-else
-	$this->inStreamReader->appendResponse("not verified\n");
+		$verification = "denied";
+		if ($rsa->verify($_SESSION['sign_token'], $this->signature)) {
+			$verification = "ok";
+			$_SESSION['user_auth'] = true;
+		}
 	
 		// produce output
 		$outStream = new ProtocolOutStream();
 		$outStream->pushStanza(new IqOutStanza(IqType::$kResult));
-
 		$stanza = new OutStanza("user_auth_signed");
-		$stanza->addAttribute("verified", $verified);
+		$stanza->addAttribute("verification", $verification);
 		$outStream->pushChildStanza($stanza);
-
 		$this->inStreamReader->appendResponse($outStream->flush());
 	}
 }
 
+
+class LogoutStanzaHandler extends InStanzaHandler {
+	private $inStreamReader;
+
+	public function __construct($inStreamReader) {
+		InStanzaHandler::__construct("logout");
+		$this->inStreamReader = $inStreamReader;
+	}
+
+	public function handleStanza($xml) {
+		$_SESSION['sign_token'] = "";
+		$_SESSION['user'] = "";
+		$_SESSION['user_auth'] = false;
+
+		// produce output
+		$outStream = new ProtocolOutStream();
+		$outStream->pushStanza(new IqOutStanza(IqType::$kResult));
+		$stanza = new OutStanza("logout");
+		$stanza->addAttribute("status", "ok");
+		$outStream->pushChildStanza($stanza);
+		$this->inStreamReader->appendResponse($outStream->flush());
+
+		return true;
+	}
+}
 ?>

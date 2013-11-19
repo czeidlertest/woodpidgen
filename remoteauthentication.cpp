@@ -91,26 +91,30 @@ void RemoteAuthentication::handleAuthenticationRequest(WP::err code)
     }
 
     fAuthenticationReply = fConnection->send(data);
-    connect(fAuthenticationReply, SIGNAL(finished(WP::err)), this, SLOT(handleAuthenticationAttempt(WP::err)));
+    connect(fAuthenticationReply, SIGNAL(finished(WP::err)), this,
+            SLOT(handleAuthenticationAttempt(WP::err)));
 }
 
 void RemoteAuthentication::handleAuthenticationAttempt(WP::err code)
 {
-    if (code != WP::kOk) {
-        fAuthenticationInProgress = false;
-        fAuthenticationReply = NULL;
-        emit authenticationAttemptFinished(code);
-        return;
+    WP::err error = code;
+    if (error == WP::kOk) {
+        QByteArray data = fAuthenticationReply->readAll();
+        error = wasLoginSuccessful(data);
     }
-qDebug(fAuthenticationReply->readAll());
+    if (error == WP::kOk)
+        fVerified = true;
+
     fAuthenticationInProgress = false;
-    fVerified = true;
     fAuthenticationReply = NULL;
-    emit authenticationAttemptFinished(WP::kOk);
+    emit authenticationAttemptFinished(error);
 }
 
 
-SignatureAuthentication::SignatureAuthentication(RemoteConnection *connection, const QString &userName, const QString &keyStoreId, const QString &keyId) :
+SignatureAuthentication::SignatureAuthentication(RemoteConnection *connection,
+                                                 const QString &userName,
+                                                 const QString &keyStoreId,
+                                                 const QString &keyId) :
     RemoteAuthentication(connection, userName, keyStoreId, keyId)
 {
 }
@@ -195,7 +199,54 @@ qDebug(serverRequest);
     return WP::kOk;
 }
 
+
+class UserAuthResultHandler : public InStanzaHandler {
+public:
+    UserAuthResultHandler() :
+        InStanzaHandler("user_auth_signed")
+    {
+    }
+
+    bool handleStanza(const QXmlStreamAttributes &attributes)
+    {
+        if (!attributes.hasAttribute("verification"))
+            return false;
+
+        result = attributes.value("verification").toString();
+        return true;
+    }
+
+public:
+    QString result;
+};
+
+
+WP::err SignatureAuthentication::wasLoginSuccessful(QByteArray &data)
+{
+qDebug(data);
+    IqInStanzaHandler iqHandler(kResult);
+    UserAuthResultHandler *userAuthResutlHandler = new UserAuthResultHandler();
+    iqHandler.addChildHandler(userAuthResutlHandler);
+
+    ProtocolInStream inStream(data);
+    inStream.addHandler(&iqHandler);
+    inStream.parse();
+
+    if (!userAuthResutlHandler->hasBeenHandled())
+        return WP::kError;
+
+    if (userAuthResutlHandler->result != "ok")
+        return WP::kError;
+
+    return WP::kOk;
+}
+
 void SignatureAuthentication::getLogoutData(QByteArray &data)
 {
-
+    ProtocolOutStream outStream(&data);
+    IqOutStanza *iqStanza = new IqOutStanza(kSet);
+    outStream.pushStanza(iqStanza);
+    OutStanza *authStanza =  new OutStanza("logout");
+    outStream.pushChildStanza(authStanza);
+    outStream.flush();
 }

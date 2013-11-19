@@ -6,6 +6,7 @@ include_once 'Crypt/DiffieHellman.php';
 include_once 'phpseclib0.3.5/Crypt/AES.php';
 
 include_once 'InitHandlers.php';
+include_once 'Session.php';
 include_once 'XMLProtocol.php'; 
 
 
@@ -127,7 +128,12 @@ $request = $gPortal->receiveData($request);
 
 
 $XMLHandler = new XMLHandler($request);
-InitHandlers::initPrivateHandlers($XMLHandler);
+
+if (Session::get()->isUserLoggedIn())
+	InitHandlers::initPrivateHandlers($XMLHandler);
+else
+	InitHandlers::initPublicHandlers($XMLHandler);
+
 $response = $XMLHandler->handle();
 
 // start working

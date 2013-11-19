@@ -363,11 +363,9 @@ function url_decode($data) {
 class XMLHandler {
 	private $inStream;
 	private $response;
-	private $database;
 
 	public function __construct($input) {
 		$this->inStream = new ProtocolInStream($input);
-		$this->database = new GitDatabase(".git");
 	}
 
 	public function getInStream() {

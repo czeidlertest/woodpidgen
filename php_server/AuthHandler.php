@@ -1,6 +1,7 @@
 <?php
 
-include_once './XMLProtocol.php';
+include_once 'Session.php';
+include_once 'XMLProtocol.php';
 
 set_include_path('phpseclib0.3.5');
 include_once 'Crypt/RSA.php';
@@ -39,8 +40,8 @@ class UserAuthStanzaHandler extends InStanzaHandler {
 		$outStream->pushChildStanza($stanza);
 
 		$this->inStreamReader->appendResponse($outStream->flush());
-		$_SESSION['sign_token'] = $signToken;
-		$_SESSION['user'] = $this->userName;
+		Session::get()->setSignatureToken($signToken);
+		Session::get()->setUserName($this->userName);
 	}
 }
 
@@ -65,7 +66,7 @@ class UserAuthSignedStanzaHandler extends InStanzaHandler {
 	}
 
 	public function finished() {
-		$publickey = file_get_contents("signature.pup");
+		$publickey = file_get_contents(Session::get()->getUserName()."/signature.pup");
 
 		$rsa = new Crypt_RSA();
 		$rsa->setSignatureMode(CRYPT_RSA_SIGNATURE_PKCS1);
@@ -73,9 +74,9 @@ class UserAuthSignedStanzaHandler extends InStanzaHandler {
 		
 		$rsa->loadKey($publickey);
 		$verification = "denied";
-		if ($rsa->verify($_SESSION['sign_token'], $this->signature)) {
+		if ($rsa->verify(Session::get()->getSignatureToken(), $this->signature)) {
 			$verification = "ok";
-			$_SESSION['user_auth'] = true;
+			Session::get()->setUserLoggedIn(true);
 		}
 	
 		// produce output
@@ -98,9 +99,9 @@ class LogoutStanzaHandler extends InStanzaHandler {
 	}
 
 	public function handleStanza($xml) {
-		$_SESSION['sign_token'] = "";
-		$_SESSION['user'] = "";
-		$_SESSION['user_auth'] = false;
+		Session::get()->setSignatureToken("");
+		Session::get()->setUserName("");
+		Session::get()->setUserLoggedIn(false);
 
 		// produce output
 		$outStream = new ProtocolOutStream();

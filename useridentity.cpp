@@ -16,29 +16,24 @@ UserIdentity::~UserIdentity()
 }
 
 
-WP::err UserIdentity::createNewIdentity(bool addUidToBaseDir)
+WP::err UserIdentity::createNewIdentity(KeyStore *keyStore, const QString &defaultKeyId, bool addUidToBaseDir)
 {
+    // derive uid
     QString certificate;
     QString publicKey;
     QString privateKey;
     WP::err error = fCrypto->generateKeyPair(certificate, publicKey, privateKey, "");
     if (error != WP::kOk)
         return error;
+    QByteArray hashResult = fCrypto->sha1Hash(certificate.toLatin1());
+    QString uid = fCrypto->toHex(hashResult);
 
-    error = fKeyStore->writeAsymmetricKey(certificate, publicKey, privateKey, fIdentityKey);
+    // start creating the identity
+    error = EncryptedUserData::create(uid, keyStore, defaultKeyId, addUidToBaseDir);
     if (error != WP::kOk)
         return error;
 
-    QByteArray hashResult = fCrypto->sha1Hash(certificate.toLatin1());
-    QString uid = fCrypto->toHex(hashResult);
-    if (addUidToBaseDir) {
-        QString newBaseDir;
-        (fDatabaseBaseDir == "") ? newBaseDir = uid : newBaseDir = fDatabaseBaseDir + "/" + uid;
-        setBaseDir(newBaseDir);
-    }
-    setUid(uid);
-
-    error = EncryptedUserData::writeConfig();
+    error = fKeyStore->writeAsymmetricKey(certificate, publicKey, privateKey, fIdentityKey);
     if (error != WP::kOk)
         return error;
     error = write("identity_key", fIdentityKey);
@@ -62,7 +57,7 @@ WP::err UserIdentity::createNewIdentity(bool addUidToBaseDir)
 
 WP::err UserIdentity::open(KeyStoreFinder *keyStoreFinder)
 {
-    WP::err error = EncryptedUserData::readKeyStore(keyStoreFinder);
+    WP::err error = EncryptedUserData::open(keyStoreFinder);
     if (error != WP::kOk)
         return error;
 

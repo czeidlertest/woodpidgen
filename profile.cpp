@@ -2,6 +2,7 @@
 
 #include <QStringList>
 
+#include "mailbox.h"
 #include "useridentity.h"
 #include "remotestorage.h"
 
@@ -25,7 +26,7 @@ int IdentityListModel::rowCount(const QModelIndex &/*parent*/) const
     return fIdentities.count();
 }
 
-void IdentityListModel::addIdentity(ProfileEntryIdentity *identity)
+void IdentityListModel::addIdentity(IdentityRef *identity)
 {
     int count = fIdentities.count();
     beginInsertRows(QModelIndex(), count, count);
@@ -33,7 +34,7 @@ void IdentityListModel::addIdentity(ProfileEntryIdentity *identity)
     endInsertRows();
 }
 
-void IdentityListModel::removeIdentity(ProfileEntryIdentity *identity)
+void IdentityListModel::removeIdentity(IdentityRef *identity)
 {
     int index = fIdentities.indexOf(identity);
     beginRemoveRows(QModelIndex(), index, index);
@@ -41,9 +42,9 @@ void IdentityListModel::removeIdentity(ProfileEntryIdentity *identity)
     endRemoveRows();
 }
 
-ProfileEntryIdentity *IdentityListModel::removeIdentityAt(int index)
+IdentityRef *IdentityListModel::removeIdentityAt(int index)
 {
-    ProfileEntryIdentity *entry = fIdentities.at(index);
+    IdentityRef *entry = fIdentities.at(index);
     beginRemoveRows(QModelIndex(), index, index);
     fIdentities.removeAt(index);
     endRemoveRows();
@@ -94,7 +95,7 @@ WP::err Profile::createNewProfile(const SecureArray &password)
     // init user identity
     DatabaseBranch *identitiesBranch = databaseBranchFor(fDatabaseBranch->getDatabasePath(), "identities");
     UserIdentity *identity = NULL;
-    error = createNewUserIdentity(keyStore, identitiesBranch, &identity);
+    error = createNewUserIdentity(identitiesBranch, &identity);
     if (error != WP::kOk)
         return error;
 
@@ -123,7 +124,7 @@ WP::err Profile::open(const SecureArray &password)
         return error;
 
     Profile::ProfileKeyStoreFinder keyStoreFinder(fMapOfKeyStores);
-    error = readKeyStore(&keyStoreFinder);
+    error = EncryptedUserData::open(&keyStoreFinder);
     if (error != WP::kOk)
         return error;
     error = fKeyStore->open(password);
@@ -147,17 +148,62 @@ WP::err Profile::open(const SecureArray &password)
     return WP::kOk;
 }
 
+WP::err Profile::createNewKeyStore(const SecureArray &password, DatabaseBranch *branch, KeyStore **keyStoreOut)
+{
+    // init key store and master key
+    KeyStore* keyStore = new KeyStore(branch, "");
+    WP::err error = keyStore->create(password);
+    if (error != WP::kOk)
+        return error;
+    error = addKeyStore(keyStore);
+    if (error != WP::kOk)
+        return error;
+    *keyStoreOut = keyStore;
+    return WP::kOk;
+}
+
 WP::err Profile::loadKeyStores()
 {
     QStringList keyStores = listDirectories("key_stores");
 
     for (int i = 0; i < keyStores.count(); i++) {
-        ProfileEntryKeyStore *entry
-            = new ProfileEntryKeyStore(this, prependBaseDir("key_stores/" + keyStores.at(i)), NULL);
+        KeyStoreRef *entry
+            = new KeyStoreRef(this, prependBaseDir("key_stores/" + keyStores.at(i)), NULL);
         if (entry->load(this) != WP::kOk)
             continue;
         addKeyStore(entry);
     }
+    return WP::kOk;
+}
+
+WP::err Profile::addKeyStore(KeyStore *keyStore)
+{
+    QString dir = "key_stores/";
+    dir += keyStore->getUid();
+
+    KeyStoreRef *entry = new KeyStoreRef(this, dir, keyStore);
+    WP::err error = entry->writeEntry();
+    if (error != WP::kOk)
+        return error;
+    addKeyStore(entry);
+    return WP::kOk;
+}
+
+void Profile::addKeyStore(KeyStoreRef *entry)
+{
+    fMapOfKeyStores[entry->getUserData()->getUid()] = entry;
+}
+
+WP::err Profile::createNewUserIdentity(DatabaseBranch *branch, UserIdentity **userIdentityOut)
+{
+    UserIdentity *identity = new UserIdentity(branch, "");
+    WP::err error = identity->createNewIdentity(getKeyStore(), getDefaultKeyId());
+    if (error != WP::kOk)
+        return error;
+    error = addUserIdentity(identity);
+    if (error != WP::kOk)
+        return error;
+    *userIdentityOut = identity;
     return WP::kOk;
 }
 
@@ -166,13 +212,13 @@ WP::err Profile::loadUserIdentities()
     QStringList identityList = listDirectories("user_identities");
 
     for (int i = 0; i < identityList.count(); i++) {
-        ProfileEntryIdentity *entry
-            = new ProfileEntryIdentity(this, prependBaseDir("user_identities/" + identityList.at(i)), NULL);
+        IdentityRef *entry
+            = new IdentityRef(this, prependBaseDir("user_identities/" + identityList.at(i)), NULL);
         if (entry->load(this) != WP::kOk)
             continue;
         UserIdentity *id = entry->getUserData();
         Profile::ProfileKeyStoreFinder keyStoreFinder(fMapOfKeyStores);
-        WP::err error = id->readKeyStore(&keyStoreFinder);
+        WP::err error = id->open(&keyStoreFinder);
         if (error != WP::kOk){
             delete entry;
             continue;
@@ -183,9 +229,37 @@ WP::err Profile::loadUserIdentities()
     return WP::kOk;
 }
 
-void Profile::addUserIdentity(ProfileEntryIdentity *entry)
+WP::err Profile::addUserIdentity(UserIdentity *identity)
+{
+    QString dir = "user_identities/";
+    dir += identity->getUid();
+
+    IdentityRef *entry = new IdentityRef(this, dir, identity);
+    WP::err error = entry->writeEntry();
+    if (error != WP::kOk)
+        return error;
+    addUserIdentity(entry);
+    return WP::kOk;
+}
+
+void Profile::addUserIdentity(IdentityRef *entry)
 {
     fIdentities.addIdentity(entry);
+}
+
+WP::err Profile::createNewMailbox(DatabaseBranch *branch, UserIdentity **userIdentityOut)
+{
+
+}
+
+WP::err Profile::loadMailboxs()
+{
+
+}
+
+void Profile::addMailBox(MailboxRef *entry)
+{
+
 }
 
 WP::err Profile::loadRemotes()
@@ -209,34 +283,6 @@ RemoteDataStorage *Profile::findRemoteDataStorage(const QString &id)
     if (it == fMapOfRemotes.end())
         return NULL;
     return it.value();
-}
-
-WP::err Profile::createNewKeyStore(const SecureArray &password, DatabaseBranch *branch, KeyStore **keyStoreOut)
-{
-    // init key store and master key
-    KeyStore* keyStore = new KeyStore(branch, "");
-    WP::err error = keyStore->create(password);
-    if (error != WP::kOk)
-        return error;
-    error = addKeyStore(keyStore);
-    if (error != WP::kOk)
-        return error;
-    *keyStoreOut = keyStore;
-    return WP::kOk;
-}
-
-WP::err Profile::createNewUserIdentity(KeyStore *keyStore, DatabaseBranch *branch, UserIdentity **userIdentityOut)
-{
-    UserIdentity *identity = new UserIdentity(branch, "");
-    identity->setKeyStore(keyStore);
-    WP::err error = identity->createNewIdentity();
-    if (error != WP::kOk)
-        return error;
-    error = addUserIdentity(identity);
-    if (error != WP::kOk)
-        return error;
-    *userIdentityOut = identity;
-    return WP::kOk;
 }
 
 WP::err Profile::writeDatabaseBranch(DatabaseBranch *databaseBranch)
@@ -309,7 +355,7 @@ QList<DatabaseBranch *> &Profile::getBranches()
 
 void Profile::clear()
 {
-    QMap<QString, ProfileEntryKeyStore*>::const_iterator it;
+    QMap<QString, KeyStoreRef*>::const_iterator it;
     for (it = fMapOfKeyStores.begin(); it != fMapOfKeyStores.end(); it++)
         delete it.value();
     fMapOfKeyStores.clear();
@@ -324,24 +370,11 @@ void Profile::clear()
 
 KeyStore *Profile::findKeyStore(const QString &keyStoreId)
 {
-    QMap<QString, ProfileEntryKeyStore*>::const_iterator it;
+    QMap<QString, KeyStoreRef*>::const_iterator it;
     it = fMapOfKeyStores.find(keyStoreId);
     if (it == fMapOfKeyStores.end())
         return NULL;
     return it.value()->getUserData();
-}
-
-WP::err Profile::addUserIdentity(UserIdentity *identity)
-{
-    QString dir = "user_identities/";
-    dir += identity->getUid();
-
-    ProfileEntryIdentity *entry = new ProfileEntryIdentity(this, dir, identity);
-    WP::err error = entry->writeEntry();
-    if (error != WP::kOk)
-        return error;
-    addUserIdentity(entry);
-    return WP::kOk;
 }
 
 DatabaseBranch *Profile::databaseBranchFor(const QString &database, const QString &branch)
@@ -439,56 +472,50 @@ WP::err Profile::connectFreeBranches(RemoteDataStorage *remote)
     return WP::kOk;
 }
 
-WP::err Profile::addKeyStore(KeyStore *keyStore)
-{
-    QString dir = "key_stores/";
-    dir += keyStore->getUid();
-
-    ProfileEntryKeyStore *entry = new ProfileEntryKeyStore(this, dir, keyStore);
-    WP::err error = entry->writeEntry();
-    if (error != WP::kOk)
-        return error;
-    addKeyStore(entry);
-    return WP::kOk;
-}
-
-void Profile::addKeyStore(ProfileEntryKeyStore *entry)
-{
-    fMapOfKeyStores[entry->getUserData()->getUid()] = entry;
-}
-
-ProfileEntryIdentity::ProfileEntryIdentity(EncryptedUserData *database, const QString &path,
-                                           UserIdentity *identity) :
-    ProfileEntry<UserIdentity>(database, path, identity)
-{
-}
-
-UserIdentity *ProfileEntryIdentity::instanciate()
-{
-    return new UserIdentity(fDatabaseBranch, fDatabaseBaseDir);
-}
-
-ProfileEntryKeyStore::ProfileEntryKeyStore(EncryptedUserData *database, const QString &path,
-                                           KeyStore *keyStore) :
-    ProfileEntry<KeyStore>(database, path, keyStore)
-{
-}
-
-KeyStore *ProfileEntryKeyStore::instanciate()
-{
-    return new KeyStore(fDatabaseBranch, fDatabaseBaseDir);
-}
-
-Profile::ProfileKeyStoreFinder::ProfileKeyStoreFinder(QMap<QString, ProfileEntryKeyStore *> &map) :
-    fMapOfKeyStores(map)
-{
-}
-
 KeyStore *Profile::ProfileKeyStoreFinder::find(const QString &keyStoreId)
 {
-    QMap<QString, ProfileEntryKeyStore*>::const_iterator it;
+    QMap<QString, KeyStoreRef*>::const_iterator it;
     it = fMapOfKeyStores.find(keyStoreId);
     if (it == fMapOfKeyStores.end())
         return NULL;
     return it.value()->getUserData();
+}
+
+
+IdentityRef::IdentityRef(EncryptedUserData *database, const QString &path,
+                                           UserIdentity *identity) :
+    UserDataRef<UserIdentity>(database, path, identity)
+{
+}
+
+UserIdentity *IdentityRef::instanciate()
+{
+    return new UserIdentity(fDatabaseBranch, fDatabaseBaseDir);
+}
+
+KeyStoreRef::KeyStoreRef(EncryptedUserData *database, const QString &path,
+                                           KeyStore *keyStore) :
+    UserDataRef<KeyStore>(database, path, keyStore)
+{
+}
+
+KeyStore *KeyStoreRef::instanciate()
+{
+    return new KeyStore(fDatabaseBranch, fDatabaseBaseDir);
+}
+
+Profile::ProfileKeyStoreFinder::ProfileKeyStoreFinder(QMap<QString, KeyStoreRef *> &map) :
+    fMapOfKeyStores(map)
+{
+}
+
+MailboxRef::MailboxRef(EncryptedUserData *database, const QString &path, Mailbox *mailbox) :
+    UserDataRef<Mailbox>(database, path, mailbox)
+{
+
+}
+
+Mailbox *MailboxRef::instanciate()
+{
+    return new Mailbox(fDatabaseBranch, fDatabaseBaseDir);
 }

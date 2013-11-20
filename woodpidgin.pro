@@ -37,7 +37,8 @@ SOURCES += main.cpp \
     protocolparser.cpp \
     remotestorage.cpp \
     remoteconnection.cpp \
-    remoteauthentication.cpp
+    remoteauthentication.cpp \
+    mailbox.cpp
 
 # Installation path
 # target.path =
@@ -65,7 +66,8 @@ HEADERS += \
     protocolparser.h \
     remotestorage.h \
     remoteconnection.h \
-    remoteauthentication.h
+    remoteauthentication.h \
+    mailbox.h
 
 FORMS += \
     mainwindow.ui

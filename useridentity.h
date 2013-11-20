@@ -35,7 +35,8 @@ public:
     UserIdentity(const DatabaseBranch *branch, const QString &baseDir = "");
     ~UserIdentity();
 
-    WP::err createNewIdentity(bool addUidToBaseDir = true);
+    WP::err createNewIdentity(KeyStore *keyStore, const QString &defaultKeyId,
+                              bool addUidToBaseDir = true);
     WP::err open(KeyStoreFinder *keyStoreFinder);
 
     const QString &getIdentityKey();

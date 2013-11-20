@@ -367,13 +367,6 @@ EncryptedUserData::~EncryptedUserData()
 {
 }
 
-void EncryptedUserData::setTo(EncryptedUserData *database, const QString &baseDir)
-{
-    fKeyStore = database->getKeyStore();
-    fDefaultKeyId = database->getDefaultKeyId();
-    setToDatabase(database->getDatabaseBranch(), baseDir);
-}
-
 WP::err EncryptedUserData::writeConfig()
 {
     if (fKeyStore == NULL)
@@ -391,7 +384,7 @@ WP::err EncryptedUserData::writeConfig()
     return error;
 }
 
-WP::err EncryptedUserData::readKeyStore(KeyStoreFinder *keyStoreFinder)
+WP::err EncryptedUserData::open(KeyStoreFinder *keyStoreFinder)
 {
     if (fDatabase == NULL)
         return WP::kNotInit;
@@ -475,6 +468,22 @@ WP::err EncryptedUserData::readSafe(const QString &path, QByteArray &data, const
     if (error != WP::kOk)
         return error;
     return fCrypto->decryptSymmetric(encrypted, data, key, iv);
+}
+
+WP::err EncryptedUserData::create(const QString &uid, KeyStore *keyStore, const QString defaultKeyId,
+                                  bool addUidToBaseDir)
+{
+    setUid(uid);
+    setKeyStore(keyStore);
+    setDefaultKeyId(defaultKeyId);
+
+    if (addUidToBaseDir) {
+        QString newBaseDir;
+        (fDatabaseBaseDir == "") ? newBaseDir = uid : newBaseDir = fDatabaseBaseDir + "/" + uid;
+        setBaseDir(newBaseDir);
+    }
+
+    return writeConfig();
 }
 
 void EncryptedUserData::setKeyStore(KeyStore *keyStore)

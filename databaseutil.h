@@ -145,10 +145,8 @@ public:
     EncryptedUserData();
     virtual ~EncryptedUserData();
 
-    void setTo(EncryptedUserData *database, const QString &baseDir);
-
     virtual WP::err writeConfig();
-    virtual WP::err readKeyStore(KeyStoreFinder *keyStoreFinder);
+    virtual WP::err open(KeyStoreFinder *keyStoreFinder);
 
     KeyStore *getKeyStore() const;
     void setKeyStore(KeyStore *keyStore);
@@ -168,6 +166,9 @@ public:
     WP::err readSafe(const QString& path, QByteArray& data, const QString &keyId) const;
 
 protected:
+    virtual WP::err create(const QString &uid, KeyStore *keyStore, const QString defaultKeyId,
+                           bool addUidToBaseDir);
+
     KeyStore *fKeyStore;
     QString fDefaultKeyId;
 };

@@ -9,9 +9,9 @@
 #include "databaseutil.h"
 #include "error_codes.h"
 
-class ProfileEntryKeyStore;
-class ProfileEntryRemote;
-class ProfileEntryIdentity;
+class KeyStoreRef;
+class MailboxRef;
+class IdentityRef;
 class RemoteConnection;
 class UserIdentity;
 
@@ -23,12 +23,12 @@ public:
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
     int rowCount(const QModelIndex & parent = QModelIndex()) const;
 
-    void addIdentity(ProfileEntryIdentity *identity);
-    void removeIdentity(ProfileEntryIdentity *identity);
-    ProfileEntryIdentity *removeIdentityAt(int index);
+    void addIdentity(IdentityRef *identity);
+    void removeIdentity(IdentityRef *identity);
+    IdentityRef *removeIdentityAt(int index);
     UserIdentity *identityAt(int index);
 private:
-    QList<ProfileEntryIdentity*> fIdentities;
+    QList<IdentityRef*> fIdentities;
 };
 
 
@@ -70,54 +70,57 @@ public:
 private:
     void clear();
 
+    WP::err createNewKeyStore(const SecureArray &password, DatabaseBranch *branch, KeyStore **keyStoreOut);
     WP::err loadKeyStores();
-    void addKeyStore(ProfileEntryKeyStore *entry);
+    void addKeyStore(KeyStoreRef *entry);
+
+    WP::err createNewUserIdentity(DatabaseBranch *branch, UserIdentity **userIdentityOut);
     WP::err loadUserIdentities();
-    void addUserIdentity(ProfileEntryIdentity *entry);
+    void addUserIdentity(IdentityRef *entry);
+
+    WP::err createNewMailbox(DatabaseBranch *branch, UserIdentity **userIdentityOut);
+    WP::err loadMailboxs();
+    void addMailBox(MailboxRef *entry);
+
     WP::err loadRemotes();
     WP::err addRemoteDataStorage(RemoteDataStorage *remote);
     void addRemote(RemoteDataStorage *remote);
     RemoteDataStorage *findRemoteDataStorage(const QString &id);
-
-    WP::err createNewKeyStore(const SecureArray &password, DatabaseBranch *branch, KeyStore **keyStoreOut);
-    WP::err createNewUserIdentity(KeyStore *keyStore, DatabaseBranch *branch, UserIdentity **userIdentityOut);
 
     WP::err writeDatabaseBranch(DatabaseBranch *databaseBranch);
     WP::err loadDatabaseBranches();
 private:
     class ProfileKeyStoreFinder : public KeyStoreFinder {
     public:
-        ProfileKeyStoreFinder(QMap<QString, ProfileEntryKeyStore*> &map);
+        ProfileKeyStoreFinder(QMap<QString, KeyStoreRef*> &map);
         virtual KeyStore *find(const QString &keyStoreId);
     private:
-        QMap<QString, ProfileEntryKeyStore*> &fMapOfKeyStores;
+        QMap<QString, KeyStoreRef*> &fMapOfKeyStores;
     };
 
     IdentityListModel fIdentities;
 
-    QMap<QString, ProfileEntryKeyStore*> fMapOfKeyStores;
+    QMap<QString, KeyStoreRef*> fMapOfKeyStores;
     QMap<QString, RemoteDataStorage*> fMapOfRemotes;
     
     QList<DatabaseBranch*> fBranches;
 };
 
-// TODO rename it to ProfileUserDataRef
+
 template<class Type>
-class ProfileEntry : public EncryptedUserData {
+class UserDataRef : public StorageDirectory {
 public:
-    ProfileEntry(EncryptedUserData *database, const QString &path, Type *userData) :
-        EncryptedUserData(*database),
+    UserDataRef(EncryptedUserData *database, const QString &path, Type *userData) :
+        StorageDirectory(database, path),
         fUserData(userData)
     {
-        setBaseDir(path);
-
         if (fUserData != NULL) {
             fDatabaseBranch = fUserData->getDatabaseBranch();
             fDatabaseBaseDir = fUserData->getDatabaseBaseDir();
         }
     }
 
-    virtual ~ProfileEntry() {
+    virtual ~UserDataRef() {
         delete fUserData;
     }
 
@@ -177,9 +180,9 @@ protected:
 
 class KeyStore;
 
-class ProfileEntryKeyStore : public ProfileEntry<KeyStore> {
+class KeyStoreRef : public UserDataRef<KeyStore> {
 public:
-    ProfileEntryKeyStore(EncryptedUserData *database, const QString &path,
+    KeyStoreRef(EncryptedUserData *database, const QString &path,
                          KeyStore *keyStore);
 protected:
     KeyStore *instanciate();
@@ -188,11 +191,21 @@ protected:
 
 class UserIdentity;
 
-class ProfileEntryIdentity : public ProfileEntry<UserIdentity> {
+class IdentityRef : public UserDataRef<UserIdentity> {
 public:
-    ProfileEntryIdentity(EncryptedUserData *database, const QString &path, UserIdentity *identity);
+    IdentityRef(EncryptedUserData *database, const QString &path, UserIdentity *identity);
 protected:
     UserIdentity *instanciate();
+};
+
+
+class Mailbox;
+
+class MailboxRef : public UserDataRef<Mailbox> {
+public:
+    MailboxRef(EncryptedUserData *database, const QString &path, Mailbox *mailbox);
+protected:
+    Mailbox *instanciate();
 };
 
 

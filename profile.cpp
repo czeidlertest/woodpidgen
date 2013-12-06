@@ -67,7 +67,7 @@ Profile::~Profile()
     clear();
 }
 
-WP::err Profile::createNewProfile(const SecureArray &password)
+WP::err Profile::createNewProfile(const QString &userName, const SecureArray &password)
 {
     QByteArray uid = fCrypto->generateInitalizationVector(512);
     setUid(fCrypto->toHex(fCrypto->sha1Hash(uid)));
@@ -92,10 +92,20 @@ WP::err Profile::createNewProfile(const SecureArray &password)
     if (error != WP::kOk)
         return error;
 
+    // create mailbox
+    DatabaseBranch *mailboxesBranch = databaseBranchFor(fDatabaseBranch->getDatabasePath(), "mailboxes");
+    Mailbox *mailbox = NULL;
+    error = createNewMailbox(mailboxesBranch, &mailbox);
+    if (error != WP::kOk)
+        return error;
+
     // init user identity
     DatabaseBranch *identitiesBranch = databaseBranchFor(fDatabaseBranch->getDatabasePath(), "identities");
     UserIdentity *identity = NULL;
-    error = createNewUserIdentity(identitiesBranch, &identity);
+    error = createNewUserIdentity(identitiesBranch, mailbox, &identity);
+    if (error != WP::kOk)
+        return error;
+    error = identity->setUserName(userName);
     if (error != WP::kOk)
         return error;
 
@@ -141,6 +151,12 @@ WP::err Profile::open(const SecureArray &password)
     if (error != WP::kOk)
         return error;
 
+    // load mailboxes
+    error = loadMailboxes();
+    if (error != WP::kOk)
+        return error;
+
+    // load identities
     error = loadUserIdentities();
     if (error != WP::kOk)
         return error;
@@ -194,10 +210,11 @@ void Profile::addKeyStore(KeyStoreRef *entry)
     fMapOfKeyStores[entry->getUserData()->getUid()] = entry;
 }
 
-WP::err Profile::createNewUserIdentity(DatabaseBranch *branch, UserIdentity **userIdentityOut)
+WP::err Profile::createNewUserIdentity(DatabaseBranch *branch, Mailbox *mailbox, UserIdentity **userIdentityOut)
 {
     UserIdentity *identity = new UserIdentity(branch, "");
-    WP::err error = identity->createNewIdentity(getKeyStore(), getDefaultKeyId());
+    WP::err error = identity->createNewIdentity(getKeyStore(), getDefaultKeyId(),
+                                                mailbox);
     if (error != WP::kOk)
         return error;
     error = addUserIdentity(identity);
@@ -218,7 +235,8 @@ WP::err Profile::loadUserIdentities()
             continue;
         UserIdentity *id = entry->getUserData();
         Profile::ProfileKeyStoreFinder keyStoreFinder(fMapOfKeyStores);
-        WP::err error = id->open(&keyStoreFinder);
+        Profile::ProfileMailboxFinder mailboxFinder(fMapOfMailboxes);
+        WP::err error = id->open(&keyStoreFinder, &mailboxFinder);
         if (error != WP::kOk){
             delete entry;
             continue;
@@ -247,19 +265,57 @@ void Profile::addUserIdentity(IdentityRef *entry)
     fIdentities.addIdentity(entry);
 }
 
-WP::err Profile::createNewMailbox(DatabaseBranch *branch, UserIdentity **userIdentityOut)
+WP::err Profile::createNewMailbox(DatabaseBranch *branch, Mailbox **mailboxOut)
 {
-
+    Mailbox *mailbox = new Mailbox(branch, "");
+    WP::err error = mailbox->createNewMailbox(getKeyStore(), getDefaultKeyId());
+    if (error != WP::kOk)
+        return error;
+    error = addMailbox(mailbox);
+    if (error != WP::kOk)
+        return error;
+    *mailboxOut = mailbox;
+    return WP::kOk;
 }
 
-WP::err Profile::loadMailboxs()
+WP::err Profile::loadMailboxes()
 {
+    QStringList mailboxList = listDirectories("mailboxes");
 
+    for (int i = 0; i < mailboxList.count(); i++) {
+        MailboxRef *entry
+            = new MailboxRef(this, prependBaseDir("mailboxes/" + mailboxList.at(i)), NULL);
+        if (entry->load(this) != WP::kOk)
+            continue;
+        Mailbox *id = entry->getUserData();
+        Profile::ProfileKeyStoreFinder keyStoreFinder(fMapOfKeyStores);
+        WP::err error = id->open(&keyStoreFinder);
+        if (error != WP::kOk){
+            delete entry;
+            continue;
+        }
+
+        addMailbox(entry);
+    }
+    return WP::kOk;
 }
 
-void Profile::addMailBox(MailboxRef *entry)
+WP::err Profile::addMailbox(Mailbox *mailbox)
 {
+    QString dir = "mailboxes/";
+    dir += mailbox->getUid();
 
+    MailboxRef *entry = new MailboxRef(this, dir, mailbox);
+    WP::err error = entry->writeEntry();
+    if (error != WP::kOk)
+        return error;
+    addMailbox(entry);
+    return WP::kOk;
+}
+
+void Profile::addMailbox(MailboxRef *entry)
+{
+    fMapOfMailboxes[entry->getUserData()->getUid()] = entry;
 }
 
 WP::err Profile::loadRemotes()
@@ -268,7 +324,7 @@ WP::err Profile::loadRemotes()
 
     for (int i = 0; i < remotesList.count(); i++) {
         RemoteDataStorage *remote
-            = new RemoteDataStorage();
+            = new RemoteDataStorage(this);
         StorageDirectory dir(this, prependBaseDir("remotes/" + remotesList.at(i)));
         if (remote->load(dir) != WP::kOk)
             continue;
@@ -394,7 +450,7 @@ DatabaseBranch *Profile::databaseBranchFor(const QString &database, const QStrin
 
 RemoteDataStorage *Profile::addPHPRemote(const QString &url)
 {
-    RemoteDataStorage *remoteDataStorage = new RemoteDataStorage();
+    RemoteDataStorage *remoteDataStorage = new RemoteDataStorage(this);
     remoteDataStorage->setPHPEncryptedRemoteConnection(url);
 
     WP::err error = addRemoteDataStorage(remoteDataStorage);
@@ -407,7 +463,7 @@ RemoteDataStorage *Profile::addPHPRemote(const QString &url)
 
 RemoteDataStorage *Profile::addHTTPRemote(const QString &url)
 {
-    RemoteDataStorage *remoteDataStorage = new RemoteDataStorage();
+    RemoteDataStorage *remoteDataStorage = new RemoteDataStorage(this);
     remoteDataStorage->setHTTPRemoteConnection(url);
 
     WP::err error = addRemoteDataStorage(remoteDataStorage);
@@ -518,4 +574,19 @@ MailboxRef::MailboxRef(EncryptedUserData *database, const QString &path, Mailbox
 Mailbox *MailboxRef::instanciate()
 {
     return new Mailbox(fDatabaseBranch, fDatabaseBaseDir);
+}
+
+
+Profile::ProfileMailboxFinder::ProfileMailboxFinder(QMap<QString, MailboxRef *> &map) :
+    fMapOfKeyMailboxes(map)
+{
+}
+
+Mailbox *Profile::ProfileMailboxFinder::find(const QString &mailboxId)
+{
+    QMap<QString, MailboxRef*>::const_iterator it;
+    it = fMapOfKeyMailboxes.find(mailboxId);
+    if (it == fMapOfKeyMailboxes.end())
+        return NULL;
+    return it.value()->getUserData();
 }

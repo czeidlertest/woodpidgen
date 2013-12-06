@@ -1,7 +1,8 @@
 <?php
 
-include_once './SyncHandler.php';
 include_once './AuthHandler.php';
+include_once './MessageHandler.php';
+include_once './SyncHandler.php';
 
 
 function initSyncHandlers($XMLHandler) {
@@ -23,32 +24,49 @@ function initSyncHandlers($XMLHandler) {
 	$XMLHandler->addHandler($pushIqGetHandler);
 }
 
+function initAccountAuthHandler($XMLHandler) {
+	$iqHandler = new InIqStanzaHandler(IqType::$kSet);
+	$handler = new AccountAuthStanzaHandler($XMLHandler->getInStream());
+	$iqHandler->addChild($handler);
+	$XMLHandler->addHandler($iqHandler);
+}
+
+function initAccountAuthSignedHandler($XMLHandler) {
+	$iqHandler = new InIqStanzaHandler(IqType::$kSet);
+	$handler = new AccountAuthSignedStanzaHandler($XMLHandler->getInStream());
+	$iqHandler->addChild($handler);
+	$XMLHandler->addHandler($iqHandler);
+}
+
 function initAuthHandlers($XMLHandler) {
 	// auth
-	$userAuthIqGetHandler = new InIqStanzaHandler(IqType::$kSet);
-	$userAuthHandler = new UserAuthStanzaHandler($XMLHandler->getInStream());
-	$userAuthIqGetHandler->addChild($userAuthHandler);
-	$XMLHandler->addHandler($userAuthIqGetHandler);
+	initAccountAuthHandler($XMLHandler);
+	initAccountAuthSignedHandler($XMLHandler);	
 
-	$userAuthSignatureIqGetHandler = new InIqStanzaHandler(IqType::$kSet);
-	$userAuthSignatureHandler = new UserAuthSignedStanzaHandler($XMLHandler->getInStream());
-	$userAuthSignatureIqGetHandler->addChild($userAuthSignatureHandler);
-	$XMLHandler->addHandler($userAuthSignatureIqGetHandler);
-		
-	$logoutIqGetHandler = new InIqStanzaHandler(IqType::$kSet);
+	$logoutIqSetHandler = new InIqStanzaHandler(IqType::$kSet);
 	$logoutHandler = new LogoutStanzaHandler($XMLHandler->getInStream());
-	$logoutIqGetHandler->addChild($logoutHandler);
-	$XMLHandler->addHandler($logoutIqGetHandler);
+	$logoutIqSetHandler->addChild($logoutHandler);
+	$XMLHandler->addHandler($logoutIqSetHandler);
 }
+
+function initMessageHandlers($XMLHandler) {
+	$iqHandler = new InIqStanzaHandler(IqType::$kSet);
+	$handler = new MessageStanzaHandler($XMLHandler->getInStream());
+	$iqHandler->addChild($handler);
+	$XMLHandler->addHandler($iqHandler);	
+}
+
 
 class InitHandlers {
 	static public function initPrivateHandlers($XMLHandler) {
 		initSyncHandlers($XMLHandler);
 		initAuthHandlers($XMLHandler);
+		initMessageHandlers($XMLHandler);
 	}
 	
 	static public function initPublicHandlers($XMLHandler) {
 		initAuthHandlers($XMLHandler);
+		initMessageHandlers($XMLHandler);
 	}
 }
 

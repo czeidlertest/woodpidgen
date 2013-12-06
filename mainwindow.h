@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QProgressBar>
 
+#include <messageview.h>
 #include <profile.h>
 
 
@@ -25,7 +26,7 @@ public slots:
 private:
     Ui::MainWindow *ui;
     QWidget *fIdentityView;
-    QWidget *fMessageView;
+    MessageView *fMessageView;
     Profile *fProfile;
     QProgressBar *fProgressBar;
 };

@@ -1,8 +1,8 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
-#include <messageview.h>
-#include <useridentityview.h>
+#include "useridentity.h"
+#include "useridentityview.h"
 
 
 MainWindow::MainWindow(Profile *profile, QWidget *parent) :
@@ -25,6 +25,8 @@ MainWindow::MainWindow(Profile *profile, QWidget *parent) :
 
     fIdentityView = new UserIdentityView(fProfile->getIdentityList(), this);
     fMessageView = new MessageView(this);
+    fMessageView->setMailbox(fProfile->getIdentityList()->identityAt(0)->getMailbox());
+
     ui->horizontalLayout->setMargin(0);
     ui->stackedWidget->addWidget(fIdentityView);
     ui->stackedWidget->addWidget(fMessageView);

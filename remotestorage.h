@@ -28,11 +28,12 @@ private:
 };
 
 
+class Profile;
 class RemoteAuthentication;
 
 class RemoteDataStorage {
 public:
-    RemoteDataStorage();
+    RemoteDataStorage(Profile *profile);
     virtual ~RemoteDataStorage();
 
     WP::err write(StorageDirectory &dir);
@@ -63,6 +64,8 @@ private:
 
     static ConnectionManager<HTTPConnection> sHTTPConnectionManager;
     static ConnectionManager<EncryptedPHPConnection> sPHPConnectionManager;
+
+    Profile *fProfile;
 
     RemoteConnection *fConnection;
     RemoteAuthentication *fAuthentication;

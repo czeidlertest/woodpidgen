@@ -6,7 +6,8 @@
 ConnectionManager<HTTPConnection> RemoteDataStorage::sHTTPConnectionManager;
 ConnectionManager<EncryptedPHPConnection> RemoteDataStorage::sPHPConnectionManager;
 
-RemoteDataStorage::RemoteDataStorage() :
+RemoteDataStorage::RemoteDataStorage(Profile *profile) :
+    fProfile(profile),
     fConnection(NULL),
     fAuthentication(NULL)
 {
@@ -75,7 +76,8 @@ void RemoteDataStorage::setSignatureAuth(const QString &userName, const QString 
     fAuthKeyStoreId = keyStoreId;
     fAuthKeyId = keyId;
     delete fAuthentication;
-    fAuthentication = new SignatureAuthentication(fConnection, fAuthUserName, fAuthKeyStoreId, fAuthKeyId);
+    fAuthentication = new SignatureAuthentication(fConnection, fProfile, fAuthUserName,
+                                                  fAuthKeyStoreId, fAuthKeyId, fAuthUserName);
 }
 
 RemoteConnection *RemoteDataStorage::getRemoteConnection()

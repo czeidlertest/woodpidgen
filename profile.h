@@ -8,6 +8,8 @@
 #include "databaseinterface.h"
 #include "databaseutil.h"
 #include "error_codes.h"
+#include "mailbox.h"
+
 
 class KeyStoreRef;
 class MailboxRef;
@@ -39,7 +41,7 @@ public:
     ~Profile();
 
     /*! create a new profile and adds a new KeyStore with \par password. */
-    WP::err createNewProfile(const SecureArray &password);
+    WP::err createNewProfile(const QString &userName, const SecureArray &password);
 
     WP::err commit();
 
@@ -74,13 +76,14 @@ private:
     WP::err loadKeyStores();
     void addKeyStore(KeyStoreRef *entry);
 
-    WP::err createNewUserIdentity(DatabaseBranch *branch, UserIdentity **userIdentityOut);
+    WP::err createNewUserIdentity(DatabaseBranch *branch, Mailbox *mailbox, UserIdentity **userIdentityOut);
     WP::err loadUserIdentities();
     void addUserIdentity(IdentityRef *entry);
 
-    WP::err createNewMailbox(DatabaseBranch *branch, UserIdentity **userIdentityOut);
-    WP::err loadMailboxs();
-    void addMailBox(MailboxRef *entry);
+    WP::err createNewMailbox(DatabaseBranch *branch, Mailbox **mailboxOut);
+    WP::err loadMailboxes();
+    WP::err addMailbox(Mailbox *mailbox);
+    void addMailbox(MailboxRef *entry);
 
     WP::err loadRemotes();
     WP::err addRemoteDataStorage(RemoteDataStorage *remote);
@@ -98,11 +101,20 @@ private:
         QMap<QString, KeyStoreRef*> &fMapOfKeyStores;
     };
 
+    class ProfileMailboxFinder : public MailboxFinder {
+    public:
+        ProfileMailboxFinder(QMap<QString, MailboxRef*> &map);
+        virtual Mailbox *find(const QString &mailboxId);
+    private:
+        QMap<QString, MailboxRef*> &fMapOfKeyMailboxes;
+    };
+
     IdentityListModel fIdentities;
 
     QMap<QString, KeyStoreRef*> fMapOfKeyStores;
+    QMap<QString, MailboxRef*> fMapOfMailboxes;
     QMap<QString, RemoteDataStorage*> fMapOfRemotes;
-    
+
     QList<DatabaseBranch*> fBranches;
 };
 
@@ -198,8 +210,6 @@ protected:
     UserIdentity *instanciate();
 };
 
-
-class Mailbox;
 
 class MailboxRef : public UserDataRef<Mailbox> {
 public:

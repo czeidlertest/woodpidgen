@@ -348,8 +348,8 @@ DatabaseInterface *KeyStore::getDatabaseInterface()
     return fDatabase;
 }
 
-const char *kPathKeyStoreID = "key_store_id";
-const char *kPathDefaultKeyID = "default_key_id";
+const char *kPathKeyStoreId = "key_store_id";
+const char *kPathDefaultKeyId = "default_key_id";
 
 EncryptedUserData::EncryptedUserData(const EncryptedUserData &data) :
     fKeyStore(data.getKeyStore()),
@@ -376,11 +376,11 @@ WP::err EncryptedUserData::writeConfig()
     if (error != WP::kOk)
         return error;
 
-    error = write(kPathKeyStoreID, fKeyStore->getUid());
+    error = write(kPathKeyStoreId, fKeyStore->getUid());
     if (error != WP::kOk)
         return error;
 
-    error = write(kPathDefaultKeyID, fDefaultKeyId);
+    error = write(kPathDefaultKeyId, fDefaultKeyId);
     return error;
 }
 
@@ -390,14 +390,14 @@ WP::err EncryptedUserData::open(KeyStoreFinder *keyStoreFinder)
         return WP::kNotInit;
 
     QString keyStoreId;
-    WP::err error = read(kPathKeyStoreID, keyStoreId);
+    WP::err error = read(kPathKeyStoreId, keyStoreId);
     if (error != WP::kOk)
         return error;
     fKeyStore = keyStoreFinder->find(keyStoreId);
     if (fKeyStore == NULL)
         return WP::kEntryNotFound;
 
-    error = read(kPathDefaultKeyID, fDefaultKeyId);
+    error = read(kPathDefaultKeyId, fDefaultKeyId);
     return error;
 }
 

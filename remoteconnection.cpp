@@ -91,7 +91,7 @@ void HTTPConnectionReply::finishedSlot()
     emit finished(WP::kOk);
 }
 
-void HTTPConnectionReply::errorSlot(QNetworkReply::NetworkError /*code*/)
+void HTTPConnectionReply::errorSlot(QNetworkReply::NetworkError code)
 {
     emit finished(WP::kError);
 }

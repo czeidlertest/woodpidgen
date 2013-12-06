@@ -5,13 +5,8 @@
 #include "protocolparser.h"
 
 
-RemoteAuthentication::RemoteAuthentication(RemoteConnection *connection, const QString &userName, const QString &keyStoreId,
-                                           const QString &keyId) :
+RemoteAuthentication::RemoteAuthentication(RemoteConnection *connection) :
     fConnection(connection),
-    fUserName(userName),
-    fKeyStoreId(keyStoreId),
-    fKeyId(keyId),
-    fProfile(NULL),
     fAuthenticationReply(NULL),
     fAuthenticationInProgress(false),
     fVerified(false)
@@ -23,13 +18,13 @@ RemoteConnection *RemoteAuthentication::getConnection()
     return fConnection;
 }
 
-WP::err RemoteAuthentication::login(Profile *profile)
+WP::err RemoteAuthentication::login()
 {
-    fProfile = profile;
     if (fAuthenticationInProgress)
         return WP::kOk;
     if (fVerified) {
         emit authenticationAttemptFinished(WP::kOk);
+        return WP::kOk;
     }
 
     fAuthenticationInProgress = true;
@@ -62,60 +57,36 @@ bool RemoteAuthentication::verified()
     return fVerified;
 }
 
-void RemoteAuthentication::handleConnectionAttempt(WP::err code)
+void RemoteAuthentication::setAuthenticationCanceled(WP::err code)
 {
-    if (code != WP::kOk) {
-        fAuthenticationInProgress = false;
-        emit authenticationAttemptFinished(code);
-        return;
-    }
-    QByteArray data;
-    getLoginRequestData(data);
-    fAuthenticationReply = fConnection->send(data);
-    connect(fAuthenticationReply, SIGNAL(finished(WP::err)), this, SLOT(handleAuthenticationRequest(WP::err)));
+    fAuthenticationInProgress = false;
+    //fAuthenticationReply = NULL;
+    emit authenticationAttemptFinished(code);
 }
 
-void RemoteAuthentication::handleAuthenticationRequest(WP::err code)
+void RemoteAuthentication::setAuthenticationSucceeded()
 {
-    if (code != WP::kOk) {
-        fAuthenticationInProgress = false;
-        emit authenticationAttemptFinished(code);
-        return;
-    }
-    QByteArray data;
-    WP::err error = getLoginData(data, fAuthenticationReply->readAll());
-    if (error != WP::kOk) {
-        fAuthenticationInProgress = false;
-        emit authenticationAttemptFinished(error);
-        return;
-    }
-
-    fAuthenticationReply = fConnection->send(data);
-    connect(fAuthenticationReply, SIGNAL(finished(WP::err)), this,
-            SLOT(handleAuthenticationAttempt(WP::err)));
-}
-
-void RemoteAuthentication::handleAuthenticationAttempt(WP::err code)
-{
-    WP::err error = code;
-    if (error == WP::kOk) {
-        QByteArray data = fAuthenticationReply->readAll();
-        error = wasLoginSuccessful(data);
-    }
-    if (error == WP::kOk)
-        fVerified = true;
-
+    fVerified = true;
     fAuthenticationInProgress = false;
     fAuthenticationReply = NULL;
-    emit authenticationAttemptFinished(error);
+    emit authenticationAttemptFinished(WP::kOk);
 }
 
 
+const char *kAuthStanza = "auth";
+const char *kAuthSignedStanza = "auth_signed";
+
 SignatureAuthentication::SignatureAuthentication(RemoteConnection *connection,
+                                                 Profile *profile,
                                                  const QString &userName,
                                                  const QString &keyStoreId,
-                                                 const QString &keyId) :
-    RemoteAuthentication(connection, userName, keyStoreId, keyId)
+                                                 const QString &keyId, const QString &serverUser) :
+    RemoteAuthentication(connection),
+    fProfile(profile),
+    fUserName(userName),
+    fServerUser(serverUser),
+    fKeyStoreId(keyStoreId),
+    fKeyId(keyId)
 {
 }
 
@@ -126,9 +97,10 @@ void SignatureAuthentication::getLoginRequestData(QByteArray &data)
     IqOutStanza *iqStanza = new IqOutStanza(kGet);
     outStream.pushStanza(iqStanza);
 
-    OutStanza *authStanza =  new OutStanza("user_auth");
+    OutStanza *authStanza =  new OutStanza(kAuthStanza);
     authStanza->addAttribute("type", "signature");
     authStanza->addAttribute("user", fUserName);
+    authStanza->addAttribute("server_user", fServerUser);
     outStream.pushChildStanza(authStanza);
 
     outStream.flush();
@@ -137,7 +109,7 @@ void SignatureAuthentication::getLoginRequestData(QByteArray &data)
 class UserAuthHandler : public InStanzaHandler {
 public:
     UserAuthHandler() :
-        InStanzaHandler("user_auth")
+        InStanzaHandler(kAuthStanza)
     {
     }
 
@@ -191,7 +163,7 @@ qDebug(serverRequest);
     ProtocolOutStream outStream(&data);
     IqOutStanza *iqStanza = new IqOutStanza(kSet);
     outStream.pushStanza(iqStanza);
-    OutStanza *authStanza =  new OutStanza("user_auth_signed");
+    OutStanza *authStanza =  new OutStanza(kAuthSignedStanza);
     authStanza->addAttribute("signature", signature);
     outStream.pushChildStanza(authStanza);
     outStream.flush();
@@ -203,29 +175,44 @@ qDebug(serverRequest);
 class UserAuthResultHandler : public InStanzaHandler {
 public:
     UserAuthResultHandler() :
-        InStanzaHandler("user_auth_signed")
+        InStanzaHandler(kAuthSignedStanza)
     {
     }
 
     bool handleStanza(const QXmlStreamAttributes &attributes)
     {
-        if (!attributes.hasAttribute("verification"))
-            return false;
+        return true;
+    }
+};
 
-        result = attributes.value("verification").toString();
+class AuthResultRoleHandler : public InStanzaHandler {
+public:
+    AuthResultRoleHandler() :
+        InStanzaHandler("role", true)
+    {
+    }
+
+    bool handleStanza(const QXmlStreamAttributes &attributes)
+    {
+        return true;
+    }
+
+    bool handleText(const QStringRef &text) {
+        roles.append(text.toString());
         return true;
     }
 
 public:
-    QString result;
+    QStringList roles;
 };
-
 
 WP::err SignatureAuthentication::wasLoginSuccessful(QByteArray &data)
 {
 qDebug(data);
     IqInStanzaHandler iqHandler(kResult);
     UserAuthResultHandler *userAuthResutlHandler = new UserAuthResultHandler();
+    AuthResultRoleHandler *roleHander = new AuthResultRoleHandler();
+    userAuthResutlHandler->addChildHandler(roleHander);
     iqHandler.addChildHandler(userAuthResutlHandler);
 
     ProtocolInStream inStream(data);
@@ -235,7 +222,8 @@ qDebug(data);
     if (!userAuthResutlHandler->hasBeenHandled())
         return WP::kError;
 
-    if (userAuthResutlHandler->result != "ok")
+    fRoles = roleHander->roles;
+    if (fRoles.count() == 0)
         return WP::kError;
 
     return WP::kOk;
@@ -249,4 +237,49 @@ void SignatureAuthentication::getLogoutData(QByteArray &data)
     OutStanza *authStanza =  new OutStanza("logout");
     outStream.pushChildStanza(authStanza);
     outStream.flush();
+}
+
+
+void SignatureAuthentication::handleConnectionAttempt(WP::err code)
+{
+    if (code != WP::kOk) {
+        setAuthenticationCanceled(code);
+        return;
+    }
+    QByteArray data;
+    getLoginRequestData(data);
+    fAuthenticationReply = fConnection->send(data);
+    connect(fAuthenticationReply, SIGNAL(finished(WP::err)), this, SLOT(handleAuthenticationRequest(WP::err)));
+}
+
+void SignatureAuthentication::handleAuthenticationRequest(WP::err code)
+{
+    if (code != WP::kOk) {
+        setAuthenticationCanceled(code);
+        return;
+    }
+    QByteArray data;
+    WP::err error = getLoginData(data, fAuthenticationReply->readAll());
+    if (error != WP::kOk) {
+        setAuthenticationCanceled(error);
+        return;
+    }
+
+    fAuthenticationReply = fConnection->send(data);
+    connect(fAuthenticationReply, SIGNAL(finished(WP::err)), this,
+            SLOT(handleAuthenticationAttempt(WP::err)));
+}
+
+void SignatureAuthentication::handleAuthenticationAttempt(WP::err code)
+{
+    WP::err error = code;
+    if (error == WP::kOk) {
+        QByteArray data = fAuthenticationReply->readAll();
+        error = wasLoginSuccessful(data);
+    }
+    if (error != WP::kOk) {
+        setAuthenticationCanceled(error);
+        return;
+    }
+    setAuthenticationSucceeded();
 }

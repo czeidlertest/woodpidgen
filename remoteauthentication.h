@@ -1,6 +1,8 @@
 #ifndef REMOTEAUTHENTICATION_H
 #define REMOTEAUTHENTICATION_H
 
+#include <QStringList>
+
 #include "remoteconnection.h"
 
 class Profile;
@@ -9,37 +11,29 @@ class RemoteAuthentication : public QObject
 {
 Q_OBJECT
 public:
-    RemoteAuthentication(RemoteConnection *connection, const QString &userName,
-                         const QString &keyStoreId, const QString &keyId);
+    RemoteAuthentication(RemoteConnection *connection);
     virtual ~RemoteAuthentication() {}
 
     RemoteConnection *getConnection();
 
     //! Establish a connection and login afterwards.
-    WP::err login(Profile *profile);
+    WP::err login();
     void logout();
     bool verified();
 
 protected slots:
-    void handleConnectionAttempt(WP::err code);
-    void handleAuthenticationRequest(WP::err code);
-    void handleAuthenticationAttempt(WP::err code);
+    virtual void handleConnectionAttempt(WP::err code) = 0;
 
 signals:
     void authenticationAttemptFinished(WP::err code);
 
 protected:
-    virtual void getLoginRequestData(QByteArray &data) = 0;
-    virtual WP::err getLoginData(QByteArray &data, const QByteArray &serverRequest) = 0;
-    virtual WP::err wasLoginSuccessful(QByteArray &data) = 0;
+    void setAuthenticationCanceled(WP::err code);
+    void setAuthenticationSucceeded();
+
     virtual void getLogoutData(QByteArray &data) = 0;
 
     RemoteConnection *fConnection;
-    QString fUserName;
-    QString fKeyStoreId;
-    QString fKeyId;
-    Profile *fProfile;
-
     RemoteConnectionReply *fAuthenticationReply;
 
     bool fAuthenticationInProgress;
@@ -48,15 +42,31 @@ protected:
 
 
 class SignatureAuthentication : public RemoteAuthentication {
+Q_OBJECT
 public:
-    SignatureAuthentication(RemoteConnection *connection, const QString &userName,
-                            const QString &keyStoreId, const QString &keyId);
+    SignatureAuthentication(RemoteConnection *connection, Profile *profile,
+                            const QString &userName, const QString &keyStoreId,
+                            const QString &keyId, const QString &serverUser);
+
+protected slots:
+    void handleConnectionAttempt(WP::err code);
+    void handleAuthenticationRequest(WP::err code);
+    void handleAuthenticationAttempt(WP::err code);
 
 protected:
-    virtual void getLoginRequestData(QByteArray &data);
-    virtual WP::err getLoginData(QByteArray &data, const QByteArray &serverRequest);
-    virtual WP::err wasLoginSuccessful(QByteArray &data);
-    virtual void getLogoutData(QByteArray &data);
+    void getLoginRequestData(QByteArray &data);
+    WP::err getLoginData(QByteArray &data, const QByteArray &serverRequest);
+    WP::err wasLoginSuccessful(QByteArray &data);
+    void getLogoutData(QByteArray &data);
+
+private:
+    Profile *fProfile;
+    QString fUserName;
+    QString fServerUser;
+    QString fKeyStoreId;
+    QString fKeyId;
+
+    QStringList fRoles;
 };
 
 

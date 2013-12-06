@@ -6,9 +6,10 @@
 #include <QString>
 #include <QTextStream>
 
-#include <cryptointerface.h>
-#include <databaseinterface.h>
-#include <databaseutil.h>
+#include "cryptointerface.h"
+#include "databaseinterface.h"
+#include "databaseutil.h"
+#include "mailbox.h"
 
 
 /*! UserIdentity database structure:
@@ -36,24 +37,15 @@ public:
     ~UserIdentity();
 
     WP::err createNewIdentity(KeyStore *keyStore, const QString &defaultKeyId,
-                              bool addUidToBaseDir = true);
-    WP::err open(KeyStoreFinder *keyStoreFinder);
+                              Mailbox *mailbox, bool addUidToBaseDir = true);
+    WP::err open(KeyStoreFinder *keyStoreFinder, MailboxFinder *mailboxFinder);
 
-    const QString &getIdentityKey();
+    const QString &getIdentityKeyId() const;
 
-            //! discare changes and reload values from database
-            int                 reload();
+    const QString &getUserName() const;
+    const WP::err setUserName(const QString &userName);
 
-
-            QString             getSignatureName();
-            // keys
-            QList<QString>      getPublicKeyNames();
-            QList<QString>      getPrivateKeyNames();
-            QList<QString>      getCertificateNames();
-
-            QByteArray          getPublicKey(QString name);
-            SecureArray    getPrivateKey(QString name);
-            QByteArray          getCertificate(QString name);
+    Mailbox *getMailbox() const;
 
             // contacts
 
@@ -63,7 +55,10 @@ public:
 private:
     WP::err writePublicSignature(const QString &filename, const QString &publicKey);
 
-    QString fIdentityKey;
+    QString fIdentityKeyId;
+    Mailbox *fMailbox;
+
+    QString fUserName;
 };
 
 #endif // USERIDENTITY_H

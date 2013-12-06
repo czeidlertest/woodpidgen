@@ -41,8 +41,6 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
 
     fProfile = new Profile(".git", "profile");
 
-    fMainWindow = new MainWindow(fProfile);
-    fMainWindow->show();
 /*
     // pull test
     DatabaseInterface *syncDatabase;
@@ -53,26 +51,39 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
     return;
 */
     SecureArray password("test_password");
+    QString userName = "cle";
+    QString remoteUrl = "http://localhost/php_server/portal.php";
     if (fProfile->open(password) != WP::kOk) {
         //RemoteDataStorage* remote = new HTTPRemoteStorage("http://localhost/php_server/portal.php");
         //RemoteDataStorage* remote = new PHPEncryptedRemoteStorage("http://localhost/php_server/portal.php");
-        WP::err error = fProfile->createNewProfile(password);
+        WP::err error = fProfile->createNewProfile(userName, password);
         if (error != WP::kOk) {
             QMessageBox::information(NULL, "Error", "Unable to create or load a profile!");
             quit();
         }
-        RemoteDataStorage *remote = fProfile->addHTTPRemote("http://localhost/php_server/portal.php");
+        RemoteDataStorage *remote = fProfile->addHTTPRemote(remoteUrl);
         UserIdentity *mainIdentity = fProfile->getIdentityList()->identityAt(0);
-        fProfile->setSignatureAuth(remote, "cle", mainIdentity->getKeyStore()->getUid(), mainIdentity->getIdentityKey());
+        fProfile->setSignatureAuth(remote, mainIdentity->getUserName(),
+                                   mainIdentity->getKeyStore()->getUid(),
+                                   mainIdentity->getIdentityKeyId());
 
         fProfile->connectFreeBranches(remote);
         fProfile->commit();
     }
 
-    DatabaseBranch *branch = fProfile->getBranches().at(0);
+    DatabaseBranch *branch = NULL;
+    QList<DatabaseBranch*> &branches = fProfile->getBranches();
+    foreach (branch, branches) {
+        RemoteSync *sync = new RemoteSync(branch->getDatabase(), branch->getRemoteAuthAt(0), fProfile, this);
+        sync->sync();
+    }
 
-    RemoteSync *sync = new RemoteSync(branch->getDatabase(), branch->getRemoteAuthAt(0), fProfile, this);
-    sync->sync();
+    fMainWindow = new MainWindow(fProfile);
+    fMainWindow->show();
+
+    MailMessenger *messenger = new MailMessenger("cle@localhost", fProfile, fProfile->getIdentityList()->identityAt(0));
+    RawMailMessage *message = new RawMailMessage("header", "body");
+    messenger->postMessage(message);
 /*
     QByteArray data;
     ProtocolOutStream outStream(&data);

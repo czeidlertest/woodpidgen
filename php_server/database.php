@@ -32,6 +32,11 @@ class TreeBuilder {
 		$newTrees = array();
 	}
 
+	public function updateFile($path, $object)
+    {
+		$this->_updateNode($this->rootTree, $path, 100644, $object);
+    }
+
 	public function updateNode($path, $mode, $object)
     {
 		$this->_updateNode($this->rootTree, $path, $mode, $object);
@@ -245,7 +250,7 @@ class GitDatabase extends Git {
 		return $rootTree;
 	}
 
-	private function writeBlob($data) {
+	public function writeBlob($data) {
 		$object = new GitBlob($this);
 		$object->data = $data;
 		$object->rehash();

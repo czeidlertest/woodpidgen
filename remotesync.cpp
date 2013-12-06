@@ -37,7 +37,7 @@ WP::err RemoteSync::sync()
     else {
         connect(fAuthentication, SIGNAL(authenticationAttemptFinished(WP::err)),
                 this, SLOT(syncConnected(WP::err)));
-        fAuthentication->login(fProfile);
+        fAuthentication->login();
     }
     return WP::kOk;
 }

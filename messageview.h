@@ -9,13 +9,14 @@
 #include <QWidget>
 
 #include "mailbox.h"
+#include "profile.h"
 
 
 class MessageView : public QSplitter
 {
     Q_OBJECT
 public:
-    explicit MessageView(QWidget *parent = 0);
+    explicit MessageView(Profile *profile, QWidget *parent = 0);
     
     void setMailbox(Mailbox *mailbox);
 
@@ -23,12 +24,16 @@ signals:
     
 public slots:
     
+private slots:
+    void onSendButtonClicked();
+
 private:
     QListView *fMessageDisplay;
     QLineEdit *fReceiver;
     QTextEdit *fMessageComposer;
     QPushButton *fSendButton;
 
+    Profile *fProfile;
     Mailbox *fMailbox;
 };
 

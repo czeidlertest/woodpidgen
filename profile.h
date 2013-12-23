@@ -43,6 +43,8 @@ public:
     /*! create a new profile and adds a new KeyStore with \par password. */
     WP::err createNewProfile(const QString &userName, const SecureArray &password);
 
+    WP::err writeConfig();
+
     WP::err commit();
 
     //! adds an external key store to the profile
@@ -52,6 +54,9 @@ public:
 
     WP::err addUserIdentity(UserIdentity *identity);
     WP::err removeUserIdentity(UserIdentity *useIdentity);
+
+    int getMailboxCount() const;
+    Mailbox * getMailboxAt(int index) const;
 
     DatabaseBranch* databaseBranchFor(const QString &database, const QString &branch);
 
@@ -69,6 +74,7 @@ public:
     EncryptedUserData* findStorageDirectory(UserData *userData);
 
     QList<DatabaseBranch*> &getBranches();
+
 private:
     void clear();
 
@@ -112,6 +118,7 @@ private:
     IdentityListModel fIdentities;
 
     QMap<QString, KeyStoreRef*> fMapOfKeyStores;
+    QString fMainMailbox;
     QMap<QString, MailboxRef*> fMapOfMailboxes;
     QMap<QString, RemoteDataStorage*> fMapOfRemotes;
 

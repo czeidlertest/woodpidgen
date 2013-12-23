@@ -2,8 +2,12 @@
 
 #include <QVBoxLayout>
 
-MessageView::MessageView(QWidget *parent) :
+#include "useridentity.h"
+
+
+MessageView::MessageView(Profile *profile, QWidget *parent) :
     QSplitter(Qt::Vertical, parent),
+    fProfile(profile),
     fMailbox(NULL)
 {
     fMessageDisplay = new QListView(this);
@@ -18,6 +22,9 @@ MessageView::MessageView(QWidget *parent) :
     composerLayout->addWidget(fMessageComposer);
     composerLayout->addWidget(fSendButton);
 
+    connect(fSendButton, SIGNAL(clicked()), this, SLOT(onSendButtonClicked()));
+
+    setMailbox(fProfile->getIdentityList()->identityAt(0)->getMailbox());
 }
 
 void MessageView::setMailbox(Mailbox *mailbox)
@@ -25,4 +32,19 @@ void MessageView::setMailbox(Mailbox *mailbox)
     fMailbox = mailbox;
     QAbstractListModel &listModel = fMailbox->getMessages();
     fMessageDisplay->setModel(&listModel);
+}
+
+void MessageView::onSendButtonClicked()
+{
+    QString receiver = fReceiver->text();
+    if (receiver == "")
+        return;
+
+    QString body = fMessageComposer->toPlainText();
+    MailMessenger *messenger = new MailMessenger(receiver, fProfile, fProfile->getIdentityList()->identityAt(0));
+    RawMailMessage *message = new RawMailMessage("header", body);
+    messenger->postMessage(message);
+
+    // todo progress bar
+    fMessageComposer->clear();
 }

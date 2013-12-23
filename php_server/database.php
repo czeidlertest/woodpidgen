@@ -237,13 +237,13 @@ class GitDatabase extends Git {
 		}
 	}
 
-	// unused
+	// Returns the root tree object.
 	public function getRootTree($branch) {
 		$rootTree = NULL;
 		try {
 			$tip = $this->getTip($branch);
 			$rootCommit = $this->getObject($tip);
-			$rootTree = clone $rootCommit->tree;
+			$rootTree = $this->getObject($rootCommit->tree);
 		} catch (Exception $e) {
 			$rootTree = new GitTree($this);
 		}
@@ -270,6 +270,16 @@ class GitDatabase extends Git {
 			echo "Object Blob: ".sha1_hex($object->getName())."<br>";
 		}
 	}
+
+	public function readBlobContent($branch, $path) {
+		$tree = $this->getRootTree($branch);
+		$blobId = $tree->find($path);
+		$blob = $this->getObject($blobId);
+		if ($blob === null)
+			return null;
+		return $blob->data;
+	}
+
 }
 
 

@@ -24,8 +24,9 @@ MainWindow::MainWindow(Profile *profile, QWidget *parent) :
     actionGroup->addAction(messageAction);
 
     fIdentityView = new UserIdentityView(fProfile->getIdentityList(), this);
-    fMessageView = new MessageView(this);
-    fMessageView->setMailbox(fProfile->getIdentityList()->identityAt(0)->getMailbox());
+    fMessageView = new MessageView(fProfile, this);
+    Mailbox *mailbox = fProfile->getMailboxAt(0);
+    fMessageView->setMailbox(mailbox);
 
     ui->horizontalLayout->setMargin(0);
     ui->stackedWidget->addWidget(fIdentityView);
@@ -37,7 +38,7 @@ MainWindow::MainWindow(Profile *profile, QWidget *parent) :
     fProgressBar = new QProgressBar(this);
     statusBar()->addWidget(fProgressBar);
 
-    accountAction->setChecked(true);
+    messageAction->setChecked(true);
 }
 
 MainWindow::~MainWindow()

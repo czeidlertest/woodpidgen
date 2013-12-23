@@ -103,6 +103,7 @@ WP::err Mailbox::open(KeyStoreFinder *keyStoreFinder)
     if (error != WP::kOk)
         return error;
 
+    readMailDatabase();
     return error;
 }
 

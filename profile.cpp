@@ -7,6 +7,9 @@
 #include "remotestorage.h"
 
 
+const char *kMainMailboxPath = "main_mailbox";
+
+
 IdentityListModel::IdentityListModel(QObject * parent)
     :
       QAbstractListModel(parent)
@@ -88,9 +91,6 @@ WP::err Profile::createNewProfile(const QString &userName, const SecureArray &pa
         return error;
 
     setDefaultKeyId(masterKeyId);
-    error = writeConfig();
-    if (error != WP::kOk)
-        return error;
 
     // create mailbox
     DatabaseBranch *mailboxesBranch = databaseBranchFor(fDatabaseBranch->getDatabasePath(), "mailboxes");
@@ -98,6 +98,7 @@ WP::err Profile::createNewProfile(const QString &userName, const SecureArray &pa
     error = createNewMailbox(mailboxesBranch, &mailbox);
     if (error != WP::kOk)
         return error;
+    fMainMailbox = mailbox->getUid();
 
     // init user identity
     DatabaseBranch *identitiesBranch = databaseBranchFor(fDatabaseBranch->getDatabasePath(), "identities");
@@ -109,7 +110,21 @@ WP::err Profile::createNewProfile(const QString &userName, const SecureArray &pa
     if (error != WP::kOk)
         return error;
 
+    error = writeConfig();
+    if (error != WP::kOk)
+        return error;
+
     return WP::kOk;
+}
+
+WP::err Profile::writeConfig()
+{
+    WP::err error = EncryptedUserData::writeConfig();
+    if (error != WP::kOk)
+        return error;
+
+    error = write(kMainMailboxPath, fMainMailbox);
+    return error;
 }
 
 WP::err Profile::commit()
@@ -130,6 +145,10 @@ WP::err Profile::open(const SecureArray &password)
         return WP::kNotInit;
 
     WP::err error = loadKeyStores();
+    if (error != WP::kOk)
+        return error;
+
+    error = read(kMainMailboxPath, fMainMailbox);
     if (error != WP::kOk)
         return error;
 
@@ -260,6 +279,16 @@ WP::err Profile::addUserIdentity(UserIdentity *identity)
     return WP::kOk;
 }
 
+Mailbox *Profile::getMailboxAt(int index) const
+{
+    QMap<QString, MailboxRef*>::const_iterator it  = fMapOfMailboxes.begin();
+    for (int i = 0; it != fMapOfMailboxes.end() || i > index; i++) {
+        if (i == index)
+            return it.value()->getUserData();
+    }
+    return NULL;
+}
+
 void Profile::addUserIdentity(IdentityRef *entry)
 {
     fIdentities.addIdentity(entry);
@@ -268,7 +297,7 @@ void Profile::addUserIdentity(IdentityRef *entry)
 WP::err Profile::createNewMailbox(DatabaseBranch *branch, Mailbox **mailboxOut)
 {
     Mailbox *mailbox = new Mailbox(branch, "");
-    WP::err error = mailbox->createNewMailbox(getKeyStore(), getDefaultKeyId());
+    WP::err error = mailbox->createNewMailbox(getKeyStore(), getDefaultKeyId(), false);
     if (error != WP::kOk)
         return error;
     error = addMailbox(mailbox);

@@ -68,7 +68,6 @@ class MessageStanzaHandler extends InStanzaHandler {
 	}
 
 	public function finished() {
-
 		$database = Session::get()->getDatabase();
 		if ($database === null)
 			throw new exception("unable to get database");
@@ -76,7 +75,12 @@ class MessageStanzaHandler extends InStanzaHandler {
 		$header = $this->headerStanzaHandler->getText();
 		$body = $this->bodyStanzaHandler->getText();
 
-		$branch = "messages";
+		$branch = "";
+		$baseDir = "";
+		$this->findMailbox($database, $branch, $baseDir);
+		if ($branch == "")
+			throw new exception("unable to find mailbox");
+
 		$rootTree = $database->getRootTree($branch);
 
 		# get message name
@@ -86,7 +90,10 @@ class MessageStanzaHandler extends InStanzaHandler {
 		//foreach ($attachments as $attachment)
 		//	hash_update($hash, $attachment);
 		$messageName = sha1_hex(hash_final($hash, TRUE));
-		$path = $this->pathForMessageId($messageName);
+		$path = "";
+		if ($baseDir != "")
+			$path = $baseDir."/";			
+		$path = $path.$this->pathForMessageId($messageName);
 
 		$treeBuilder = new TreeBuilder($rootTree);
 		# build new tree
@@ -110,6 +117,16 @@ class MessageStanzaHandler extends InStanzaHandler {
 		$rootTree->write();
 
 		$this->commit($database, $rootTree->getName(), $branch);
+	}
+
+	private function findMailbox($database, &$branch, &$dir) {
+		$branch = "";
+		$dir = "";
+		$maiboxUid = $database->readBlobContent("profile", "main_mailbox");
+		if ($maiboxUid === null)
+			return;
+		$branch = $database->readBlobContent("profile", "mailboxes/".$maiboxUid."/database_branch");
+		$dir = $database->readBlobContent("profile", "mailboxes/".$maiboxUid."/database_base_dir");
 	}
 
 	private function commit($database, $tree, $branch) {

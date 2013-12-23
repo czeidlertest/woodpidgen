@@ -43,7 +43,7 @@ public:
     const QString &getIdentityKeyId() const;
 
     const QString &getUserName() const;
-    const WP::err setUserName(const QString &userName);
+    WP::err setUserName(const QString &userName);
 
     Mailbox *getMailbox() const;
 

@@ -112,7 +112,7 @@ const QString &UserIdentity::getUserName() const
     return fUserName;
 }
 
-const WP::err UserIdentity::setUserName(const QString &userName)
+WP::err UserIdentity::setUserName(const QString &userName)
 {
     WP::err error = writeSafe("userName", userName);
     if (error != WP::kOk)

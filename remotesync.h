@@ -13,8 +13,7 @@ class RemoteSync : public QObject
 {
     Q_OBJECT
 public:
-    explicit RemoteSync(DatabaseInterface *database, RemoteAuthentication* remoteAuth,
-                        Profile *profile, QObject *parent = 0);
+    explicit RemoteSync(DatabaseInterface *database, RemoteAuthentication* remoteAuth, QObject *parent = 0);
     ~RemoteSync();
 
     WP::err sync();
@@ -32,7 +31,6 @@ private:
     RemoteAuthentication *fAuthentication;
     RemoteConnection *fRemoteConnection;
     RemoteConnectionReply *fServerReply;
-    Profile *fProfile;
 };
 
 #endif // REMOTESYNC_H

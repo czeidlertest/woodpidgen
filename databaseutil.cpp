@@ -111,13 +111,18 @@ WP::err UserData::setToDatabase(const DatabaseBranch *branch, const QString &bas
     fDatabase = branch->getDatabase();
     if (fDatabase == NULL)
         return WP::kError;
-
+    connect(fDatabase, SIGNAL(newCommits(QString,QString)), this, SLOT(onNewCommits(QString,QString)));
     return WP::kOk;
 }
 
 void UserData::setBaseDir(const QString &baseDir)
 {
     fDatabaseBaseDir = baseDir;
+}
+
+void UserData::onNewCommits(const QString &startCommit, const QString &endCommit)
+{
+
 }
 
 QString UserData::prependBaseDir(const QString &path) const

@@ -21,6 +21,11 @@ WP::err DatabaseFactory::open(const QString &databasePath, const QString &branch
     return WP::kOk;
 }
 
+DatabaseInterface::DatabaseInterface(QObject *parent) :
+     QObject(parent)
+{
+
+}
 
 WP::err DatabaseInterface::write(const QString &path, const QString &data)
 {

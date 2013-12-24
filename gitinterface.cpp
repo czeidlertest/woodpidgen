@@ -451,7 +451,7 @@ WP::err GitInterface::setBranch(const QString &branch, bool /*createBranch*/)
     return WP::kOk;
 }
 
-QString GitInterface::branch()
+QString GitInterface::branch() const
 {
     return fCurrentBranch;
 }
@@ -536,6 +536,8 @@ WP::err GitInterface::commit()
     if (error != 0)
         return (WP::err)error;
 
+    QString oldCommit = getTip();
+
     QString refName = "refs/heads/";
     refName += fCurrentBranch;
 
@@ -561,7 +563,10 @@ WP::err GitInterface::commit()
         return (WP::err)error;
 
     fNewRootTreeOid.id[0] = '\0';
+
+    emit newCommits(oldCommit, getTip());
     return WP::kOk;
+
    //git_reference* out;
     //int result = git_reference_lookup(&out, fRepository, "refs/heads/master");
     //git_reference_free(out);
@@ -775,7 +780,10 @@ WP::err GitInterface::exportPack(QByteArray &pack, const QString &startCommit, c
 WP::err GitInterface::importPack(const QByteArray &pack, const QString &startCommit, const QString &endCommit, int format)
 {
     PackManager packManager(this, fRepository, fObjectDatabase);
-    return packManager.importPack(pack, startCommit, endCommit);
+    WP::err error = packManager.importPack(pack, startCommit, endCommit);
+    if (error == WP::kOk)
+        emit newCommits(startCommit, endCommit);
+    return error;
 }
 
 QStringList GitInterface::listDirectoryContent(const QString &path, int type) const

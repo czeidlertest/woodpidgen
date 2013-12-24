@@ -38,7 +38,8 @@ SOURCES += main.cpp \
     remotestorage.cpp \
     remoteconnection.cpp \
     remoteauthentication.cpp \
-    mailbox.cpp
+    mailbox.cpp \
+    syncmanager.cpp
 
 # Installation path
 # target.path =
@@ -67,7 +68,8 @@ HEADERS += \
     remotestorage.h \
     remoteconnection.h \
     remoteauthentication.h \
-    mailbox.h
+    mailbox.h \
+    syncmanager.h
 
 FORMS += \
     mainwindow.ui

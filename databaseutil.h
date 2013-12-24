@@ -91,6 +91,9 @@ public:
     DatabaseInterface *getDatabase() const;
     void setBaseDir(const QString &baseDir);
 
+private slots:
+    virtual void onNewCommits(const QString &startCommit, const QString &endCommit);
+
 protected:
     void setUid(const QString &uid);
     WP::err setToDatabase(const DatabaseBranch *branch, const QString &baseDir = "");

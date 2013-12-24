@@ -83,6 +83,8 @@ public:
     void removeMessage(MailRef *messageRef);
     MailRef *removeMessageAt(int index);
     MailRef *messageAt(int index);
+
+    void clear();
 private:
     QList<MailRef*> fMessages;
 };
@@ -107,6 +109,9 @@ public:
 signals:
     void databaseReadProgress(float progress);
     void databaseRead();
+
+private slots:
+    virtual void onNewCommits(const QString &startCommit, const QString &endCommit);
 
 private:
     QString pathForMessageId(const QString &messageId);

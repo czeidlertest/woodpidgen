@@ -46,6 +46,24 @@ void MessageListModel::addMessage(MailRef *messageRef)
     endInsertRows();
 }
 
+MailRef *MessageListModel::removeMessageAt(int index)
+{
+    MailRef *entry = fMessages.at(index);
+    beginRemoveRows(QModelIndex(), index, index);
+    fMessages.removeAt(index);
+    endRemoveRows();
+    return entry;
+}
+
+void MessageListModel::clear()
+{
+    beginRemoveRows(QModelIndex(), 0, fMessages.count() - 1);
+    foreach (MailRef *ref, fMessages)
+        delete ref;
+    fMessages.clear();
+    endRemoveRows();
+}
+
 MailRef::MailRef(const QString &messageId, Mailbox *mailbox) :
     fMessageId(messageId),
     fMailbox(mailbox)
@@ -65,7 +83,7 @@ const QByteArray &MailRef::getHeader()
 const QByteArray &MailRef::getBody()
 {
     if (fBody.count() == 0) {
-        WP::err error = fMailbox->readHeader(fMessageId, fBody);
+        WP::err error = fMailbox->readBody(fMessageId, fBody);
         if (error != WP::kOk)
             throw git_io_exception;
     }
@@ -142,6 +160,11 @@ WP::err Mailbox::readBody(const QString &messageId, QByteArray &body)
     return read(path, body);
 }
 
+void Mailbox::onNewCommits(const QString &startCommit, const QString &endCommit)
+{
+    readMailDatabase();
+}
+
 QString Mailbox::pathForMessageId(const QString &messageId)
 {
     QString path = messageId.left(2);
@@ -152,6 +175,8 @@ QString Mailbox::pathForMessageId(const QString &messageId)
 
 WP::err Mailbox::readMailDatabase()
 {
+    fMessageList.clear();
+
     QStringList mails = getMailIds();
     for (int i = 0; i < mails.count(); i++) {
         const QString &mailId = mails.at(i);

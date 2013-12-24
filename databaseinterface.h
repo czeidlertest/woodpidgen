@@ -1,14 +1,17 @@
 #ifndef DATABASEINTERFACE_H
 #define DATABASEINTERFACE_H
 
+#include <QObject>
 #include <QByteArray>
 #include <QString>
 
 #include "error_codes.h"
 
 
-class DatabaseInterface {
+class DatabaseInterface : public QObject {
+    Q_OBJECT
 public:
+    DatabaseInterface(QObject *parent = NULL);
     virtual ~DatabaseInterface() {}
 
     virtual WP::err setTo(const QString &path, bool create = true) = 0;
@@ -17,7 +20,7 @@ public:
 
     virtual WP::err setBranch(const QString &branch,
                               bool createBranch = true) = 0;
-    virtual QString branch() = 0;
+    virtual QString branch() const = 0;
 
     virtual WP::err write(const QString& path, const QByteArray& data) = 0;
     virtual WP::err write(const QString& path, const QString& data);
@@ -36,6 +39,9 @@ public:
     virtual WP::err exportPack(QByteArray &pack, const QString &startCommit, const QString &endCommit, int format = -1) const = 0;
     //! import pack and update the tip to endCommit
     virtual WP::err importPack(const QByteArray &pack, const QString &startCommit, const QString &endCommit, int format = -1) = 0;
+
+signals:
+    void newCommits(const QString &startCommit, const QString &endCommit);
 };
 
 

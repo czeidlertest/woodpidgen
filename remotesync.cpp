@@ -17,14 +17,12 @@ public:
 };
 
 
-RemoteSync::RemoteSync(DatabaseInterface *database, RemoteAuthentication *remoteAuth,
-                       Profile *profile, QObject *parent) :
+RemoteSync::RemoteSync(DatabaseInterface *database, RemoteAuthentication *remoteAuth, QObject *parent) :
     QObject(parent),
     fDatabase(database),
     fAuthentication(remoteAuth),
     fRemoteConnection(remoteAuth->getConnection()),
-    fServerReply(NULL),
-    fProfile(profile)
+    fServerReply(NULL)
 {
 }
 

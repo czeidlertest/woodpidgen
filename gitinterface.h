@@ -21,7 +21,7 @@ public:
     QString path();
 
     WP::err setBranch(const QString &branch, bool createBranch = true);
-    QString branch();
+    QString branch() const;
 
     WP::err write(const QString &path, const QByteArray &data);
     WP::err remove(const QString& path);

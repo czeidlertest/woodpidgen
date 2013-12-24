@@ -80,10 +80,16 @@ void RemoteConnection::setDisconnected()
 
 
 HTTPConnectionReply::HTTPConnectionReply(QIODevice *device, QNetworkReply *reply, QObject *parent) :
-    RemoteConnectionReply(device, parent)
+    RemoteConnectionReply(device, parent),
+    fReply(reply)
 {
     connect(reply, SIGNAL(finished()), this, SLOT(finishedSlot()));
     connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(errorSlot(QNetworkReply::NetworkError)));
+}
+
+void HTTPConnectionReply::abort()
+{
+    fReply->abort();
 }
 
 void HTTPConnectionReply::finishedSlot()

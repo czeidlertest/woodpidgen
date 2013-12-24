@@ -19,6 +19,7 @@ public:
     QIODevice *device();
 
     QByteArray readAll();
+    virtual void abort() = 0;
 
 signals:
     void finished(WP::err error);
@@ -60,9 +61,14 @@ Q_OBJECT
 public:
     HTTPConnectionReply(QIODevice *device, QNetworkReply *reply, QObject *parent = NULL);
 
+    virtual void abort();
+
 private slots:
     void finishedSlot();
     void errorSlot(QNetworkReply::NetworkError code);
+
+private:
+    QNetworkReply *fReply;
 };
 
 

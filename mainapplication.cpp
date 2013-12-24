@@ -5,8 +5,8 @@
 
 #include <messagereceiver.h>
 
-#include <useridentity.h>
-#include "remotestorage.h"
+#include "useridentity.h"
+#include "syncmanager.h"
 
 // test
 #include <remoteconnection.h>
@@ -73,17 +73,18 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
 
     DatabaseBranch *branch = NULL;
     QList<DatabaseBranch*> &branches = fProfile->getBranches();
-    foreach (branch, branches) {
-        RemoteSync *sync = new RemoteSync(branch->getDatabase(), branch->getRemoteAuthAt(0), fProfile, this);
-        sync->sync();
-    }
+    SyncManager *syncManager = new SyncManager(branches.at(0)->getRemoteAt(0));
+    foreach (branch, branches)
+        syncManager->keepSynced(branch->getDatabase());
+    syncManager->startWatching();
 
     fMainWindow = new MainWindow(fProfile);
     fMainWindow->show();
-
+/*
     MailMessenger *messenger = new MailMessenger("cle@localhost", fProfile, fProfile->getIdentityList()->identityAt(0));
     RawMailMessage *message = new RawMailMessage("header", "body");
     messenger->postMessage(message);
+    */
 /*
     QByteArray data;
     ProtocolOutStream outStream(&data);

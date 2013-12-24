@@ -190,7 +190,7 @@ class GitDatabase extends Git {
 		$f = fopen($this->dir."/refs/heads/$branchName", 'cb');
 		flock($f, LOCK_SH);
 		ftruncate($f, 0);
-		fwrite($f, $commitHex);
+		fwrite($f, $commitHex."\n");
 		fclose($f);
 		return true;
 	}
@@ -274,6 +274,8 @@ class GitDatabase extends Git {
 	public function readBlobContent($branch, $path) {
 		$tree = $this->getRootTree($branch);
 		$blobId = $tree->find($path);
+		if ($blobId === null)
+			return null;
 		$blob = $this->getObject($blobId);
 		if ($blob === null)
 			return null;
@@ -316,16 +318,17 @@ class PackManager {
 			$this->writeFile($hash, substr($pack, $objectStart, $size));
 			$objectStart += $size;
 		}
-       
+  
 		// update tip
-        $currentTip = $this->repository->getBranchTip($branch);
-        if ($currentTip == "")
-            return $this->repository->setBranchTip($branch, $endCommit);
-        // check if all commit objects are in place
-        if (!$this-isAncestorCommit($endCommit, $currentTip))
-            return false;
-        // TODO also check if all blobs for the new commits are in place
-        return $this->repository->setBranchTip($branch, $endCommit);
+		$currentTip = $this->repository->getBranchTip($branch);
+		if ($currentTip == "")
+			return $this->repository->setBranchTip($branch, $endCommit);
+
+		// check if all commit objects are in place
+		if (!$this-isAncestorCommit($endCommit, $currentTip))
+			return false;
+		// TODO also check if all blobs for the new commits are in place
+		return $this->repository->setBranchTip($branch, $endCommit);
 	}
 
 	private function readTill($in, &$out, $start, $stopChar)

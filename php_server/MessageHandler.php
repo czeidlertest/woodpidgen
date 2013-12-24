@@ -81,12 +81,13 @@ class MessageStanzaHandler extends InStanzaHandler {
 		if ($branch == "")
 			throw new exception("unable to find mailbox");
 
-		$rootTree = $database->getRootTree($branch);
+		$rootTree = clone $database->getRootTree($branch);
 
 		# get message name
 		$hash = hash_init('sha1');
 		hash_update($hash, $header);
-		//hash_update($hash, $body);
+		hash_update($hash, $body);
+
 		//foreach ($attachments as $attachment)
 		//	hash_update($hash, $attachment);
 		$messageName = sha1_hex(hash_final($hash, TRUE));
@@ -117,6 +118,16 @@ class MessageStanzaHandler extends InStanzaHandler {
 		$rootTree->write();
 
 		$this->commit($database, $rootTree->getName(), $branch);
+		
+		// produce output
+		$outStream = new ProtocolOutStream();
+		$outStream->pushStanza(new IqOutStanza(IqType::$kResult));
+
+		$stanza = new OutStanza(MessageConst::$kMessageStanza);
+		$stanza->addAttribute("status", "message_received");
+		$outStream->pushChildStanza($stanza);
+
+		$this->inStreamReader->appendResponse($outStream->flush());
 	}
 
 	private function findMailbox($database, &$branch, &$dir) {
@@ -156,6 +167,7 @@ class MessageStanzaHandler extends InStanzaHandler {
 
 		$commit->rehash();
 		$commit->write();
+
 		$database->setBranchTip($branch, sha1_hex($commit->getName()));
 
 		return $commit;

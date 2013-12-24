@@ -276,26 +276,11 @@ class ProtocolInStream {
 		while ($this->xml->read()) { 
 			switch ($this->xml->nodeType) {
 				case XMLReader::END_ELEMENT:
-					$parent = $this->currentHandlerTree->parentTree;
-					$this->currentHandlerTree = $parent;
-
-					foreach ($this->currentHandlerTree->handlers as $handler) {
-						if ($handler->hasBeenHandled())
-							$handler->finished();
-					}
-
-					// update handler list
-					$parentHandler = $this->currentHandlerTree->parentTree;
-					if ($parentHandler != null) {
-						$this->currentHandlerTree->handlers = array();
-						foreach ($parentHandler->handlers as $handler) {
-							$this->currentHandlerTree->handlers = array_merge(
-								$this->currentHandlerTree->handlers, $handler->getChildHandlers());
-						}
-					}
+					$this->endElement();
 					break;
 
 				case XMLReader::ELEMENT:
+					$isEmptyElement = $this->xml->isEmptyElement;
 					$handlerTree = new handler_tree($this->currentHandlerTree);
 					foreach ($this->currentHandlerTree->handlers as $handler) {
 						if ($handler->getName() == $this->xml->name) {
@@ -308,6 +293,8 @@ class ProtocolInStream {
 						}
 					}
 					$this->currentHandlerTree = $handlerTree;
+					if ($isEmptyElement)
+						$this->endElement();
 					break;
 			}
 		}
@@ -317,6 +304,25 @@ class ProtocolInStream {
 	public function addHandler($handler, $optional = true) {
 		$handler->setOptional($optional);
 		$this->root->handlers[] = $handler;
+	}
+
+	private function endElement() {
+		$parent = $this->currentHandlerTree->parentTree;
+		$this->currentHandlerTree = $parent;
+		foreach ($this->currentHandlerTree->handlers as $handler) {
+			if ($handler->hasBeenHandled())
+				$handler->finished();
+		}
+
+		// update handler list
+		$parentHandler = $this->currentHandlerTree->parentTree;
+		if ($parentHandler != null) {
+			$this->currentHandlerTree->handlers = array();
+			foreach ($parentHandler->handlers as $handler) {
+				$this->currentHandlerTree->handlers = array_merge(
+					$this->currentHandlerTree->handlers, $handler->getChildHandlers());
+			}
+		}
 	}
 }
 

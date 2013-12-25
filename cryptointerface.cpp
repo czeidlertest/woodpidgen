@@ -307,7 +307,7 @@ void CryptoInterface::generateDHParam(QString &prime, QString &base, QString &se
     pub = privateKey.toDH().y().toString();
 }
 
-#include <QDebug>
+
 SecureArray CryptoInterface::sharedDHKey(const QString &prime, const QString &base, const QString &secret)
 {
     BigUnsigned primeNumber = stringToBigUnsigned(prime.toStdString());
@@ -325,8 +325,6 @@ SecureArray CryptoInterface::sharedDHKey(const QString &prime, const QString &ba
     }
 
     int size = key.size();
-    qDebug() << "ByteArray " << size << ":" << key.toBase64() << endl;
-
     return key;
 }
 

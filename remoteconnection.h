@@ -91,6 +91,9 @@ protected slots:
     void replyFinished(QNetworkReply *reply);
 
 protected:
+    virtual RemoteConnectionReply* createRemoteConnectionReply(QNetworkReply *reply);
+
+protected:
     QUrl fUrl;
     QMap<QNetworkReply*, RemoteConnectionReply*> fReplyMap;
 };
@@ -109,7 +112,7 @@ protected:
 private:
     PHPEncryptionFilter *fEncryption;
     QNetworkReply *fSource;
-    bool fHasBeenEncrypted;
+    bool fHasBeenDecrypted;
 };
 
 
@@ -134,6 +137,9 @@ public:
 private slots:
     void handleConnectionAttemptReply();
     void networkRequestError(QNetworkReply::NetworkError code);
+
+protected:
+    virtual RemoteConnectionReply* createRemoteConnectionReply(QNetworkReply *reply);
 
 private:
     CryptoInterface *fCrypto;

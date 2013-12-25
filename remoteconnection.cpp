@@ -2,6 +2,7 @@
 
 #include <QCoreApplication>
 #include <QDebug>
+#include <QHttpPart>
 #include <QXmlStreamAttributes>
 #include <QXmlStreamReader>
 
@@ -138,6 +139,25 @@ WP::err HTTPConnection::disconnect()
 
 RemoteConnectionReply *HTTPConnection::send(const QByteArray &data)
 {
+     QHttpMultiPart *multiPart = new QHttpMultiPart(QHttpMultiPart::FormDataType);
+
+     QHttpPart previewPathPart;
+     previewPathPart.setHeader(QNetworkRequest::ContentDispositionHeader,
+                               QVariant("form-data; name=\"transfer_data\""));
+     previewPathPart.setBody("transfer_data.txt");
+
+     QHttpPart previewFilePart;
+     previewFilePart.setHeader(QNetworkRequest::ContentTypeHeader, QVariant("text/plain"));
+     previewFilePart.setHeader(QNetworkRequest::ContentDispositionHeader,
+                               QVariant("form-data; name=\"transfer_data\"; filename=\"transfer_data.txt\""));
+
+     previewFilePart.setBody(data);
+
+     multiPart->append(previewPathPart);
+     multiPart->append(previewFilePart);
+
+     QNetworkRequest request(fUrl);
+/*
     QNetworkRequest request;
     request.setUrl(fUrl);
     request.setHeader(QNetworkRequest::ContentTypeHeader,"application/x-www-form-urlencoded");
@@ -145,14 +165,17 @@ RemoteConnectionReply *HTTPConnection::send(const QByteArray &data)
     QNetworkAccessManager *manager = getNetworkAccessManager();
     QByteArray outgoing = data;
     outgoing.prepend("request=");
-    QNetworkReply *reply = manager->post(request, outgoing);
+    */
+    QNetworkAccessManager *manager = getNetworkAccessManager();
+
+    QNetworkReply *reply = manager->post(request, multiPart);
     if (reply == NULL)
         return NULL;
 
     connect(manager, SIGNAL(finished(QNetworkReply*)), this, SLOT(replyFinished(QNetworkReply*)));
     //connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(replyError(QNetworkReply::NetworkError)));
 
-    RemoteConnectionReply *remoteConnectionReply = new HTTPConnectionReply(reply, reply, this);
+    RemoteConnectionReply *remoteConnectionReply = createRemoteConnectionReply(reply);
     fReplyMap.insert(reply, remoteConnectionReply);
     return remoteConnectionReply;
 }
@@ -166,6 +189,11 @@ void HTTPConnection::replyFinished(QNetworkReply *reply)
     RemoteConnectionReply* receiver = it.value();
     receiver->deleteLater();
     fReplyMap.remove(reply);
+}
+
+RemoteConnectionReply *HTTPConnection::createRemoteConnectionReply(QNetworkReply *reply)
+{
+    return new HTTPConnectionReply(reply, reply, this);
 }
 
 EncryptedPHPConnection::EncryptedPHPConnection(QUrl url, QObject *parent) :
@@ -217,27 +245,12 @@ WP::err EncryptedPHPConnection::disconnect()
 
 RemoteConnectionReply *EncryptedPHPConnection::send(const QByteArray &data)
 {
-    QNetworkRequest request;
-    request.setUrl(fUrl);
-    request.setHeader(QNetworkRequest::ContentTypeHeader,"application/x-www-form-urlencoded");
-
-    QNetworkAccessManager *manager = getNetworkAccessManager();
-    QNetworkReply *reply = NULL;
-    if (fEncryption != NULL) {
-        QByteArray outgoing;
-        fEncryption->sendFilter(data, outgoing);
-        outgoing.prepend("request=");
-        reply = manager->post(request, outgoing);
-    }
-    if (reply == NULL)
+    if (fEncryption == NULL)
         return NULL;
 
-    connect(manager, SIGNAL(finished(QNetworkReply*)), this, SLOT(replyFinished(QNetworkReply*)));
-    //connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(replyError(QNetworkReply::NetworkError)));
-
-    RemoteConnectionReply *remoteConnectionReply = new EncryptedPHPConnectionReply(fEncryption, reply, this);
-    fReplyMap.insert(reply, remoteConnectionReply);
-    return remoteConnectionReply;
+    QByteArray outgoing;
+    fEncryption->sendFilter(data, outgoing);
+    return HTTPConnection::send(outgoing);
 }
 
 void EncryptedPHPConnection::handleConnectionAttemptReply()
@@ -290,10 +303,15 @@ void EncryptedPHPConnection::networkRequestError(QNetworkReply::NetworkError cod
     emit connectionAttemptFinished(WP::kError);
 }
 
+RemoteConnectionReply *EncryptedPHPConnection::createRemoteConnectionReply(QNetworkReply *reply)
+{
+    return new EncryptedPHPConnectionReply(fEncryption, reply, this);
+}
+
 
 PHPEncryptionFilter::PHPEncryptionFilter(CryptoInterface *crypto,
-                                                                const SecureArray &cipherKey,
-                                                                const QByteArray &iv) :
+                                         const SecureArray &cipherKey,
+                                         const QByteArray &iv) :
     fCrypto(crypto),
     fCipherKey(cipherKey),
     fIV(iv)
@@ -308,14 +326,13 @@ void PHPEncryptionFilter::sendFilter(const QByteArray &in, QByteArray &out)
 
 void PHPEncryptionFilter::receiveFilter(const QByteArray &in, QByteArray &out)
 {
-    QByteArray raw = QByteArray::fromBase64(in);
-    fCrypto->decryptSymmetric(raw, out, fCipherKey, fIV, "aes128");
+    fCrypto->decryptSymmetric(in, out, fCipherKey, fIV, "aes128");
 }
 
 PHPEncryptedDevice::PHPEncryptedDevice(PHPEncryptionFilter *encryption, QNetworkReply *source) :
     fEncryption(encryption),
     fSource(source),
-    fHasBeenEncrypted(false)
+    fHasBeenDecrypted(false)
 {
 }
 
@@ -323,10 +340,10 @@ qint64 PHPEncryptedDevice::readData(char *data, qint64 maxSize)
 {
     if (!fSource->isFinished())
         return 0;
-    if (!fHasBeenEncrypted) {
+    if (!fHasBeenDecrypted) {
         const QByteArray &encryptedData = fSource->readAll();
         fEncryption->receiveFilter(encryptedData, buffer());
-        fHasBeenEncrypted = true;
+        fHasBeenDecrypted = true;
         emit readyRead();
     }
     return QBuffer::readData(data, maxSize);

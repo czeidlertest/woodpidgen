@@ -16,6 +16,7 @@ MessageView::MessageView(Profile *profile, QWidget *parent) :
     composerWidget->setLayout(composerLayout);
 
     fReceiver = new QLineEdit(composerWidget);
+fReceiver->setText("cle@localhost");
     fMessageComposer = new QTextEdit(composerWidget);
     fSendButton = new QPushButton("Send", composerWidget);
     composerLayout->addWidget(fReceiver);

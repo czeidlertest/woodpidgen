@@ -52,7 +52,7 @@ class EncryptedPortal implements IPortalInterface{
     public function sendData($data) {
 		$this->fAES->setKey($this->fKey);
 		$this->fAES->setIV($this->fIV);
-		return base64_encode($this->fAES->encrypt($data));
+		return $this->fAES->encrypt($data);
     }
     
 };
@@ -76,11 +76,16 @@ function finished() {
 	exit(0);
 }
 
+$request = "";
 
-if (empty($_POST['request']))
+if (isset($_FILES['transfer_data']['tmp_name']))
+	$request = file_get_contents($_FILES['transfer_data']['tmp_name']);
+else if (!empty($_POST['request']))
+	$request = $_POST['request'];
+else
 	die("invalid request");
 
-$request = $_POST['request'];
+
 if ($request == "neqotiate_dh_key") {
 	if (empty($_POST['dh_prime']) || empty($_POST['dh_base']) || empty($_POST['dh_public_key'])) {
 		echo XMLResponse::error(-1, "missing values for Diffie Hellman negotiation"); 
@@ -99,33 +104,38 @@ if ($request == "neqotiate_dh_key") {
 		array_push($sharedKey, '\0');
 
 	$_SESSION['dh_private_key'] = base64_encode(call_user_func_array("pack", array_merge(array("C*"), $sharedKey)));
-	
-	writeToOutput(XMLResponse::diffieHellmanPublicKey($_POST['dh_prime'], $_POST['dh_base'], $dh->getPublicKey()));
+
+	$outStream = new ProtocolOutStream();
+	$stanza = new OutStanza("neqotiated_dh_key");
+	$stanza->addAttribute("dh_prime", $_POST['dh_prime']);
+	$stanza->addAttribute("dh_base", $_POST['dh_base']);
+	$stanza->addAttribute("dh_public_key", $dh->getPublicKey());
+	$outStream->pushStanza($stanza);
+	writeToOutput($outStream->flush());
+/* DEBUG
 	writeToOutput("public remote: ".$_POST['dh_public_key']."\n");
 	writeToOutput("secrete: ".$randomNumber."\n");
 	writeToOutput("secrete share: ".$dh->getSharedSecretKey()."\n");
 	writeToOutput("binary secrete share: ".base64_encode($_SESSION['dh_private_key'])."\n");
 	writeToOutput("iv share: ".$_POST['encrypt_iv']."\n");
-
+*/
 	if (!empty($_POST['encrypt_iv']))
 		$_SESSION['encrypt_iv'] = str_replace(" ", "+", $_POST['encrypt_iv']);
 
 	finished();
 }
 
-
 // check if we use an encrypted connection and set portal accordantly
 if (isset($_SESSION['dh_private_key']) && isset($_SESSION['encrypt_iv']))
 	$gPortal = new EncryptedPortal(base64_decode($_SESSION['dh_private_key']), base64_decode($_SESSION['encrypt_iv']));
 // TODO enable again
-//else {
-//	writeToOutput("php encryption required");
-//	finished();
-//}
+/*else {
+	writeToOutput("php encryption required");
+	finished();
+}*/
 
 // get data
 $request = $gPortal->receiveData($request);
-
 
 $XMLHandler = new XMLHandler($request);
 

@@ -41,27 +41,17 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
 
     fProfile = new Profile(".git", "profile");
 
-/*
-    // pull test
-    DatabaseInterface *syncDatabase;
-    DatabaseFactory::open(".git", "profile", &syncDatabase);
-    RemoteConnection *connection = new HTTPConnection(QUrl("http://localhost/php_server/portal.php"));
-    RemoteSync *pullSync = new RemoteSync(syncDatabase, connection, this);
-    pullSync->sync();
-    return;
-*/
     SecureArray password("test_password");
     QString userName = "cle";
     QString remoteUrl = "http://localhost/php_server/portal.php";
     if (fProfile->open(password) != WP::kOk) {
-        //RemoteDataStorage* remote = new HTTPRemoteStorage("http://localhost/php_server/portal.php");
-        //RemoteDataStorage* remote = new PHPEncryptedRemoteStorage("http://localhost/php_server/portal.php");
         WP::err error = fProfile->createNewProfile(userName, password);
         if (error != WP::kOk) {
             QMessageBox::information(NULL, "Error", "Unable to create or load a profile!");
             quit();
         }
-        RemoteDataStorage *remote = fProfile->addHTTPRemote(remoteUrl);
+        //RemoteDataStorage *remote = fProfile->addHTTPRemote(remoteUrl);
+        RemoteDataStorage *remote = fProfile->addPHPRemote(remoteUrl);
         UserIdentity *mainIdentity = fProfile->getIdentityList()->identityAt(0);
         fProfile->setSignatureAuth(remote, mainIdentity->getUserName(),
                                    mainIdentity->getKeyStore()->getUid(),

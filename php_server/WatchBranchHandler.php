@@ -54,6 +54,9 @@ class WatchBranchesStanzaHandler extends InStanzaHandler {
 		if ($database === null)
 			throw new exception("unable to get database");
 
+		// allow other requests from the same client to get through, e.g., to post messages
+		session_write_close();
+
 		$updatedBranches = array();
 
 		$status = "server_timeout";

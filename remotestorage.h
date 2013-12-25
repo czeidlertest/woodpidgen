@@ -5,29 +5,6 @@
 #include "remoteconnection.h"
 
 
-template<class Type>
-class ConnectionManager
-{
-public:
-    Type *connectionFor(const QString &url) {
-        Type *connection = NULL;
-        typename QMap<QString, Type*>::iterator it = fConnections.find(url);
-        if (it != fConnections.end()) {
-            connection = it.value();
-        } else {
-            connection = new Type(QUrl(url));
-        if (connection == NULL)
-            return NULL;
-            fConnections[url] = connection;
-        }
-        return connection;
-    }
-
-private:
-    QMap<QString, Type*> fConnections;
-};
-
-
 class Profile;
 class RemoteAuthentication;
 
@@ -61,9 +38,6 @@ private:
     void setSignatureAuth(const QString &userName, const QString &keyStoreId, const QString &keyId);
 
     QString hash();
-
-    static ConnectionManager<HTTPConnection> sHTTPConnectionManager;
-    static ConnectionManager<EncryptedPHPConnection> sPHPConnectionManager;
 
     Profile *fProfile;
 

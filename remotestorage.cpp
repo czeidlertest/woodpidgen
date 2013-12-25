@@ -3,9 +3,6 @@
 #include "remoteauthentication.h"
 
 
-ConnectionManager<HTTPConnection> RemoteDataStorage::sHTTPConnectionManager;
-ConnectionManager<EncryptedPHPConnection> RemoteDataStorage::sPHPConnectionManager;
-
 RemoteDataStorage::RemoteDataStorage(Profile *profile) :
     fProfile(profile),
     fConnection(NULL),
@@ -57,7 +54,7 @@ void RemoteDataStorage::setPHPEncryptedRemoteConnection(const QString &url)
 {
     fConnectionType = "PHPEncryptedRemoteStorage";
     fUrl = url;
-    fConnection = sPHPConnectionManager.connectionFor(fUrl);
+    fConnection = ConnectionManager::connectionPHPFor(QUrl(fUrl));
     fUid = hash();
 }
 
@@ -65,7 +62,7 @@ void RemoteDataStorage::setHTTPRemoteConnection(const QString &url)
 {
     fConnectionType = "HTTPRemoteStorage";
     fUrl = url;
-    fConnection = sHTTPConnectionManager.connectionFor(fUrl);
+    fConnection = ConnectionManager::connectionHTTPFor(QUrl(fUrl));
     fUid = hash();
 }
 

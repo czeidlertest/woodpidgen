@@ -50,8 +50,8 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
             QMessageBox::information(NULL, "Error", "Unable to create or load a profile!");
             quit();
         }
-        //RemoteDataStorage *remote = fProfile->addHTTPRemote(remoteUrl);
-        RemoteDataStorage *remote = fProfile->addPHPRemote(remoteUrl);
+        RemoteDataStorage *remote = fProfile->addHTTPRemote(remoteUrl);
+        //RemoteDataStorage *remote = fProfile->addPHPRemote(remoteUrl);
         UserIdentity *mainIdentity = fProfile->getIdentityList()->identityAt(0);
         fProfile->setSignatureAuth(remote, mainIdentity->getUserName(),
                                    mainIdentity->getKeyStore()->getUid(),

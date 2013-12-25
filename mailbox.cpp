@@ -2,6 +2,7 @@
 
 #include <exception>
 
+#include <QDebug>
 #include <QStringList>
 
 #include "protocolparser.h"
@@ -184,16 +185,17 @@ WP::err Mailbox::readMailDatabase()
         fMessageList.addMessage(ref);
     }
     emit databaseRead();
+    return WP::kOk;
 }
 
 
 MailMessenger::MailMessenger(const QString &targetAddress, Profile *profile, UserIdentity *identity) :
-    fRemoteConnection(NULL),
-    fMessage(NULL)
+    fMessage(NULL),
+    fRemoteConnection(NULL)
 {
     parseAddress(targetAddress);
-    //fRemoteConnection = new EncryptedPHPConnection(QUrl(fTargetServer));
-    fRemoteConnection = new HTTPConnection(QUrl(fTargetServer));
+    //fRemoteConnection = sPHPConnectionManager.connectionFor(QUrl(fTargetServer));
+    fRemoteConnection = ConnectionManager::connectionHTTPFor(QUrl(fTargetServer));
     if (fRemoteConnection == NULL)
         return;
     fAuthentication = new SignatureAuthentication(fRemoteConnection, profile, identity->getUserName(),
@@ -259,7 +261,7 @@ void MailMessenger::authConnected(WP::err error)
 void MailMessenger::handleReply(WP::err error)
 {
     QByteArray data = fServerReply->readAll();
-    qDebug(data);
+    qDebug() << data;
 }
 
 void MailMessenger::parseAddress(const QString &targetAddress)

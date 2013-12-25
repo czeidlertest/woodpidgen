@@ -151,4 +151,40 @@ private:
 };
 
 
+
+template<class Type>
+class ConnectionBucket
+{
+public:
+    Type *connectionFor(const QUrl &url) {
+        Type *connection = NULL;
+        QString hash = url.toString();
+        typename QMap<QString, Type*>::iterator it = fConnections.find(hash);
+        if (it != fConnections.end()) {
+            connection = it.value();
+        } else {
+            connection = new Type(QUrl(url));
+            if (connection == NULL)
+                return NULL;
+            fConnections[hash] = connection;
+        }
+        return connection;
+    }
+
+private:
+    QMap<QString, Type*> fConnections;
+};
+
+
+class ConnectionManager {
+public:
+   static HTTPConnection *connectionHTTPFor(const QUrl &url);
+   static EncryptedPHPConnection *connectionPHPFor(const QUrl &url);
+
+private:
+    static ConnectionBucket<HTTPConnection> sHTTPConnectionBucket;
+    static ConnectionBucket<EncryptedPHPConnection> sPHPConnectionBucket;
+};
+
+
 #endif // SERVERCONNECTION_H

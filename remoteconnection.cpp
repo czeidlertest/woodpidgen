@@ -177,6 +177,7 @@ RemoteConnectionReply *HTTPConnection::send(const QByteArray &data)
 
     RemoteConnectionReply *remoteConnectionReply = createRemoteConnectionReply(reply);
     fReplyMap.insert(reply, remoteConnectionReply);
+
     return remoteConnectionReply;
 }
 
@@ -360,4 +361,18 @@ EncryptedPHPConnectionReply::EncryptedPHPConnectionReply(PHPEncryptionFilter *en
 EncryptedPHPConnectionReply::~EncryptedPHPConnectionReply()
 {
     delete fDevice;
+}
+
+
+ConnectionBucket<HTTPConnection> ConnectionManager::sHTTPConnectionBucket;
+ConnectionBucket<EncryptedPHPConnection> ConnectionManager::sPHPConnectionBucket;
+
+HTTPConnection *ConnectionManager::connectionHTTPFor(const QUrl &url)
+{
+    return sHTTPConnectionBucket.connectionFor(url);
+}
+
+EncryptedPHPConnection *ConnectionManager::connectionPHPFor(const QUrl &url)
+{
+    return sPHPConnectionBucket.connectionFor(url);
 }

@@ -37,7 +37,7 @@ class WatchBranchesStanzaHandler extends InStanzaHandler {
 	public function __construct($inStreamReader) {
 		InStanzaHandler::__construct(WatchMessageConst::$kWatchStanza);
 		
-		$this->timeOut = 5;//60 * 1; // x minutes
+		$this->timeOut = 60 * 1; // x minutes
 		$this->pollInterval = 1;
 
 		$this->inStreamReader = $inStreamReader;
@@ -68,7 +68,7 @@ class WatchBranchesStanzaHandler extends InStanzaHandler {
 				try {
 					$currentTip = sha1_hex($database->getTip($branch));
 				} catch (exception $e) {
-					// branch is not there so trigger a sync now
+					// branch is not there so trigger a sync by returning an invalid tip
 					$currentTip = "DoesNotExist";
 				}
 				if ($currentTip != $tip)

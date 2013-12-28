@@ -6,6 +6,7 @@
 #include <QString>
 #include <QTextStream>
 
+#include "contact.h"
 #include "cryptointerface.h"
 #include "databaseinterface.h"
 #include "databaseutil.h"
@@ -37,28 +38,23 @@ public:
     ~UserIdentity();
 
     WP::err createNewIdentity(KeyStore *keyStore, const QString &defaultKeyId,
-                              Mailbox *mailbox, bool addUidToBaseDir = true);
+                              const QString &nickname, Mailbox *mailbox,
+                              bool addUidToBaseDir = true);
     WP::err open(KeyStoreFinder *keyStoreFinder, MailboxFinder *mailboxFinder);
 
-    const QString &getIdentityKeyId() const;
-
-    const QString &getUserName() const;
-    WP::err setUserName(const QString &userName);
-
     Mailbox *getMailbox() const;
+    Contact *getMyself() const;
+    const QList<Contact *> &getContacts();
 
-            // contacts
-
-
-            // channels
+    WP::err addContact(Contact *contact);
 
 private:
     WP::err writePublicSignature(const QString &filename, const QString &publicKey);
 
-    QString fIdentityKeyId;
     Mailbox *fMailbox;
 
-    QString fUserName;
+    Contact *fMyselfContact;
+    QList<Contact *> fContacts;
 };
 
 #endif // USERIDENTITY_H

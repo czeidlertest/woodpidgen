@@ -198,9 +198,9 @@ MailMessenger::MailMessenger(const QString &targetAddress, Profile *profile, Use
     fRemoteConnection = ConnectionManager::connectionHTTPFor(QUrl(fTargetServer));
     if (fRemoteConnection == NULL)
         return;
-    fAuthentication = new SignatureAuthentication(fRemoteConnection, profile, identity->getUserName(),
+    fAuthentication = new SignatureAuthentication(fRemoteConnection, profile, identity->getMyself()->getNickname(),
                                                   identity->getKeyStore()->getUid(),
-                                                  identity->getIdentityKeyId(), fTargetUser);
+                                                  identity->getMyself()->getKeys()->getMainKeyId(), fTargetUser);
 }
 
 MailMessenger::~MailMessenger()

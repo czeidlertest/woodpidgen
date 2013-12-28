@@ -103,10 +103,7 @@ WP::err Profile::createNewProfile(const QString &userName, const SecureArray &pa
     // init user identity
     DatabaseBranch *identitiesBranch = databaseBranchFor(fDatabaseBranch->getDatabasePath(), "identities");
     UserIdentity *identity = NULL;
-    error = createNewUserIdentity(identitiesBranch, mailbox, &identity);
-    if (error != WP::kOk)
-        return error;
-    error = identity->setUserName(userName);
+    error = createNewUserIdentity(identitiesBranch, userName, mailbox, &identity);
     if (error != WP::kOk)
         return error;
 
@@ -229,11 +226,12 @@ void Profile::addKeyStore(KeyStoreRef *entry)
     fMapOfKeyStores[entry->getUserData()->getUid()] = entry;
 }
 
-WP::err Profile::createNewUserIdentity(DatabaseBranch *branch, Mailbox *mailbox, UserIdentity **userIdentityOut)
+WP::err Profile::createNewUserIdentity(DatabaseBranch *branch, const QString &nickName,
+                                       Mailbox *mailbox, UserIdentity **userIdentityOut)
 {
     UserIdentity *identity = new UserIdentity(branch, "");
     WP::err error = identity->createNewIdentity(getKeyStore(), getDefaultKeyId(),
-                                                mailbox);
+                                                nickName, mailbox);
     if (error != WP::kOk)
         return error;
     error = addUserIdentity(identity);

@@ -30,7 +30,8 @@ public:
 
     WP::err remove(const QString& path);
 
-    const QString& directory();
+    const QString& getDirectory();
+    void setDirectory(const QString &directory);
 
 protected:
     EncryptedUserData *fDatabase;

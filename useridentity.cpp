@@ -10,17 +10,23 @@ const char* kPathIdentityKeyId = "identity_key_id";
 
 
 UserIdentity::UserIdentity(const DatabaseBranch *branch, const QString &baseDir) :
-    fMailbox(NULL)
+    fMailbox(NULL),
+    fMyselfContact(NULL)
 {
     setToDatabase(branch, baseDir);
 }
 
 UserIdentity::~UserIdentity()
 {
+    delete fMyselfContact;
+    foreach (Contact *contact, fContacts)
+        delete contact;
 }
 
 
-WP::err UserIdentity::createNewIdentity(KeyStore *keyStore, const QString &defaultKeyId, Mailbox *mailbox, bool addUidToBaseDir)
+WP::err UserIdentity::createNewIdentity(KeyStore *keyStore, const QString &defaultKeyId,
+                                        const QString &nickname, Mailbox *mailbox,
+                                        bool addUidToBaseDir)
 {
     // derive uid
     QString certificate;
@@ -38,27 +44,22 @@ WP::err UserIdentity::createNewIdentity(KeyStore *keyStore, const QString &defau
         return error;
     fMailbox = mailbox;
 
-    error = fKeyStore->writeAsymmetricKey(certificate, publicKey, privateKey, fIdentityKeyId);
+    QString keyId;
+    error = fKeyStore->writeAsymmetricKey(certificate, publicKey, privateKey, keyId);
     if (error != WP::kOk)
         return error;
-    error = write(kPathIdentityKeyId, fIdentityKeyId);
+
+    fMyselfContact = new Contact(this, "myself");
+    error = fMyselfContact->createUserIdentityContact(keyStore, keyId, nickname);
     if (error != WP::kOk)
         return error;
+
     error = write(kPathMailboxId, fMailbox->getUid());
     if (error != WP::kOk)
         return error;
 
     QString outPut("signature.pup");
     writePublicSignature(outPut, publicKey);
-
-    // test data
-    QByteArray testData("Hello id");
-    QByteArray encyptedTestData;
-    error = fCrypto->encyrptAsymmetric(testData, encyptedTestData, certificate.toLatin1());
-    if (error != WP::kOk)
-        return error;
-
-    write("test_data", encyptedTestData);
 
     return error;
 }
@@ -77,53 +78,50 @@ WP::err UserIdentity::open(KeyStoreFinder *keyStoreFinder, MailboxFinder *mailbo
     if (fMailbox == NULL)
         return WP::kEntryNotFound;
 
-    QByteArray identityKeyArray;
-    read(kPathIdentityKeyId, identityKeyArray);
-    fIdentityKeyId = identityKeyArray;
-
-    error = readSafe("userName", fUserName);
+    fMyselfContact = new Contact(this, "myself");
+    error = fMyselfContact->open(keyStoreFinder);
     if (error != WP::kOk)
         return error;
 
-    // test
-    QString publicKey;
-    QString privateKey;
-    QString certificate;
-    fKeyStore->readAsymmetricKey(fIdentityKeyId, certificate, publicKey, privateKey);
+    QStringList contactNames = listDirectories("contacts");
+    foreach (const QString &contactName, contactNames) {
+        Contact *contact = new Contact(this, contactName);
+        WP::err error = contact->open(keyStoreFinder);
+        if (error != WP::kOk) {
+            delete contact;
+            continue;
+        }
+        fContacts.append(contact);
+    }
 
-    // test data
-    QByteArray encyptedTestData;
-    read("test_data", encyptedTestData);
-    QByteArray testData;
-    error = fCrypto->decryptAsymmetric(encyptedTestData, testData, privateKey, "", certificate);
-
-    printf("test %s\n", testData.data());
-
-    return error;
-}
-
-const QString &UserIdentity::getIdentityKeyId() const
-{
-    return fIdentityKeyId;
-}
-
-const QString &UserIdentity::getUserName() const
-{
-    return fUserName;
-}
-
-WP::err UserIdentity::setUserName(const QString &userName)
-{
-    WP::err error = writeSafe("userName", userName);
-    if (error != WP::kOk)
-        return error;
-    fUserName = userName;
     return error;
 }
 
 Mailbox *UserIdentity::getMailbox() const
 {
     return fMailbox;
+}
+
+Contact *UserIdentity::getMyself() const
+{
+    return fMyselfContact;
+}
+
+const QList<Contact *> &UserIdentity::getContacts()
+{
+    return fContacts;
+}
+
+WP::err UserIdentity::addContact(Contact *contact)
+{
+    QString contactUid = contact->getUid();
+    QString path = contact->getDirectory() + "contacts/" + contactUid;
+    contact->setDirectory(path);
+    WP::err error = contact->writeConfig();
+    if (error != WP::kOk)
+        return error;
+    fContacts.append(contact);
+    return WP::kOk;
 }
 
 WP::err UserIdentity::writePublicSignature(const QString &filename, const QString &publicKey)

@@ -82,7 +82,8 @@ private:
     WP::err loadKeyStores();
     void addKeyStore(KeyStoreRef *entry);
 
-    WP::err createNewUserIdentity(DatabaseBranch *branch, Mailbox *mailbox, UserIdentity **userIdentityOut);
+    WP::err createNewUserIdentity(DatabaseBranch *branch, const QString &nickName,
+                                  Mailbox *mailbox, UserIdentity **userIdentityOut);
     WP::err loadUserIdentities();
     void addUserIdentity(IdentityRef *entry);
 

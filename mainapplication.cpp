@@ -53,9 +53,9 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
         RemoteDataStorage *remote = fProfile->addHTTPRemote(remoteUrl);
         //RemoteDataStorage *remote = fProfile->addPHPRemote(remoteUrl);
         UserIdentity *mainIdentity = fProfile->getIdentityList()->identityAt(0);
-        fProfile->setSignatureAuth(remote, mainIdentity->getUserName(),
+        fProfile->setSignatureAuth(remote, mainIdentity->getMyself()->getNickname(),
                                    mainIdentity->getKeyStore()->getUid(),
-                                   mainIdentity->getIdentityKeyId());
+                                   mainIdentity->getMyself()->getKeys()->getMainKeyId());
 
         fProfile->connectFreeBranches(remote);
         fProfile->commit();

@@ -39,7 +39,10 @@ SOURCES += main.cpp \
     remoteconnection.cpp \
     remoteauthentication.cpp \
     mailbox.cpp \
-    syncmanager.cpp
+    syncmanager.cpp \
+    message.cpp \
+    contactrequest.cpp \
+    contact.cpp
 
 # Installation path
 # target.path =
@@ -69,7 +72,10 @@ HEADERS += \
     remoteconnection.h \
     remoteauthentication.h \
     mailbox.h \
-    syncmanager.h
+    syncmanager.h \
+    message.h \
+    contactrequest.h \
+    contact.h
 
 FORMS += \
     mainwindow.ui

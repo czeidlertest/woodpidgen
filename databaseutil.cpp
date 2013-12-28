@@ -580,9 +580,14 @@ WP::err StorageDirectory::remove(const QString &path)
     return fDatabase->getDatabase()->remove(fDirectory + "/" + path);
 }
 
-const QString &StorageDirectory::directory()
+const QString &StorageDirectory::getDirectory()
 {
     return fDirectory;
+}
+
+void StorageDirectory::setDirectory(const QString &directory)
+{
+    fDirectory = directory;
 }
 
 

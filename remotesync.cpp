@@ -135,7 +135,7 @@ qDebug() << data;
     if (!syncPullHandler->hasBeenHandled() || syncPullHandler->branch != localBranch) {
         // error occured, the server should at least send back the branch name
         // TODO better error message
-        emit syncFinished(WP::kEntryNotFound);
+        emit syncFinished(WP::kBadValue);
         return;
     }
     if (syncPullHandler->tip == localTipCommit) {

@@ -31,6 +31,11 @@ class Session {
 		return new GitDatabase($serverUser."/.git");
 	}
 
+	public function getProfile() {
+		$database = $this->getDatabase();
+		return new Profile($database, "profile", "");
+	}
+
 	public function getUserDir() {
 		return $_SESSION['server_user'];
 	}

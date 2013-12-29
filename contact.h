@@ -25,7 +25,7 @@ public:
 
     // methods for remote contacts where we don't have the private key
     virtual WP::err getKeySet(const QString &keyId, QString &certificate,
-                            QString &puContactKeysblicKey) const = 0;
+                            QString &publicKey) const = 0;
     virtual WP::err addKeySet(const QString &keyId, const QString &certificate,
                               const QString &publicKey) = 0;
 
@@ -103,10 +103,17 @@ public:
 
     QString getUid() const;
     ContactKeys* getKeys();
-    virtual const QString getNickname() const;
+    virtual const QString &getNickname() const;
+
+    // build the mail address
+    virtual const QString getAddress() const;
+    const QString &getServerUser() const;
+    const QString &getServer() const;
+
+    void setServerUser(const QString &serverUser);
+    void setServer(const QString &server);
 
     virtual WP::err writeConfig();
-
 
 private:
     QString getKeysDirectory() const;
@@ -115,6 +122,9 @@ private:
     QString fUid;
     ContactKeys *fKeys;
     QString fNickname;
+
+    QString fServerUser;
+    QString fServer;
 };
 
 

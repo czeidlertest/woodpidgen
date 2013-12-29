@@ -112,6 +112,7 @@ class TreeBuilder {
 
 class GitDatabase extends Git {
 	public $dir;
+	private $currentRootTree = null;
 
 	public function __construct($repoPath) {
         $this->dir = $repoPath;
@@ -243,7 +244,7 @@ class GitDatabase extends Git {
 		try {
 			$tip = $this->getTip($branch);
 			$rootCommit = $this->getObject($tip);
-			$rootTree = $this->getObject($rootCommit->tree);
+			$rootTree = clone $this->getObject($rootCommit->tree);
 		} catch (Exception $e) {
 			$rootTree = new GitTree($this);
 		}
@@ -282,6 +283,72 @@ class GitDatabase extends Git {
 		return $blob->data;
 	}
 
+	// Stores the writes into $this->currentRootTree. This tree can be committed using commit()
+	public function write($branch, $path, $data) {
+		if ($this->currentRootTree === null)
+			$this->currentRootTree = $this->getRootTree($branch);
+		$treeBuilder = new TreeBuilder($this->currentRootTree);
+		# build new tree
+		$object = $this->writeBlob($data);
+		$treeBuilder->updateFile($path, $object->getName());
+		$treeBuilder->write();
+		$this->currentRootTree->rehash();
+		$this->currentRootTree->write();
+	}
+
+	public function commit($branch) {
+		if ($this->currentRootTree === null)
+			return null;
+
+		# write commit
+		$parents = array();
+		try {
+			$tip = $database->getTip($branch);
+			if (strlen($tip) > 0)
+				$parents[] = $tip;
+		} catch (Exception $e) {
+		} 
+
+		$commit = new GitCommit($this);
+		$commit->tree = $this->currentRootTree;
+		$commit->parents = $parents;
+
+		$commitStamp = new GitCommitStamp;
+		$commitStamp->name = "no name";
+		$commitStamp->email = "no mail";
+		$commitStamp->time = time();
+		$commitStamp->offset = 0;
+
+		$commit->author = $commitStamp;
+		$commit->committer = $commitStamp;
+		$commit->summary = "commit";
+		$commit->detail = "";
+
+		$commit->rehash();
+		$commit->write();
+
+		$this->setBranchTip($branch, sha1_hex($commit->getName()));
+
+		$this->currentRootTree = null;
+		return $commit;
+	}
+
+	public function listDirectories($branch, $path) {
+		$rootTree = $this->getRootTree($branch);
+		$tree = $rootTree->find($path);
+		if ($tree === null)
+			return null;
+
+		$list = array();
+		foreach ($tree->nodes as $node)
+        {
+            if (!$node->is_dir)
+				continue;
+			$list[] = $node->name;
+		}
+
+		return $list;
+	}
 }
 
 

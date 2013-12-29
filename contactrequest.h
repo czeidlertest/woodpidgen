@@ -12,8 +12,8 @@ class ContactRequest : QObject
 {
     Q_OBJECT
 public:
-    ContactRequest(RemoteConnection *connection, const QString &serverUser, UserIdentity *identity,
-                   QObject *parent = NULL);
+    ContactRequest(RemoteConnection *connection, const QString &remoteServerUser,
+                   UserIdentity *identity, QObject *parent = NULL);
 
     WP::err postRequest();
 

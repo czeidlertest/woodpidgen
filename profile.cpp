@@ -544,7 +544,7 @@ RemoteDataStorage *Profile::findRemote(const QString &remoteId)
 
 WP::err Profile::connectFreeBranches(RemoteDataStorage *remote)
 {
-    // already exist?
+    // exist?
     if (findRemoteDataStorage(remote->getUid()) ==  NULL)
         return WP::kEntryNotFound;
 

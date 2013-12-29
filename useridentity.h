@@ -38,7 +38,7 @@ public:
     ~UserIdentity();
 
     WP::err createNewIdentity(KeyStore *keyStore, const QString &defaultKeyId,
-                              const QString &nickname, Mailbox *mailbox,
+                              const QString &address, Mailbox *mailbox,
                               bool addUidToBaseDir = true);
     WP::err open(KeyStoreFinder *keyStoreFinder, MailboxFinder *mailboxFinder);
 

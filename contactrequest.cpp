@@ -25,7 +25,9 @@ public:
 
         if (!attributes.hasAttribute("uid"))
             return false;
-        if (!attributes.hasAttribute("name"))
+        if (!attributes.hasAttribute("nickname"))
+            return false;
+        if (!attributes.hasAttribute("address"))
             return false;
         if (!attributes.hasAttribute("certificateSignature"))
             return false;
@@ -33,7 +35,8 @@ public:
             return false;
 
         uid = attributes.value("uid").toString();
-        nickname = attributes.value("name").toString();
+        nickname = attributes.value("nickname").toString();
+        address = attributes.value("address").toString();
         certificateSignature = attributes.value("certificateSignature").toString();
         keyId = attributes.value("keyId").toString();
         return true;
@@ -43,6 +46,7 @@ public:
     QString status;
     QString uid;
     QString nickname;
+    QString address;
     QString certificateSignature;
     QString keyId;
 };
@@ -90,11 +94,11 @@ public:
 };
 
 
-ContactRequest::ContactRequest(RemoteConnection *connection, const QString &serverUser,
+ContactRequest::ContactRequest(RemoteConnection *connection, const QString &remoteServerUser,
                                UserIdentity *identity, QObject *parent) :
     QObject(parent),
     fConnection(connection),
-    fServerUser(serverUser),
+    fServerUser(remoteServerUser),
     fUserIdentity(identity),
     fServerReply(NULL)
 {
@@ -171,6 +175,11 @@ qDebug() << data;
     Contact *contact = new Contact(requestHandler->uid, requestHandler->nickname,
                                    requestHandler->keyId, certificateHandler->certificate,
                                    publicKeyHandler->publicKey);
+    QStringList addressParts = requestHandler->address.split("@");
+    if (addressParts.count() == 2) {
+        contact->setServerUser(addressParts[0]);
+        contact->setServer(addressParts[1]);
+    }
     WP::err error = fUserIdentity->addContact(contact);
     if (error != WP::kOk) {
         emit contactRequestFinished(WP::kError);
@@ -190,14 +199,11 @@ void ContactRequest::makeRequest(QByteArray &data, Contact *myself)
     QString keyId = myself->getKeys()->getMainKeyId();
     QString certificate, publicKey, privateKey;
     fUserIdentity->getKeyStore()->readAsymmetricKey(keyId, certificate, publicKey, privateKey);
-    CryptoInterface *crypto = CryptoInterfaceSingleton::getCryptoInterface();
-    QByteArray certificateSignature;
-    crypto->sign(certificate.toLatin1(), certificateSignature, privateKey, "");
 
     OutStanza *requestStanza =  new OutStanza(kContactRequestStanza);
+    requestStanza->addAttribute("serverUser", fServerUser);
+
     requestStanza->addAttribute("uid", myself->getUid());
-    requestStanza->addAttribute("name", myself->getNickname());
-    requestStanza->addAttribute("certificateSignature", certificateSignature);
     requestStanza->addAttribute("keyId", keyId);
     outStream.pushChildStanza(requestStanza);
 

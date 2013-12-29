@@ -43,7 +43,8 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
 
     SecureArray password("test_password");
     QString userName = "cle";
-    QString remoteUrl = "http://localhost/php_server/portal.php";
+    QString server = "localhost";
+    QString remoteUrl = "http://" + server + "/php_server/portal.php";
     if (fProfile->open(password) != WP::kOk) {
         WP::err error = fProfile->createNewProfile(userName, password);
         if (error != WP::kOk) {
@@ -53,9 +54,13 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
         RemoteDataStorage *remote = fProfile->addHTTPRemote(remoteUrl);
         //RemoteDataStorage *remote = fProfile->addPHPRemote(remoteUrl);
         UserIdentity *mainIdentity = fProfile->getIdentityList()->identityAt(0);
-        fProfile->setSignatureAuth(remote, mainIdentity->getMyself()->getNickname(),
+        Contact *myself = mainIdentity->getMyself();
+        myself->setServer(server);
+        myself->setServerUser(userName);
+        myself->writeConfig();
+        fProfile->setSignatureAuth(remote, myself->getServerUser(),
                                    mainIdentity->getKeyStore()->getUid(),
-                                   mainIdentity->getMyself()->getKeys()->getMainKeyId());
+                                   myself->getKeys()->getMainKeyId());
 
         fProfile->connectFreeBranches(remote);
         fProfile->commit();

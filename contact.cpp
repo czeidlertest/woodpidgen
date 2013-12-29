@@ -45,7 +45,7 @@ WP::err Contact::createUserIdentityContact(KeyStore *keyStore, const QString &ke
 WP::err Contact::open(KeyStoreFinder *keyStoreFinder)
 {
     QString type;
-    WP::err error = readSafe("keystore_type", type);
+    WP::err error = read("keystore_type", type);
     if (error == WP::kOk && type == "private") {
         fPrivateKeyStore = true;
         QString keyStoreId;
@@ -67,7 +67,15 @@ WP::err Contact::open(KeyStoreFinder *keyStoreFinder)
     if (error != WP::kOk)
         return error;
 
-    error = readSafe("nickName", fNickname);
+    error = readSafe("nickname", fNickname);
+    if (error != WP::kOk)
+        return error;
+
+    error = readSafe("serverUser", fServerUser);
+    if (error != WP::kOk)
+        return error;
+
+    error = readSafe("server", fServer);
     if (error != WP::kOk)
         return error;
 
@@ -84,9 +92,34 @@ ContactKeys *Contact::getKeys()
     return fKeys;
 }
 
-const QString Contact::getNickname() const
+const QString &Contact::getNickname() const
 {
     return fNickname;
+}
+
+const QString Contact::getAddress() const
+{
+    return fServerUser + "@" + fServer;
+}
+
+const QString &Contact::getServerUser() const
+{
+    return fServerUser;
+}
+
+const QString &Contact::getServer() const
+{
+    return fServer;
+}
+
+void Contact::setServerUser(const QString &serverUser)
+{
+    fServerUser = serverUser;
+}
+
+void Contact::setServer(const QString &server)
+{
+    fServer = server;
 }
 
 WP::err Contact::writeConfig()
@@ -94,7 +127,7 @@ WP::err Contact::writeConfig()
     WP::err error = WP::kOk;
     if (fPrivateKeyStore) {
         fPrivateKeyStore = true;
-        error = writeSafe("keystore_type", QString("private"));
+        error = write("keystore_type", QString("private"));
         if (error != WP::kOk)
             return error;
         error = writeSafe("keyStoreId", fKeys->getKeyStore()->getUid());
@@ -110,7 +143,15 @@ WP::err Contact::writeConfig()
     if (error != WP::kOk)
         return error;
 
-    error = writeSafe("nickName", fNickname);
+    error = writeSafe("nickname", fNickname);
+    if (error != WP::kOk)
+        return error;
+
+    error = writeSafe("serverUser", fServerUser);
+    if (error != WP::kOk)
+        return error;
+
+    error = writeSafe("server", fServer);
     if (error != WP::kOk)
         return error;
 

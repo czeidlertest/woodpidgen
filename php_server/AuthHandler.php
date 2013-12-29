@@ -1,10 +1,9 @@
 <?php
 
 include_once 'Session.php';
+include_once 'Signature.php';
 include_once 'XMLProtocol.php';
 
-set_include_path('phpseclib0.3.5');
-include_once 'Crypt/RSA.php';
 
 class AuthConst {
 	static public $kAuthStanza = "auth";
@@ -79,13 +78,11 @@ class AccountAuthSignedStanzaHandler extends InStanzaHandler {
 		if (file_exists($signatureFileName))
 			$publickey = file_get_contents($signatureFileName);
 
-		$rsa = new Crypt_RSA();
-		$rsa->setSignatureMode(CRYPT_RSA_SIGNATURE_PKCS1);
-		$rsa->setHash('md5');
+		$signature = new Signature($publickey);
+		$signature->verify(Session::get()->getSignatureToken(), $this->signature);
 
 		$roles = array();
-		$rsa->loadKey($publickey);
-		if ($rsa->verify(Session::get()->getSignatureToken(), $this->signature)) {
+		if ($signature->verify(Session::get()->getSignatureToken(), $this->signature)) {
 			Session::get()->setUserLoggedIn(true);
 			$roles[] =  "account";
 		} else { 

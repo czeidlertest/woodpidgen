@@ -1,7 +1,5 @@
 #include "remoteauthentication.h"
 
-#include <QDebug>
-
 #include "databaseutil.h"
 #include "profile.h"
 #include "protocolparser.h"
@@ -130,7 +128,6 @@ public:
 
 WP::err SignatureAuthentication::getLoginData(QByteArray &data, const QByteArray &serverRequest)
 {
-qDebug() << serverRequest;
     IqInStanzaHandler iqHandler(kResult);
     UserAuthHandler *userAuthHandler = new UserAuthHandler();
     iqHandler.addChildHandler(userAuthHandler);
@@ -210,7 +207,6 @@ public:
 
 WP::err SignatureAuthentication::wasLoginSuccessful(QByteArray &data)
 {
-qDebug() << data;
     IqInStanzaHandler iqHandler(kResult);
     UserAuthResultHandler *userAuthResutlHandler = new UserAuthResultHandler();
     AuthResultRoleHandler *roleHander = new AuthResultRoleHandler();

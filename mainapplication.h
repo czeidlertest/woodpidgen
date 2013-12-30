@@ -12,7 +12,6 @@
 class DatabaseInterface;
 
 #include <remoteconnection.h>
-#include <QDebug>
 
 class PingRCCommand : public QObject
 {
@@ -38,7 +37,6 @@ public slots:
     virtual void received()
     {
         QByteArray data = fReply->readAll();
-        qDebug() << data << endl;
     }
 
 private:

@@ -37,7 +37,10 @@ QIODevice *RemoteConnectionReply::device()
 
 QByteArray RemoteConnectionReply::readAll()
 {
-    return fDevice->readAll();
+    QByteArray data = fDevice->readAll();
+    qDebug() << data;
+    return data;
+    //return fDevice->readAll();
 }
 
 RemoteConnection::RemoteConnection(QObject *parent) :

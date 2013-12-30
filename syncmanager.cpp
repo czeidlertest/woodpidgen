@@ -1,7 +1,5 @@
 #include "syncmanager.h"
 
-#include <QDebug>
-
 #include "protocolparser.h"
 #include "remoteauthentication.h"
 
@@ -172,7 +170,7 @@ void SyncManager::watchReply(WP::err error)
 
     QByteArray data = fServerReply->readAll();
     fServerReply = NULL;
-qDebug() << data;
+
     IqInStanzaHandler iqHandler(kResult);
     WatchHandler *watchHandler = new WatchHandler();
     WatchItemsChangedHandler *itemsChangedHandler = new WatchItemsChangedHandler();

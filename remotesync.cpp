@@ -1,7 +1,5 @@
 #include "remotesync.h"
 
-#include <QDebug>
-
 #include "protocolparser.h"
 #include "remoteauthentication.h"
 
@@ -117,7 +115,7 @@ void RemoteSync::syncReply(WP::err code)
 
     QByteArray data = fServerReply->readAll();
     fServerReply = NULL;
-qDebug() << data;
+
     IqInStanzaHandler iqHandler(kResult);
     SyncPullHandler *syncPullHandler = new SyncPullHandler();
     SyncPullPackHandler *syncPullPackHandler = new SyncPullPackHandler();
@@ -184,6 +182,6 @@ void RemoteSync::syncPushReply(WP::err code)
         return;
 
     QByteArray data = fServerReply->readAll();
-qDebug() << data;
+
     emit syncFinished(WP::kOk);
 }

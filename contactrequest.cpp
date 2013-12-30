@@ -1,7 +1,5 @@
 #include "contactrequest.h"
 
-#include <QDebug>
-
 #include "contact.h"
 #include "protocolparser.h"
 #include "useridentity.h"
@@ -138,7 +136,7 @@ void ContactRequest::onRequestReply(WP::err code)
 
     QByteArray data = fServerReply->readAll();
     fServerReply = NULL;
-qDebug() << data;
+
     IqInStanzaHandler iqHandler(kResult);
     ContactRequestHandler *requestHandler = new ContactRequestHandler();
     CertificateHandler *certificateHandler = new CertificateHandler();

@@ -2,7 +2,6 @@
 
 #include <exception>
 
-#include <QDebug>
 #include <QStringList>
 
 #include "protocolparser.h"
@@ -282,7 +281,6 @@ void MailMessenger::onContactFound(WP::err error)
 void MailMessenger::handleReply(WP::err error)
 {
     QByteArray data = fServerReply->readAll();
-    qDebug() << data;
 }
 
 void MailMessenger::parseAddress(const QString &targetAddress)

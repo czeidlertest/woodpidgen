@@ -19,26 +19,27 @@ class Contact extends UserData {
 	}
 
 	public function getUid() {
+		$this->read("uid", $this->uid);
 		return $this->uid;
 	}
 
 	public function getKeySet($keyId, &$certificate, &$publicKey) {
 		$this->read("keys/".$keyId."/certificate", $certificate);
-		$this->read("keys/".$keyId."/publicKey", $certificate);
+		$this->read("keys/".$keyId."/public_key", $certificate);
 	}
 
 	public function addKeySet($keyId, $certificate, $publicKey) {
 		$this->write("keys/".$keyId."/certificate", $certificate);
-		$this->write("keys/".$keyId."/publicKey", $certificate);
+		$this->write("keys/".$keyId."/public_key", $certificate);
 	}
 
 	public function setMainKeyId($mainKeyId) {
-		$this->write("mainKeyId", $mainKeyId);
+		$this->write("keys/main_key_id", $mainKeyId);
 	}
 
 	public function getMainKeyId() {
 		$mainKeyId;
-		$this->read("mainKeyId", $mainKeyId);
+		$this->read("keys/main_key_id", $mainKeyId);
 		return $mainKeyId;
 	}
 

@@ -295,7 +295,7 @@ void Profile::addUserIdentity(IdentityRef *entry)
 WP::err Profile::createNewMailbox(DatabaseBranch *branch, Mailbox **mailboxOut)
 {
     Mailbox *mailbox = new Mailbox(branch, "");
-    WP::err error = mailbox->createNewMailbox(getKeyStore(), getDefaultKeyId(), false);
+    WP::err error = mailbox->createNewMailbox(getKeyStore(), getDefaultKeyId(), true);
     if (error != WP::kOk)
         return error;
     error = addMailbox(mailbox);
@@ -314,9 +314,9 @@ WP::err Profile::loadMailboxes()
             = new MailboxRef(this, prependBaseDir("mailboxes/" + mailboxList.at(i)), NULL);
         if (entry->load(this) != WP::kOk)
             continue;
-        Mailbox *id = entry->getUserData();
+        Mailbox *mailbox = entry->getUserData();
         Profile::ProfileKeyStoreFinder keyStoreFinder(fMapOfKeyStores);
-        WP::err error = id->open(&keyStoreFinder);
+        WP::err error = mailbox->open(&keyStoreFinder);
         if (error != WP::kOk){
             delete entry;
             continue;

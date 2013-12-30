@@ -171,12 +171,12 @@ WP::err ContactKeys::setMainKeyId(const QString &keyId)
 
 WP::err ContactKeys::open()
 {
-    return read("mainKeyId", fMainKeyId);
+    return read("main_key_id", fMainKeyId);
 }
 
 WP::err ContactKeys::writeConfig()
 {
-    return write("mainKeyId", fMainKeyId);
+    return write("main_key_id", fMainKeyId);
 }
 
 KeyStore *ContactKeys::getKeyStore()
@@ -273,7 +273,7 @@ WP::err ContactKeysBuddies::writeConfig()
         error = writeSafe(keyId + "/certificate", it.value().certificate);
         if (error != WP::kOk)
             return error;
-        error = write(keyId + "/publicKey", it.value().publicKey);
+        error = write(keyId + "/public_key", it.value().publicKey);
         if (error != WP::kOk)
             return error;
     }
@@ -292,7 +292,7 @@ WP::err ContactKeysBuddies::open()
         if (error != WP::kOk)
             return error;
         // the public key is needed by the server to verify incoming data so it can't be stored encrypted
-        error = read(keyId + "/publicKey", keySet.publicKey);
+        error = read(keyId + "/public_key", keySet.publicKey);
         if (error != WP::kOk)
             return error;
         fKeyMap[keyId] = keySet;

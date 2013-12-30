@@ -116,7 +116,7 @@ class ContactRequestStanzaHandler extends InStanzaHandler {
 		$myCertificate;
 		$myPublicKey;
 		$keyStore->readAsymmetricKey($mainKeyId, $myCertificate, $myPublicKey);
-		
+
 		$stanza->addAttribute("uid", $myself->getUid());
 		$stanza->addAttribute("keyId", $mainKeyId);
     

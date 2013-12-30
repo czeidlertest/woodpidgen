@@ -90,7 +90,7 @@ const QByteArray &MailRef::getBody()
     return fBody;
 }
 
-Mailbox::Mailbox(const DatabaseBranch *branch, const QString &baseDir) :
+Mailbox::Mailbox(DatabaseBranch *branch, const QString &baseDir) :
     fMessageList(this)
 {
     setToDatabase(branch, baseDir);

@@ -34,7 +34,7 @@ branch identities:
 class UserIdentity : public EncryptedUserData
 {
 public:
-    UserIdentity(const DatabaseBranch *branch, const QString &baseDir = "");
+    UserIdentity(DatabaseBranch *branch, const QString &baseDir = "");
     ~UserIdentity();
 
     WP::err createNewIdentity(KeyStore *keyStore, const QString &defaultKeyId, Mailbox *mailbox,

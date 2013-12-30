@@ -96,7 +96,7 @@ class Mailbox : public EncryptedUserData
 {
 Q_OBJECT
 public:
-    Mailbox(const DatabaseBranch *branch, const QString &baseDir = "");
+    Mailbox(DatabaseBranch *branch, const QString &baseDir = "");
     ~Mailbox();
 
     WP::err createNewMailbox(KeyStore *keyStore, const QString &defaultKeyId,

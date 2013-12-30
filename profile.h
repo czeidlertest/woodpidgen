@@ -194,7 +194,7 @@ protected:
     virtual Type *instanciate() = 0;
 
 protected:
-    const DatabaseBranch *fDatabaseBranch;
+    DatabaseBranch *fDatabaseBranch;
     QString fDatabaseBaseDir;
 
     Type *fUserData;

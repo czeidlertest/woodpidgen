@@ -165,13 +165,13 @@ void ContactRequest::onRequestReply(WP::err code)
         return;
     }
 
-    CryptoInterface *crypto = CryptoInterfaceSingleton::getCryptoInterface();
+    /*CryptoInterface *crypto = CryptoInterfaceSingleton::getCryptoInterface();
     if (crypto->verifySignatur(certificateHandler->certificate.toLatin1(),
                                requestHandler->certificateSignature.toLatin1(),
                                publicKeyHandler->publicKey)) {
         emit contactRequestFinished(WP::kBadValue);
         return;
-    }
+    }*/
     Contact *contact = new Contact(requestHandler->uid, requestHandler->keyId,
                                    certificateHandler->certificate, publicKeyHandler->publicKey);
     QStringList addressParts = requestHandler->address.split("@");
@@ -184,6 +184,8 @@ void ContactRequest::onRequestReply(WP::err code)
         emit contactRequestFinished(WP::kError);
         return;
     }
+    // commit changes
+    fUserIdentity->getDatabaseBranch()->commit();
 
     emit contactRequestFinished(WP::kOk);
     return;

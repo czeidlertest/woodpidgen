@@ -84,7 +84,7 @@ QStringList UserData::listDirectories(const QString &path) const
     return fDatabase->listDirectories(prependBaseDir(path));
 }
 
-const DatabaseBranch *UserData::getDatabaseBranch() const
+DatabaseBranch *UserData::getDatabaseBranch() const
 {
     return fDatabaseBranch;
 }
@@ -104,7 +104,7 @@ void UserData::setUid(const QString &uid)
     fUid = uid;
 }
 
-WP::err UserData::setToDatabase(const DatabaseBranch *branch, const QString &baseDir)
+WP::err UserData::setToDatabase(DatabaseBranch *branch, const QString &baseDir)
 {
     fDatabaseBranch = branch;
     fDatabaseBaseDir = baseDir;
@@ -135,7 +135,7 @@ QString UserData::prependBaseDir(const QString &path) const
 }
 
 
-KeyStore::KeyStore(const DatabaseBranch *branch, const QString &baseDir)
+KeyStore::KeyStore(DatabaseBranch *branch, const QString &baseDir)
 {
     setToDatabase(branch, baseDir);
 }

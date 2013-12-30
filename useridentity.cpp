@@ -9,7 +9,7 @@ const char* kPathMailboxId = "mailbox_id";
 const char* kPathIdentityKeyId = "identity_key_id";
 
 
-UserIdentity::UserIdentity(const DatabaseBranch *branch, const QString &baseDir) :
+UserIdentity::UserIdentity(DatabaseBranch *branch, const QString &baseDir) :
     fMailbox(NULL),
     fMyselfContact(NULL)
 {
@@ -116,7 +116,7 @@ WP::err UserIdentity::addContact(Contact *contact)
 {
     QString contactUid = contact->getUid();
     QString path = getDatabaseBaseDir() + "/contacts/" + contactUid;
-    contact->setDirectory(path);
+    contact->setTo(this, path);
     WP::err error = contact->writeConfig();
     if (error != WP::kOk)
         return error;

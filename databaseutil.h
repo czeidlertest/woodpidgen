@@ -87,7 +87,7 @@ public:
 
     QStringList listDirectories(const QString &path) const;
 
-    const DatabaseBranch *getDatabaseBranch() const;
+    DatabaseBranch *getDatabaseBranch() const;
     QString getDatabaseBaseDir() const;
     DatabaseInterface *getDatabase() const;
     void setBaseDir(const QString &baseDir);
@@ -97,12 +97,12 @@ private slots:
 
 protected:
     void setUid(const QString &uid);
-    WP::err setToDatabase(const DatabaseBranch *branch, const QString &baseDir = "");
+    WP::err setToDatabase(DatabaseBranch *branch, const QString &baseDir = "");
 
     QString prependBaseDir(const QString &path) const;
 
 protected:
-    const DatabaseBranch *fDatabaseBranch;
+    DatabaseBranch *fDatabaseBranch;
     QString fDatabaseBaseDir;
 
     CryptoInterface *fCrypto;
@@ -114,7 +114,7 @@ private:
 
 class KeyStore : public UserData {
 public:
-    KeyStore(const DatabaseBranch *branch, const QString &baseDir = "");
+    KeyStore(DatabaseBranch *branch, const QString &baseDir = "");
 
     WP::err open(const SecureArray &password);
     WP::err create(const SecureArray &password, bool addUidToBaseDir = true);

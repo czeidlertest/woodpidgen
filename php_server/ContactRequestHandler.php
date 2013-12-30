@@ -88,8 +88,7 @@ class ContactRequestStanzaHandler extends InStanzaHandler {
 		$publicKey = $this->publicKeyStanzaHandler->getPublicKey();
 		$certificate = $this->certificateStanzaHandler->getCertificate();
 
-		$profile = Session::get()->getProfile();
-		$userIdentity = $profile->getUserIdentityAt(0);
+		$userIdentity = Session::get()->getMainUserIdentity();
 
 		$contact = new Contact($userIdentity, $userIdentity->getDirectory()."/contacts");
 		$contact->setUid($this->uid);
@@ -106,6 +105,7 @@ class ContactRequestStanzaHandler extends InStanzaHandler {
 		$stanza->addAttribute("status", "ok");
 
 		$myself = $userIdentity->getMyself();
+		$profile = Session::get()->getProfile();
 		$keyStore = $profile->getUserIdentityKeyStore($userIdentity);
 		if ($keyStore === null) {
 			$this->printError("error", "internal error");

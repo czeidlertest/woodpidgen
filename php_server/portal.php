@@ -139,8 +139,11 @@ $request = $gPortal->receiveData($request);
 
 $XMLHandler = new XMLHandler($request);
 
-if (Session::get()->isUserLoggedIn())
+$roles = Session::get()->getUserRoles();
+if (in_array("account", $roles))
 	InitHandlers::initPrivateHandlers($XMLHandler);
+else if (in_array("contact_user", $roles))
+	InitHandlers::initContactUserHandlers($XMLHandler);
 else
 	InitHandlers::initPublicHandlers($XMLHandler);
 

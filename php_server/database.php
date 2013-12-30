@@ -337,7 +337,7 @@ class GitDatabase extends Git {
 		$rootTree = $this->getRootTree($branch);
 		$treeId = $rootTree->find($path);
 		if ($treeId === null)
-			return null;
+			return array();
 		$tree = $this->getObject($treeId);
 
 		$list = array();

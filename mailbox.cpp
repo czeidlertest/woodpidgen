@@ -230,14 +230,15 @@ WP::err MailMessenger::postMessage(const RawMailMessage *message)
         return WP::kOk;
     }
 
-    fContactRequest = new ContactRequest(fRemoteConnection, fTargetUser, fIdentity, this);
-    connect(fContactRequest, SIGNAL(contactRequestFinished(WP::err)), this, SLOT(onContactFound(WP::err)));
-    return fContactRequest->postRequest();
+    return startContactRequest();
 }
 
 void MailMessenger::authConnected(WP::err error)
 {
-    if (error != WP::kOk)
+    if (error == WP::kContactNeeded) {
+        startContactRequest();
+        return;
+    } else if (error != WP::kOk)
         return;
 
     QByteArray data;
@@ -293,6 +294,13 @@ void MailMessenger::parseAddress(const QString &targetAddress)
     fTargetServer = "http://";
     fTargetServer += parts[1];
     fTargetServer += "/php_server/portal.php";
+}
+
+WP::err MailMessenger::startContactRequest()
+{
+    fContactRequest = new ContactRequest(fRemoteConnection, fTargetUser, fIdentity, this);
+    connect(fContactRequest, SIGNAL(contactRequestFinished(WP::err)), this, SLOT(onContactFound(WP::err)));
+    return fContactRequest->postRequest();
 }
 
 

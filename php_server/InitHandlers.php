@@ -84,10 +84,15 @@ class InitHandlers {
 		initWatchBranchesStanzaHandler($XMLHandler);
 		initContactRequestStanzaHandler($XMLHandler);
 	}
-	
-	static public function initPublicHandlers($XMLHandler) {
+
+	static public function initContactUserHandlers($XMLHandler) {
 		initAuthHandlers($XMLHandler);
 		initMessageHandlers($XMLHandler);
+		initWatchBranchesStanzaHandler($XMLHandler);
+	}
+
+	static public function initPublicHandlers($XMLHandler) {
+		initAuthHandlers($XMLHandler);
 		initContactRequestStanzaHandler($XMLHandler);
 	}
 }

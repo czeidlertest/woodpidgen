@@ -3,7 +3,7 @@
 set_include_path('phpseclib0.3.5');
 include_once 'Crypt/RSA.php';
  
-class Signature {
+class SignatureVerifier {
 	public $rsa;
 
 	public function __construct($publickey) {

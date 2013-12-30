@@ -43,6 +43,7 @@ private slots:
 
 private:
     void parseAddress(const QString &targetAddress);
+    WP::err startContactRequest();
 
     UserIdentity *fIdentity;
     QString fAddress;

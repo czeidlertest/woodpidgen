@@ -19,8 +19,6 @@ class UserIdentity extends UserData {
 		foreach ($contactNames as $contactName) {
 			$path = $this->getDirectory()."/contacts/".$contactName;
 			$contact = new Contact($this, $path);
-			if (!$contact->open())
-				continue;
 			$this->contacts[] = $contact;
         }
         return true;
@@ -36,6 +34,14 @@ class UserIdentity extends UserData {
 		$contact->setDirectory($path);
 		$this->contacts[] = $contact;
 		return true;
+	}
+	
+	public function findContact($uid) {
+		foreach ($this->contacts as $contact) {
+			if ($contact->getUid() == $uid)
+				return $contact;
+		}
+		return null;
 	}
 
 	public function getUid() {

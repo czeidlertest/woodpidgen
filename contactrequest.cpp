@@ -155,8 +155,8 @@ void ContactRequest::onRequestReply(WP::err code)
         return;
     }
 
-    if (requestHandler->status != "accepted") {
-        emit contactRequestFinished(WP::kNotAllowed);
+    if (requestHandler->status != "ok") {
+        emit contactRequestFinished(WP::kContactRefused);
         return;
     }
 

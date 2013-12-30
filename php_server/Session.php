@@ -5,6 +5,7 @@ include_once 'Profile.php';
 
 class Session {
 	private $database;
+	private $profile = null;
 
 	private function __construct() {
 		$this->database = null;
@@ -22,7 +23,7 @@ class Session {
 		$this->setLoginUser("");
 		$this->setServerUser("");
 		$this->setUserRoles(array());
-		$this->setUserLoggedIn(false);
+		$this->profile = null;
 	}
 
 	public function getDatabase() {
@@ -35,8 +36,16 @@ class Session {
 	}
 
 	public function getProfile() {
+		if ($this->profile !== null)
+			return $this->profile;
 		$database = $this->getDatabase();
-		return new Profile($database, "profile", "");
+		$this->profile = new Profile($database, "profile", "");
+		return $this->profile;
+	}
+
+	public function getMainUserIdentity() {
+		$profile = $this->getProfile();
+		return $profile->getUserIdentityAt(0);
 	}
 
 	public function getUserDir() {
@@ -67,16 +76,6 @@ class Session {
 		if (!isset($_SESSION['server_user']))
 			return "";
 		return $_SESSION['server_user'];
-	}
-
-	public function setUserLoggedIn($bool) {
-		$_SESSION['user_auth'] = $bool;
-	}
-	
-	public function isUserLoggedIn() {
-		if (!isset($_SESSION['user_auth']))
-			return false;
-		return $_SESSION['user_auth'];
 	}
 
 	public function setUserRoles($roles) {

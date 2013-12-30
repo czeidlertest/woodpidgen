@@ -11,8 +11,9 @@ enum err {
     kOutOfMemory,
     kIsConnected,
     kEntryExist,
-    kNotAllowed,
     kBadValue,
+    kContactNeeded,
+    kContactRefused,
 
     kError = -1,
     kOk = 0,

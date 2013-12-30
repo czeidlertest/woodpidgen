@@ -115,14 +115,17 @@ public:
 
     bool handleStanza(const QXmlStreamAttributes &attributes)
     {
-        if (!attributes.hasAttribute("sign_token"))
+        if (!attributes.hasAttribute("status"))
             return false;
+        status = attributes.value("status").toString();
 
-        signToken = attributes.value("sign_token").toString();
+        if (attributes.hasAttribute("sign_token"))
+            signToken = attributes.value("sign_token").toString();
         return true;
     }
 
 public:
+    QString status;
     QString signToken;
 };
 
@@ -137,6 +140,11 @@ WP::err SignatureAuthentication::getLoginData(QByteArray &data, const QByteArray
     inStream.parse();
 
     if (!userAuthHandler->hasBeenHandled())
+        return WP::kError;
+
+    if (userAuthHandler->status == "i_dont_know_you")
+        return WP::kContactNeeded;
+    if (userAuthHandler->status != "sign_this_token")
         return WP::kError;
 
     KeyStore *keyStore = fProfile->findKeyStore(fKeyStoreId);
@@ -256,6 +264,7 @@ void SignatureAuthentication::handleAuthenticationRequest(WP::err code)
         setAuthenticationCanceled(code);
         return;
     }
+
     QByteArray data;
     WP::err error = getLoginData(data, fAuthenticationReply->readAll());
     if (error != WP::kOk) {

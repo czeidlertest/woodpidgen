@@ -36,19 +36,40 @@ class AccountAuthStanzaHandler extends InStanzaHandler {
 		if (strcmp($this->authType, "signature"))
 			$this->inStreamReader->appendResponse(IqErrorOutStanza::makeErrorMessage("Unsupported authentication type."));
 
+		$signToken = "rand".rand()."time".time();
+		Session::get()->setSignatureToken($signToken);
+		Session::get()->setLoginUser($this->userName);
+		Session::get()->setServerUser($this->serverUser);
+
+		// Check if the user has a change to login, i.e., if we know him
+		$userIdentity = Session::get()->getMainUserIdentity();
+		// if $userIdentity is null the database is invalid give the user a change to upload a profile
+		if ($userIdentity != null) {
+			$contact = $userIdentity->findContact($this->userName);
+			if ($userIdentity->getMyself()->getUid() != $this->userName && $contact === null) {
+				Session::get()->clear();
+				// produce output
+				$outStream = new ProtocolOutStream();
+				$outStream->pushStanza(new IqOutStanza(IqType::$kResult));
+				$stanza = new OutStanza(AuthConst::$kAuthStanza);
+				$stanza->addAttribute("status", "i_dont_know_you");
+				$outStream->pushChildStanza($stanza);
+
+				$this->inStreamReader->appendResponse($outStream->flush());
+				return;
+			}
+		}
+
+		
 		// produce output
 		$outStream = new ProtocolOutStream();
 		$outStream->pushStanza(new IqOutStanza(IqType::$kResult));
-
-		$signToken = "rand".rand()."time".time();
 		$stanza = new OutStanza(AuthConst::$kAuthStanza);
+		$stanza->addAttribute("status", "sign_this_token");
 		$stanza->addAttribute("sign_token", $signToken);
 		$outStream->pushChildStanza($stanza);
 
 		$this->inStreamReader->appendResponse($outStream->flush());
-		Session::get()->setSignatureToken($signToken);
-		Session::get()->setLoginUser($this->userName);
-		Session::get()->setServerUser($this->serverUser);
 	}
 }
 
@@ -73,29 +94,34 @@ class AccountAuthSignedStanzaHandler extends InStanzaHandler {
 	}
 
 	public function finished() {
-		$signatureFileName = Session::get()->getServerUser()."/signature.pup";
-		$publickey = "";
-		if (file_exists($signatureFileName))
-			$publickey = file_get_contents($signatureFileName);
-
-		$signature = new Signature($publickey);
-		$signature->verify(Session::get()->getSignatureToken(), $this->signature);
+		$userIdentity = Session::get()->getMainUserIdentity();
 
 		$roles = array();
-		if ($signature->verify(Session::get()->getSignatureToken(), $this->signature)) {
-			Session::get()->setUserLoggedIn(true);
-			$roles[] =  "account";
-		} else { 
-			// TODO add proper login
-			Session::get()->setUserLoggedIn(true);
-			$roles[] =  "post_message";
+		if ($userIdentity != null) {
+			$loginUser = Session::get()->getLoginUser();
+			$myself = $userIdentity->getMyself();
+			if ($myself->getUid() == $loginUser) {
+				$this->accountLogin($myself, $roles);
+			} else {
+				$contact = $userIdentity->findContact($loginUser);
+				if ($contact !== null)
+					$this->userLogin($contact, $roles);
+			}
+		} else {
+			$this->setupLogin($roles);
 		}
 		Session::get()->setUserRoles($roles);
-	
+
 		// produce output
 		$outStream = new ProtocolOutStream();
 		$outStream->pushStanza(new IqOutStanza(IqType::$kResult));
 		$stanza = new OutStanza(AuthConst::$kAuthSignedStanza);
+		$status;
+		if (count($roles) > 0)
+			$status = "ok";
+		else
+			$status = "denied";
+		$stanza->addAttribute("status", $status);
 		$outStream->pushChildStanza($stanza);
 		$roles = Session::get()->getUserRoles();
 		$firstRole = true;
@@ -110,6 +136,40 @@ class AccountAuthSignedStanzaHandler extends InStanzaHandler {
 		}
 		$outStream->cdDotDot();
 		$this->inStreamReader->appendResponse($outStream->flush());
+	}
+
+	private function setupLogin(&$roles) {
+		$signatureFileName = Session::get()->getServerUser()."/signature.pup";
+		$publickey = "";
+		if (file_exists($signatureFileName))
+			$publickey = file_get_contents($signatureFileName);
+
+		$signatureVerifier = new SignatureVerifier($publickey);
+		if (!$signatureVerifier->verify(Session::get()->getSignatureToken(), $this->signature))
+			return;
+		$roles[] =  "account";
+	}
+
+	private function accountLogin($contact, &$roles) {
+		if (!$this->verifyContactData($contact, Session::get()->getSignatureToken(), $this->signature))
+			return;
+		$roles[] =  "account";
+	}
+
+	private function userLogin($contact, &$roles) {
+		if (!$this->verifyContactData($contact, Session::get()->getSignatureToken(), $this->signature))
+			return;
+		$roles[] = "contact_user";
+	}
+
+	private function verifyContactData($contact, $data, $signature) {
+		$mainKeyId = $contact->getMainKeyId();
+		$certificate;
+		$publicKey;
+		$contact->getKeySet($mainKeyId, $certificate, $publicKey);
+
+		$signatureVerifier = new SignatureVerifier($publicKey);
+		return $signatureVerifier->verify($data, $signature);
 	}
 }
 

@@ -303,14 +303,14 @@ class GitDatabase extends Git {
 		# write commit
 		$parents = array();
 		try {
-			$tip = $database->getTip($branch);
+			$tip = $this->getTip($branch);
 			if (strlen($tip) > 0)
 				$parents[] = $tip;
 		} catch (Exception $e) {
 		} 
 
 		$commit = new GitCommit($this);
-		$commit->tree = $this->currentRootTree;
+		$commit->tree = $this->currentRootTree->getName();
 		$commit->parents = $parents;
 
 		$commitStamp = new GitCommitStamp;
@@ -335,9 +335,10 @@ class GitDatabase extends Git {
 
 	public function listDirectories($branch, $path) {
 		$rootTree = $this->getRootTree($branch);
-		$tree = $rootTree->find($path);
-		if ($tree === null)
+		$treeId = $rootTree->find($path);
+		if ($treeId === null)
 			return null;
+		$tree = $this->getObject($treeId);
 
 		$list = array();
 		foreach ($tree->nodes as $node)

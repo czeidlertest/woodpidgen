@@ -1,7 +1,8 @@
 <?php
 
+include_once 'Contact.php';
 include_once 'XMLProtocol.php';
-include_once 'Signature.php';
+
 
 class ContactMessageConst {
 	static public $kContactRequestStanza = "conctact_request";
@@ -42,13 +43,15 @@ class PublicKeyStanzaHandler extends InStanzaHandler {
 		return true;
 	}
 
-	public function getCertificate() {
+	public function getPublicKey() {
 		return $this->publicKey;
 	}
 };
 
 
 class ContactRequestStanzaHandler extends InStanzaHandler {
+	private $inStreamReader;
+
 	private $serverUser;
 	private $uid;
     private $keyId;
@@ -56,8 +59,10 @@ class ContactRequestStanzaHandler extends InStanzaHandler {
     private $certificateStanzaHandler;
 	private $publicKeyStanzaHandler;
 
-	public function __construct() {
+	public function __construct($inStreamReader) {
 		InStanzaHandler::__construct(ContactMessageConst::$kContactRequestStanza);
+
+		$this->inStreamReader = $inStreamReader;
 
 		$this->certificateStanzaHandler = new CertificateStanzaHandler();
 		$this->addChild($this->certificateStanzaHandler);
@@ -69,26 +74,28 @@ class ContactRequestStanzaHandler extends InStanzaHandler {
 		$this->serverUser =  $xml->getAttribute("serverUser");
 		$this->uid = $xml->getAttribute("uid");
 		$this->keyId = $xml->getAttribute("keyId");
+
 		if ($this->serverUser == "" || $this->uid == "" || $this->keyId == "")
 			return false;
 		return true;
 	}
 
 	public function finished() {
-		if (Sessiong::get()->getServerUser() != $serverUser) {
+		if (Session::get()->getServerUser() != $this->serverUser) {
 			Session::get()->clear();
-			Session::get()->setServerUser($serverUser);
+			Session::get()->setServerUser($this->serverUser);
 		}
-		$publicKey = publicKeyStanzaHandler->getPublicKeyStanzaHandler();
-		$certificate = certificateStanzaHandler->getCertificateStanzaHandler();
+		$publicKey = $this->publicKeyStanzaHandler->getPublicKey();
+		$certificate = $this->certificateStanzaHandler->getCertificate();
 
-		$contact = new Contact($this, "contacts");
-		$contact->setUid($this->uid);
-		$contact->addKeySet($this->keyId, $certificate, $publicKey)
-		$contact->setMainKeyId($this->keyId);
-		
 		$profile = Session::get()->getProfile();
 		$userIdentity = $profile->getUserIdentityAt(0);
+
+		$contact = new Contact($userIdentity, $userIdentity->getDirectory()."/contacts");
+		$contact->setUid($this->uid);
+		$contact->addKeySet($this->keyId, $certificate, $publicKey);
+		$contact->setMainKeyId($this->keyId);
+
 		$userIdentity->addContact($contact);
 		$userIdentity->commit();
 
@@ -100,12 +107,17 @@ class ContactRequestStanzaHandler extends InStanzaHandler {
 
 		$myself = $userIdentity->getMyself();
 		$keyStore = $profile->getUserIdentityKeyStore($userIdentity);
+		if ($keyStore === null) {
+			$this->printError("error", "internal error");
+			return;
+		}
+
 		$mainKeyId = $myself->getMainKeyId();
 		$myCertificate;
 		$myPublicKey;
 		$keyStore->readAsymmetricKey($mainKeyId, $myCertificate, $myPublicKey);
 		
-		$stanza->addAttribute("uid", $userIdentity->getUid());
+		$stanza->addAttribute("uid", $myself->getUid());
 		$stanza->addAttribute("keyId", $mainKeyId);
     
 		$outStream->pushChildStanza($stanza);

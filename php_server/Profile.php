@@ -15,10 +15,9 @@ class Profile extends UserData {
 		$identityId = $ids[$index];
 		$branch;
 		$baseDir;
-		read("user_identities/".$identityId."/database_branch", $branch);
-		read("user_identities/".$identityId."/database_base_dir", $baseDir);
-
-		$identity = new UserIdentity($database, $branch, $baseDir);
+		$this->read("user_identities/".$identityId."/database_branch", $branch);
+		$this->read("user_identities/".$identityId."/database_base_dir", $baseDir);
+		$identity = new UserIdentity($this->database, $branch, $baseDir);
 		$identity->open();
 		return $identity;
 	}
@@ -26,13 +25,13 @@ class Profile extends UserData {
 	public function getUserIdentityKeyStore($userIdentity) {
 		$keyStoreId = $userIdentity->getKeyStoreId();
 		$keyStoreIds = $this->listDirectories("key_stores");
-		if (!in_array($keyStoreId, $keyStoreIds)
+		if (!in_array($keyStoreId, $keyStoreIds))
 			return null;
 		$branch;
 		$baseDir;
-		read("key_stores/".$keyStoreId."/database_branch", $branch);
-		read("key_stores/".$keyStoreId."/database_base_dir", $baseDir);
-		$keyStore = new KeyStore($database, $branch, $baseDir);
+		$this->read("key_stores/".$keyStoreId."/database_branch", $branch);
+		$this->read("key_stores/".$keyStoreId."/database_base_dir", $baseDir);
+		$keyStore = new KeyStore($this->getDatabase(), $branch, $baseDir);
 		return $keyStore;
 	}
 }

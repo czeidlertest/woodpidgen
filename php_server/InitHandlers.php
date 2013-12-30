@@ -1,9 +1,10 @@
 <?php
 
-include_once './AuthHandler.php';
-include_once './MessageHandler.php';
-include_once './SyncHandler.php';
-include_once './WatchBranchHandler.php';
+include_once 'AuthHandler.php';
+include_once 'ContactRequestHandler.php';
+include_once 'MessageHandler.php';
+include_once 'SyncHandler.php';
+include_once 'WatchBranchHandler.php';
 
 
 function initSyncHandlers($XMLHandler) {
@@ -48,6 +49,14 @@ function initWatchBranchesStanzaHandler($XMLHandler) {
 }
 
 
+function initContactRequestStanzaHandler($XMLHandler) {
+	$iqHandler = new InIqStanzaHandler(IqType::$kGet);
+	$handler = new ContactRequestStanzaHandler($XMLHandler->getInStream());
+	$iqHandler->addChild($handler);
+	$XMLHandler->addHandler($iqHandler);
+}
+
+
 function initAuthHandlers($XMLHandler) {
 	// auth
 	initAccountAuthHandler($XMLHandler);
@@ -73,11 +82,13 @@ class InitHandlers {
 		initAuthHandlers($XMLHandler);
 		initMessageHandlers($XMLHandler);
 		initWatchBranchesStanzaHandler($XMLHandler);
+		initContactRequestStanzaHandler($XMLHandler);
 	}
 	
 	static public function initPublicHandlers($XMLHandler) {
 		initAuthHandlers($XMLHandler);
 		initMessageHandlers($XMLHandler);
+		initContactRequestStanzaHandler($XMLHandler);
 	}
 }
 

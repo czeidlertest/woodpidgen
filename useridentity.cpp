@@ -125,6 +125,15 @@ WP::err UserIdentity::addContact(Contact *contact)
     return WP::kOk;
 }
 
+Contact *UserIdentity::findContact(const QString &address)
+{
+    foreach (Contact *contact, fContacts) {
+        if (contact->getAddress() == address)
+            return contact;
+    }
+    return NULL;
+}
+
 WP::err UserIdentity::writePublicSignature(const QString &filename, const QString &publicKey)
 {
     QFile file(filename);

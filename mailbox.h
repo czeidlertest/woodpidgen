@@ -3,6 +3,7 @@
 
 #include <QAbstractListModel>
 
+#include "contactrequest.h"
 #include "databaseutil.h"
 #include "remoteconnection.h"
 
@@ -33,20 +34,21 @@ public:
     MailMessenger(const QString &targetAddress, Profile *profile, UserIdentity *identity);
     ~MailMessenger();
 
-    //! if provided check if the target server is valid???
-    //void setTargetVerification(const QString &targetPublicKey);
-
     WP::err postMessage(const RawMailMessage *message);
 
 private slots:
     void handleReply(WP::err error);
     void authConnected(WP::err error);
+    void onContactFound(WP::err error);
 
 private:
     void parseAddress(const QString &targetAddress);
 
-    QString fTargetUser;
+    UserIdentity *fIdentity;
+    QString fAddress;
     QString fTargetServer;
+    QString fTargetUser;
+    ContactRequest* fContactRequest;
 
     const RawMailMessage *fMessage;
     RemoteConnection *fRemoteConnection;

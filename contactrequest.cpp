@@ -2,7 +2,9 @@
 
 #include <QDebug>
 
+#include "contact.h"
 #include "protocolparser.h"
+#include "useridentity.h"
 
 
 const char *kContactRequestStanza = "conctact_request";
@@ -209,7 +211,7 @@ void ContactRequest::makeRequest(QByteArray &data, Contact *myself)
 
     OutStanza *certificateStanza = new OutStanza("certificate");
     certificateStanza->setText(certificate);
-    outStream.pushChildStanza(requestStanza);
+    outStream.pushChildStanza(certificateStanza);
     outStream.cdDotDot();
 
     OutStanza *publicKeyStanza = new OutStanza("publicKey");

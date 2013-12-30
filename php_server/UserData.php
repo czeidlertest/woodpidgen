@@ -5,16 +5,18 @@ class UserData {
 	protected $branch;
 	protected $baseDirectory;
 
-	public function __construct($userData, $baseDirectory) {
-		$this->database = $userData->database;
-		$this->branch = $userData->branch;
-		$this->baseDirectory = $baseDirectory;
-	}
-
 	public function __construct($database, $branch, $baseDirectory) {
 		$this->database = $database;
 		$this->branch = $branch;
 		$this->baseDirectory = $baseDirectory;
+	}
+
+	public function getDatabase() {
+		return $this->database;
+	}
+
+	public function getBranch() {
+		return $this->branch;
 	}
 
 	public function getDirectory() {
@@ -26,7 +28,7 @@ class UserData {
 	}
 
 	public function write($path, $data) {
-		$this->database->write($this->branch, $this->prependBaseDir($path), $data) {
+		$this->database->write($this->branch, $this->prependBaseDir($path), $data);
 	}
 
 	public function read($path, &$data) {

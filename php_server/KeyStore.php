@@ -9,7 +9,7 @@ class KeyStore extends UserData {
 
 	public function readAsymmetricKey($keyId, &$certificate, &$publicKey) {
 		$this->read($keyId."/certificate", $certificate);
-		$this->read($keyId."/publicKey");
+		$this->read($keyId."/publicKey", $publicKey);
 	}
 
 }

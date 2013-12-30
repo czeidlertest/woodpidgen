@@ -48,14 +48,7 @@ WP::err Contact::open(KeyStoreFinder *keyStoreFinder)
     WP::err error = read("keystore_type", type);
     if (error == WP::kOk && type == "private") {
         fPrivateKeyStore = true;
-        QString keyStoreId;
-        error = readSafe("keyStoreId", keyStoreId);
-        if (error != WP::kOk)
-            return error;
-        KeyStore *keyStore = keyStoreFinder->find(keyStoreId);
-        if (keyStore == NULL)
-            return WP::kEntryNotFound;
-        fKeys = new ContactKeysKeyStore(fDatabase, getKeysDirectory(), keyStore);
+        fKeys = new ContactKeysKeyStore(fDatabase, getKeysDirectory(), fDatabase->getKeyStore());
     } else
         fKeys = new ContactKeysBuddies(fDatabase, getKeysDirectory());
 
@@ -63,7 +56,7 @@ WP::err Contact::open(KeyStoreFinder *keyStoreFinder)
     if (error != WP::kOk)
         return error;
 
-    error = readSafe("uid", fUid);
+    error = read("uid", fUid);
     if (error != WP::kOk)
         return error;
 
@@ -130,16 +123,13 @@ WP::err Contact::writeConfig()
         error = write("keystore_type", QString("private"));
         if (error != WP::kOk)
             return error;
-        error = writeSafe("keyStoreId", fKeys->getKeyStore()->getUid());
-        if (error != WP::kOk)
-            return error;
     }
     fKeys->setTo(fDatabase, getKeysDirectory());
     error = fKeys->writeConfig();
     if (error != WP::kOk)
         return error;
 
-    error = writeSafe("uid", fUid);
+    error = write("uid", fUid);
     if (error != WP::kOk)
         return error;
 
@@ -181,12 +171,12 @@ WP::err ContactKeys::setMainKeyId(const QString &keyId)
 
 WP::err ContactKeys::open()
 {
-    return readSafe("mainKeyId", fMainKeyId);
+    return read("mainKeyId", fMainKeyId);
 }
 
 WP::err ContactKeys::writeConfig()
 {
-    return writeSafe("mainKeyId", fMainKeyId);
+    return write("mainKeyId", fMainKeyId);
 }
 
 KeyStore *ContactKeys::getKeyStore()

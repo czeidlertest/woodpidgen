@@ -273,7 +273,7 @@ WP::err KeyStore::writeAsymmetricKey(const QString &certificate, const QString &
                                           fMasterKeyIV);
     if (error != WP::kOk)
         return error;
-    QByteArray encryptedPublic;
+    /*QByteArray encryptedPublic;
     error = fCrypto->encryptSymmetric(publicKey.toLatin1(), encryptedPublic, fMasterKey,
                                       fMasterKeyIV);
     if (error != WP::kOk)
@@ -282,21 +282,21 @@ WP::err KeyStore::writeAsymmetricKey(const QString &certificate, const QString &
     error = fCrypto->encryptSymmetric(certificate.toLatin1(), encryptedCertificate, fMasterKey,
                                       fMasterKeyIV);
     if (error != WP::kOk)
-        return error;
+        return error;*/
 
-    keyId = fCrypto->toHex(fCrypto->sha1Hash(encryptedPublic));
+    keyId = fCrypto->toHex(fCrypto->sha1Hash(publicKey.toLatin1()));
     QString path = keyId + "/" + kPathPrivateKey;
     error = write(path, encryptedPrivate);
     if (error != WP::kOk)
         return error;
     path = keyId + "/" + kPathPublicKey;
-    error = write(path, encryptedPublic);
+    error = write(path, publicKey);
     if (error != WP::kOk) {
         remove(keyId);
         return error;
     }
     path = keyId + "/" + kPathCertificate;
-    error = write(path, encryptedCertificate);
+    error = write(path, certificate);
     if (error != WP::kOk) {
         remove(keyId);
         return error;
@@ -313,33 +313,33 @@ WP::err KeyStore::readAsymmetricKey(const QString &keyId, QString &certificate, 
     if (error != WP::kOk)
         return error;
     path = keyId + "/" + kPathPublicKey;
-    QByteArray encryptedPublic;
-    error = read(path, encryptedPublic);
+    //QByteArray encryptedPublic;
+    error = read(path, publicKey);
     if (error != WP::kOk)
         return error;
     path = keyId + "/" + kPathCertificate;
-    QByteArray encryptedCertificate;
-    error = read(path, encryptedCertificate);
+    //QByteArray encryptedCertificate;
+    error = read(path, certificate);
     if (error != WP::kOk)
         return error;
 
     SecureArray decryptedPrivate;
-    SecureArray decryptedPublic;
-    SecureArray decryptedCertificate;
+    //SecureArray decryptedPublic;
+    //SecureArray decryptedCertificate;
 
     error = fCrypto->decryptSymmetric(encryptedPrivate, decryptedPrivate, fMasterKey, fMasterKeyIV);
     if (error != WP::kOk)
         return error;
-    error = fCrypto->decryptSymmetric(encryptedPublic, decryptedPublic, fMasterKey, fMasterKeyIV);
+    /*error = fCrypto->decryptSymmetric(encryptedPublic, decryptedPublic, fMasterKey, fMasterKeyIV);
     if (error != WP::kOk)
         return error;
     error = fCrypto->decryptSymmetric(encryptedCertificate, decryptedCertificate, fMasterKey, fMasterKeyIV);
     if (error != WP::kOk)
-        return error;
+        return error;*/
 
     privateKey = decryptedPrivate;
-    publicKey = decryptedPublic;
-    certificate = decryptedCertificate;
+    //publicKey = decryptedPublic;
+    //certificate = decryptedCertificate;
     return WP::kOk;
 }
 

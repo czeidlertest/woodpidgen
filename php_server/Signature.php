@@ -15,6 +15,6 @@ class Signature {
 	}
 
 	public function verify($data, $signature) {
-		return $this->rsa->verify($data, $siganture);
+		return $this->rsa->verify($data, $signature);
 	}
 }

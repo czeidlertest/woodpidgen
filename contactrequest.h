@@ -1,14 +1,19 @@
 #ifndef CONTACTREQUEST_H
 #define CONTACTREQUEST_H
 
+#include <QObject>
 
-#include "useridentity.h"
+#include "remoteconnection.h"
+
+
+class Contact;
+class UserIdentity;
 
 /*! Request a mutal contact. This means own contact information is sent out to a remote server and
  * in exchange the remote server sends information back. This informations contains at least all
  * neccesary informations to do basic message exchange.
  */
-class ContactRequest : QObject
+class ContactRequest : public QObject
 {
     Q_OBJECT
 public:

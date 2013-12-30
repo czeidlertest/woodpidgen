@@ -190,6 +190,9 @@ WP::err Mailbox::readMailDatabase()
 
 
 MailMessenger::MailMessenger(const QString &targetAddress, Profile *profile, UserIdentity *identity) :
+    fIdentity(identity),
+    fAddress(targetAddress),
+    fContactRequest(NULL),
     fMessage(NULL),
     fRemoteConnection(NULL)
 {
@@ -198,7 +201,7 @@ MailMessenger::MailMessenger(const QString &targetAddress, Profile *profile, Use
     fRemoteConnection = ConnectionManager::connectionHTTPFor(QUrl(fTargetServer));
     if (fRemoteConnection == NULL)
         return;
-    fAuthentication = new SignatureAuthentication(fRemoteConnection, profile, identity->getMyself()->getNickname(),
+    fAuthentication = new SignatureAuthentication(fRemoteConnection, profile, identity->getMyself()->getUid(),
                                                   identity->getKeyStore()->getUid(),
                                                   identity->getMyself()->getKeys()->getMainKeyId(), fTargetUser);
 }
@@ -222,14 +225,15 @@ WP::err MailMessenger::postMessage(const RawMailMessage *message)
     if (fAuthentication == NULL)
         return WP::kNotInit;
 
-    if (fAuthentication->verified())
-        authConnected(WP::kOk);
-    else {
-        connect(fAuthentication, SIGNAL(authenticationAttemptFinished(WP::err)),
-                this, SLOT(authConnected(WP::err)));
-        fAuthentication->login();
+    Contact *targetContact = fIdentity->findContact(fAddress);
+    if (targetContact != NULL) {
+        onContactFound(WP::kOk);
+        return WP::kOk;
     }
-    return WP::kOk;
+
+    fContactRequest = new ContactRequest(fRemoteConnection, fTargetUser, fIdentity, this);
+    connect(fContactRequest, SIGNAL(contactRequestFinished(WP::err)), this, SLOT(onContactFound(WP::err)));
+    return fContactRequest->postRequest();
 }
 
 void MailMessenger::authConnected(WP::err error)
@@ -256,6 +260,23 @@ void MailMessenger::authConnected(WP::err error)
 
     fServerReply = fRemoteConnection->send(data);
     connect(fServerReply, SIGNAL(finished(WP::err)), this, SLOT(handleReply(WP::err)));
+}
+
+void MailMessenger::onContactFound(WP::err error)
+{
+    delete fContactRequest;
+    fContactRequest = NULL;
+
+    if (error != WP::kOk)
+        return;
+
+    if (fAuthentication->verified())
+        authConnected(WP::kOk);
+    else {
+        connect(fAuthentication, SIGNAL(authenticationAttemptFinished(WP::err)),
+                this, SLOT(authConnected(WP::err)));
+        fAuthentication->login();
+    }
 }
 
 void MailMessenger::handleReply(WP::err error)

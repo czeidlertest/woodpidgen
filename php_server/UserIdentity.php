@@ -14,6 +14,8 @@ class UserIdentity extends UserData {
 
 	public function open() {
 		$contactNames = $this->listDirectories("contacts");
+		if ($contactNames === null)
+			return true;
 		foreach ($contactNames as $contactName) {
 			$path = $this->getDirectory()."/contacts/".$contactName;
 			$contact = new Contact($this, $path);
@@ -32,26 +34,24 @@ class UserIdentity extends UserData {
 		$contactUid = $contact->getUid();
 		$path = $this->getDirectory()."/contacts/".$contactUid;
 		$contact->setDirectory($path);
-		if (!$contact->writeConfig())
-			return false;
 		$this->contacts[] = $contact;
 		return true;
 	}
 
 	public function getUid() {
-		$uid;
-		read("uid" $uid);
+		$uid = "";
+		$this->read("uid", $uid);
 		return $uid;
 	}
 
 	public function getKeyStoreId() {
-		$keyStoreId;
-		read("key_store_id", $keyStoreId);
+		$keyStoreId = "";
+		$this->read("key_store_id", $keyStoreId);
 		return $keyStoreId;
 	}
 
 	public function getMyself() {
-		return new Contact($this->branch, "myself");
+		return new Contact($this, $this->getDirectory()."/myself");
 	}
 }
 

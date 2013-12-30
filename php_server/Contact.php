@@ -10,7 +10,7 @@ class Contact extends UserData {
 	private $uid;
 
 	public function __construct($userData, $directory) {
-		parent::__construct($userData, $directory)
+		parent::__construct($userData->getDatabase(), $userData->getBranch(), $directory);
 	}
 
 	public function setUid($uid) {
@@ -23,13 +23,13 @@ class Contact extends UserData {
 	}
 
 	public function getKeySet($keyId, &$certificate, &$publicKey) {
-		$this->read("keys/".keyId."/certificate", $certificate);
-		$this->read("keys/".keyId."/publicKey", $certificate);
+		$this->read("keys/".$keyId."/certificate", $certificate);
+		$this->read("keys/".$keyId."/publicKey", $certificate);
 	}
 
 	public function addKeySet($keyId, $certificate, $publicKey) {
-		$this->write("keys/".keyId."/certificate", $certificate);
-		$this->write("keys/".keyId."/publicKey", $certificate);
+		$this->write("keys/".$keyId."/certificate", $certificate);
+		$this->write("keys/".$keyId."/publicKey", $certificate);
 	}
 
 	public function setMainKeyId($mainKeyId) {

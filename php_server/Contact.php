@@ -9,9 +9,11 @@ class Contact extends UserData {
 
 	private $uid;
 
-	public function __construct($userData, $directory, $uid) {
+	public function __construct($userData, $directory) {
 		parent::__construct($userData, $directory)
+	}
 
+	public function setUid($uid) {
 		$this->uid = $uid;
 		$this->write("uid", $this->uid);
 	}

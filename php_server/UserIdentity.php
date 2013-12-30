@@ -43,6 +43,16 @@ class UserIdentity extends UserData {
 		read("uid" $uid);
 		return $uid;
 	}
+
+	public function getKeyStoreId() {
+		$keyStoreId;
+		read("key_store_id", $keyStoreId);
+		return $keyStoreId;
+	}
+
+	public function getMyself() {
+		return new Contact($this->branch, "myself");
+	}
 }
 
 ?>

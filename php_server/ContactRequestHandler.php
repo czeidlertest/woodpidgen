@@ -82,7 +82,8 @@ class ContactRequestStanzaHandler extends InStanzaHandler {
 		$publicKey = publicKeyStanzaHandler->getPublicKeyStanzaHandler();
 		$certificate = certificateStanzaHandler->getCertificateStanzaHandler();
 
-		$contact = new Contact($this, "contacts", $this->uid);
+		$contact = new Contact($this, "contacts");
+		$contact->setUid($this->uid);
 		$contact->addKeySet($this->keyId, $certificate, $publicKey)
 		$contact->setMainKeyId($this->keyId);
 		
@@ -97,9 +98,15 @@ class ContactRequestStanzaHandler extends InStanzaHandler {
 		$stanza = new OutStanza(ContactMessageConst::$kContactRequestStanza);
 		$stanza->addAttribute("status", "ok");
 
-		//TODO get own public keys 
+		$myself = $userIdentity->getMyself();
+		$keyStore = $profile->getUserIdentityKeyStore($userIdentity);
+		$mainKeyId = $myself->getMainKeyId();
+		$myCertificate;
+		$myPublicKey;
+		$keyStore->readAsymmetricKey($mainKeyId, $myCertificate, $myPublicKey);
+		
 		$stanza->addAttribute("uid", $userIdentity->getUid());
-		$stanza->addAttribute("keyId", $myKeyId);
+		$stanza->addAttribute("keyId", $mainKeyId);
     
 		$outStream->pushChildStanza($stanza);
 		

@@ -26,7 +26,7 @@ class UserData {
 	}
 
 	public function write($path, $data) {
-		write($this->branch, $this->prependBaseDir($path), $data) {
+		$this->database->write($this->branch, $this->prependBaseDir($path), $data) {
 	}
 
 	public function read($path, &$data) {

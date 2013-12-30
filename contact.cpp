@@ -1,13 +1,12 @@
 #include "contact.h"
 
 
-Contact::Contact(const QString &uid, const QString &nickname, const QString &keyId,
+Contact::Contact(const QString &uid, const QString &keyId,
                  const QString &certificate, const QString &publicKey) :
     StorageDirectory(NULL, ""),
     fPrivateKeyStore(false)
 {
     fUid = uid;
-    fNickname = nickname;
 
     fKeys = new ContactKeysBuddies(NULL, "");
     fKeys->addKeySet(keyId, certificate, publicKey);
@@ -27,8 +26,7 @@ Contact::~Contact()
     delete fKeys;
 }
 
-WP::err Contact::createUserIdentityContact(KeyStore *keyStore, const QString &keyId,
-                                           const QString &userNickname)
+WP::err Contact::createUserIdentityContact(KeyStore *keyStore, const QString &keyId)
 {
     fUid = keyId;
 
@@ -37,7 +35,6 @@ WP::err Contact::createUserIdentityContact(KeyStore *keyStore, const QString &ke
     fKeys = new ContactKeysKeyStore(fDatabase, fDirectory + "/keys", keyStore);
     fKeys->addKeySet(keyId, true);
 
-    fNickname = userNickname;
     return writeConfig();
 }
 
@@ -60,10 +57,6 @@ WP::err Contact::open(KeyStoreFinder *keyStoreFinder)
     if (error != WP::kOk)
         return error;
 
-    error = readSafe("nickname", fNickname);
-    if (error != WP::kOk)
-        return error;
-
     error = readSafe("serverUser", fServerUser);
     if (error != WP::kOk)
         return error;
@@ -83,11 +76,6 @@ QString Contact::getUid() const
 ContactKeys *Contact::getKeys()
 {
     return fKeys;
-}
-
-const QString &Contact::getNickname() const
-{
-    return fNickname;
 }
 
 const QString Contact::getAddress() const
@@ -130,10 +118,6 @@ WP::err Contact::writeConfig()
         return error;
 
     error = write("uid", fUid);
-    if (error != WP::kOk)
-        return error;
-
-    error = writeSafe("nickname", fNickname);
     if (error != WP::kOk)
         return error;
 

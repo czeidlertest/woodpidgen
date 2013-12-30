@@ -172,9 +172,8 @@ void ContactRequest::onRequestReply(WP::err code)
         emit contactRequestFinished(WP::kBadValue);
         return;
     }
-    Contact *contact = new Contact(requestHandler->uid, requestHandler->nickname,
-                                   requestHandler->keyId, certificateHandler->certificate,
-                                   publicKeyHandler->publicKey);
+    Contact *contact = new Contact(requestHandler->uid, requestHandler->keyId,
+                                   certificateHandler->certificate, publicKeyHandler->publicKey);
     QStringList addressParts = requestHandler->address.split("@");
     if (addressParts.count() == 2) {
         contact->setServerUser(addressParts[0]);

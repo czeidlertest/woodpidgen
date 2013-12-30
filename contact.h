@@ -92,18 +92,16 @@ private:
 
 class Contact : public StorageDirectory {
 public:
-    Contact(const QString &uid, const QString &nickname, const QString &keyId,
+    Contact(const QString &uid, const QString &keyId,
             const QString &certificate, const QString &publicKey);
     Contact(EncryptedUserData *database, const QString &directory);
     virtual ~Contact();
 
-    virtual WP::err createUserIdentityContact(KeyStore *keyStore, const QString &keyId,
-                                              const QString &userNickname);
+    virtual WP::err createUserIdentityContact(KeyStore *keyStore, const QString &keyId);
     virtual WP::err open(KeyStoreFinder *keyStoreFinder);
 
     QString getUid() const;
     ContactKeys* getKeys();
-    virtual const QString &getNickname() const;
 
     // build the mail address
     virtual const QString getAddress() const;
@@ -121,7 +119,6 @@ private:
     bool fPrivateKeyStore;
     QString fUid;
     ContactKeys *fKeys;
-    QString fNickname;
 
     QString fServerUser;
     QString fServer;

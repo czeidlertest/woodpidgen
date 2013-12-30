@@ -42,11 +42,11 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
     fProfile = new Profile(".git", "profile");
 
     SecureArray password("test_password");
-    QString userName = "cle";
+    QString serverUser = "cle";
     QString server = "localhost";
     QString remoteUrl = "http://" + server + "/php_server/portal.php";
     if (fProfile->open(password) != WP::kOk) {
-        WP::err error = fProfile->createNewProfile(userName, password);
+        WP::err error = fProfile->createNewProfile(password);
         if (error != WP::kOk) {
             QMessageBox::information(NULL, "Error", "Unable to create or load a profile!");
             quit();
@@ -56,11 +56,11 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
         UserIdentity *mainIdentity = fProfile->getIdentityList()->identityAt(0);
         Contact *myself = mainIdentity->getMyself();
         myself->setServer(server);
-        myself->setServerUser(userName);
+        myself->setServerUser(serverUser);
         myself->writeConfig();
-        fProfile->setSignatureAuth(remote, myself->getServerUser(),
+        fProfile->setSignatureAuth(remote, myself->getUid(),
                                    mainIdentity->getKeyStore()->getUid(),
-                                   myself->getKeys()->getMainKeyId());
+                                   myself->getKeys()->getMainKeyId(), myself->getServerUser());
 
         fProfile->connectFreeBranches(remote);
         fProfile->commit();

@@ -50,6 +50,11 @@ const QString &RemoteDataStorage::getAuthKeyId()
     return fAuthKeyId;
 }
 
+const QString &RemoteDataStorage::getServerUser()
+{
+    return fServerUser;
+}
+
 void RemoteDataStorage::setPHPEncryptedRemoteConnection(const QString &url)
 {
     fConnectionType = "PHPEncryptedRemoteStorage";
@@ -66,15 +71,18 @@ void RemoteDataStorage::setHTTPRemoteConnection(const QString &url)
     fUid = hash();
 }
 
-void RemoteDataStorage::setSignatureAuth(const QString &userName, const QString &keyStoreId, const QString &keyId)
+void RemoteDataStorage::setSignatureAuth(const QString &userName, const QString &keyStoreId,
+                                         const QString &keyId, const QString &serverUser)
 {
     fAuthType = "SignatureAuth";
     fAuthUserName = userName;
     fAuthKeyStoreId = keyStoreId;
     fAuthKeyId = keyId;
+    fServerUser = serverUser;
+
     delete fAuthentication;
     fAuthentication = new SignatureAuthentication(fConnection, fProfile, fAuthUserName,
-                                                  fAuthKeyStoreId, fAuthKeyId, fAuthUserName);
+                                                  fAuthKeyStoreId, fAuthKeyId, fServerUser);
 }
 
 RemoteConnection *RemoteDataStorage::getRemoteConnection()
@@ -116,6 +124,9 @@ WP::err RemoteDataStorage::write(StorageDirectory &dir)
     error = dir.writeSafe("auth_keyid", getAuthKeyId());
     if (error != WP::kOk)
         return error;
+    error = dir.writeSafe("server_user", getServerUser());
+    if (error != WP::kOk)
+        return error;
 
     return WP::kOk;
 }
@@ -142,6 +153,7 @@ WP::err RemoteDataStorage::load(StorageDirectory &dir)
     QString authUserName;
     QString authKeyStoreId;
     QString authKey;
+    QString serverUser;
     // auth
     error = dir.readSafe("auth_type", authType);
     if (error != WP::kOk)
@@ -155,9 +167,12 @@ WP::err RemoteDataStorage::load(StorageDirectory &dir)
     error = dir.readSafe("auth_keyid", authKey);
     if (error != WP::kOk)
         return error;
+    error = dir.readSafe("server_user", serverUser);
+    if (error != WP::kOk)
+        return error;
 
     if (authType == "SignatureAuth")
-        setSignatureAuth(authUserName, authKeyStoreId, authKey);
+        setSignatureAuth(authUserName, authKeyStoreId, authKey, serverUser);
 
     return WP::kOk;
 }

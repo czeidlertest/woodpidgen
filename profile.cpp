@@ -70,7 +70,7 @@ Profile::~Profile()
     clear();
 }
 
-WP::err Profile::createNewProfile(const QString &userName, const SecureArray &password)
+WP::err Profile::createNewProfile(const SecureArray &password)
 {
     QByteArray uid = fCrypto->generateInitalizationVector(512);
     setUid(fCrypto->toHex(fCrypto->sha1Hash(uid)));
@@ -103,7 +103,7 @@ WP::err Profile::createNewProfile(const QString &userName, const SecureArray &pa
     // init user identity
     DatabaseBranch *identitiesBranch = databaseBranchFor(fDatabaseBranch->getDatabasePath(), "identities");
     UserIdentity *identity = NULL;
-    error = createNewUserIdentity(identitiesBranch, userName, mailbox, &identity);
+    error = createNewUserIdentity(identitiesBranch, mailbox, &identity);
     if (error != WP::kOk)
         return error;
 
@@ -226,12 +226,11 @@ void Profile::addKeyStore(KeyStoreRef *entry)
     fMapOfKeyStores[entry->getUserData()->getUid()] = entry;
 }
 
-WP::err Profile::createNewUserIdentity(DatabaseBranch *branch, const QString &nickName,
-                                       Mailbox *mailbox, UserIdentity **userIdentityOut)
+WP::err Profile::createNewUserIdentity(DatabaseBranch *branch, Mailbox *mailbox,
+                                       UserIdentity **userIdentityOut)
 {
     UserIdentity *identity = new UserIdentity(branch, "");
-    WP::err error = identity->createNewIdentity(getKeyStore(), getDefaultKeyId(),
-                                                nickName, mailbox);
+    WP::err error = identity->createNewIdentity(getKeyStore(), getDefaultKeyId(), mailbox);
     if (error != WP::kOk)
         return error;
     error = addUserIdentity(identity);
@@ -502,13 +501,14 @@ RemoteDataStorage *Profile::addHTTPRemote(const QString &url)
 }
 
 WP::err Profile::setSignatureAuth(RemoteDataStorage *remote, const QString &userName,
-                                  const QString &keyStoreId, const QString &keyId)
+                                  const QString &keyStoreId, const QString &keyId,
+                                  const QString &serverName)
 {
     RemoteDataStorage *inListRemote = findRemoteDataStorage(remote->getUid());
     if (inListRemote == NULL || inListRemote != remote)
         return WP::kEntryNotFound;
 
-    remote->setSignatureAuth(userName, keyStoreId, keyId);
+    remote->setSignatureAuth(userName, keyStoreId, keyId, serverName);
     StorageDirectory dir(this, prependBaseDir("remotes/" + remote->getUid()));
     return remote->write(dir);
 }

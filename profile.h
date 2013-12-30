@@ -41,7 +41,7 @@ public:
     ~Profile();
 
     /*! create a new profile and adds a new KeyStore with \par password. */
-    WP::err createNewProfile(const QString &userName, const SecureArray &password);
+    WP::err createNewProfile(const SecureArray &password);
 
     WP::err writeConfig();
 
@@ -62,7 +62,9 @@ public:
 
     RemoteDataStorage *addPHPRemote(const QString &url);
     RemoteDataStorage *addHTTPRemote(const QString &url);
-    WP::err setSignatureAuth(RemoteDataStorage *remote, const QString &userName, const QString &keyStoreId, const QString &keyId);
+    WP::err setSignatureAuth(RemoteDataStorage *remote, const QString &userName,
+                             const QString &keyStoreId, const QString &keyId,
+                             const QString &serverName);
     WP::err connectRemote(DatabaseBranch *branch, RemoteDataStorage *remote);
     RemoteDataStorage *findRemote(const QString &remoteId);
     WP::err connectFreeBranches(RemoteDataStorage *remote);
@@ -78,12 +80,13 @@ public:
 private:
     void clear();
 
-    WP::err createNewKeyStore(const SecureArray &password, DatabaseBranch *branch, KeyStore **keyStoreOut);
+    WP::err createNewKeyStore(const SecureArray &password, DatabaseBranch *branch,
+                              KeyStore **keyStoreOut);
     WP::err loadKeyStores();
     void addKeyStore(KeyStoreRef *entry);
 
-    WP::err createNewUserIdentity(DatabaseBranch *branch, const QString &nickName,
-                                  Mailbox *mailbox, UserIdentity **userIdentityOut);
+    WP::err createNewUserIdentity(DatabaseBranch *branch, Mailbox *mailbox,
+                                  UserIdentity **userIdentityOut);
     WP::err loadUserIdentities();
     void addUserIdentity(IdentityRef *entry);
 

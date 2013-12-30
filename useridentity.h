@@ -37,8 +37,7 @@ public:
     UserIdentity(const DatabaseBranch *branch, const QString &baseDir = "");
     ~UserIdentity();
 
-    WP::err createNewIdentity(KeyStore *keyStore, const QString &defaultKeyId,
-                              const QString &address, Mailbox *mailbox,
+    WP::err createNewIdentity(KeyStore *keyStore, const QString &defaultKeyId, Mailbox *mailbox,
                               bool addUidToBaseDir = true);
     WP::err open(KeyStoreFinder *keyStoreFinder, MailboxFinder *mailboxFinder);
 

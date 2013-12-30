@@ -25,6 +25,7 @@ public:
     const QString &getAuthUserName();
     const QString &getAuthKeyStoreId();
     const QString &getAuthKeyId();
+    const QString &getServerUser();
 
     RemoteConnection *getRemoteConnection();
     RemoteAuthentication *getRemoteAuthentication();
@@ -35,7 +36,7 @@ private:
     void setPHPEncryptedRemoteConnection(const QString &url);
     void setHTTPRemoteConnection(const QString &url);
 
-    void setSignatureAuth(const QString &userName, const QString &keyStoreId, const QString &keyId);
+    void setSignatureAuth(const QString &userName, const QString &keyStoreId, const QString &keyId, const QString &serverUser);
 
     QString hash();
 
@@ -47,6 +48,8 @@ private:
     QString fConnectionType;
     QString fUrl;
     QString fUid;
+
+    QString fServerUser;
 
     QString fAuthType;
     QString fAuthUserName;

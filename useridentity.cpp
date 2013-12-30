@@ -25,8 +25,7 @@ UserIdentity::~UserIdentity()
 
 
 WP::err UserIdentity::createNewIdentity(KeyStore *keyStore, const QString &defaultKeyId,
-                                        const QString &nickname, Mailbox *mailbox,
-                                        bool addUidToBaseDir)
+                                        Mailbox *mailbox, bool addUidToBaseDir)
 {
     // derive uid
     QString certificate;
@@ -50,7 +49,7 @@ WP::err UserIdentity::createNewIdentity(KeyStore *keyStore, const QString &defau
         return error;
 
     fMyselfContact = new Contact(this, "myself");
-    error = fMyselfContact->createUserIdentityContact(keyStore, keyId, nickname);
+    error = fMyselfContact->createUserIdentityContact(keyStore, keyId);
     if (error != WP::kOk)
         return error;
 

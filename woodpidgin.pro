@@ -42,7 +42,9 @@ SOURCES += main.cpp \
     syncmanager.cpp \
     message.cpp \
     contactrequest.cpp \
-    contact.cpp
+    contact.cpp \
+    mailmessenger.cpp \
+    mail.cpp
 
 # Installation path
 # target.path =
@@ -75,7 +77,9 @@ HEADERS += \
     syncmanager.h \
     message.h \
     contactrequest.h \
-    contact.h
+    contact.h \
+    mailmessenger.h \
+    mail.h
 
 FORMS += \
     mainwindow.ui

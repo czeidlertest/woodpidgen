@@ -3,6 +3,7 @@
 #include <QVBoxLayout>
 
 #include "useridentity.h"
+#include "mailmessenger.h"
 
 
 MessageView::MessageView(Profile *profile, QWidget *parent) :

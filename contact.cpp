@@ -57,13 +57,12 @@ WP::err Contact::open(KeyStoreFinder *keyStoreFinder)
     if (error != WP::kOk)
         return error;
 
-    error = readSafe("serverUser", fServerUser);
+    QString address;
+    error = read("address", address);
     if (error != WP::kOk)
         return error;
 
-    error = readSafe("server", fServer);
-    if (error != WP::kOk)
-        return error;
+    setAddress(address);
 
     return error;
 }
@@ -121,15 +120,24 @@ WP::err Contact::writeConfig()
     if (error != WP::kOk)
         return error;
 
-    error = writeSafe("serverUser", fServerUser);
-    if (error != WP::kOk)
-        return error;
-
-    error = writeSafe("server", fServer);
+    error = write("address", getAddress());
     if (error != WP::kOk)
         return error;
 
     return error;
+}
+
+bool Contact::setAddress(const QString &address)
+{
+    QStringList addressParts = address.split("@");
+    if (addressParts.count() == 2) {
+        setServerUser(addressParts[0]);
+        setServer(addressParts[1]);
+    } else {
+        setServerUser("");
+        setServer("");
+    }
+
 }
 
 QString Contact::getKeysDirectory() const
@@ -196,7 +204,7 @@ WP::err ContactKeysKeyStore::open()
     if (error != WP::kOk)
         return error;
 
-    fKeyIdList = fDatabase->listDirectories("");
+    fKeyIdList = listDirectories("");
     return error;
 }
 
@@ -254,7 +262,7 @@ WP::err ContactKeysBuddies::writeConfig()
     QMap<QString, PublicKeySet>::iterator it;
     for (it = fKeyMap.begin(); it != fKeyMap.end(); it++) {
         QString keyId = it.key();
-        error = writeSafe(keyId + "/certificate", it.value().certificate);
+        error = write(keyId + "/certificate", it.value().certificate);
         if (error != WP::kOk)
             return error;
         error = write(keyId + "/public_key", it.value().publicKey);
@@ -269,10 +277,10 @@ WP::err ContactKeysBuddies::open()
 {
     WP::err error = WP::kOk;
 
-    QStringList keyIds = fDatabase->listDirectories("");
+    QStringList keyIds = listDirectories("");
     foreach (const QString &keyId, keyIds) {
         PublicKeySet keySet;
-        error = readSafe(keyId + "/certificate", keySet.certificate);
+        error = read(keyId + "/certificate", keySet.certificate);
         if (error != WP::kOk)
             return error;
         // the public key is needed by the server to verify incoming data so it can't be stored encrypted

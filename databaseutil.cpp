@@ -590,6 +590,11 @@ void StorageDirectory::setDirectory(const QString &directory)
     fDirectory = directory;
 }
 
+QStringList StorageDirectory::listDirectories(const QString &path) const
+{
+    return fDatabase->listDirectories(fDirectory + "/" + path);
+}
+
 
 DatabaseBranch::DatabaseBranch(const QString &database, const QString &branch) :
     fDatabasePath(database),

@@ -314,7 +314,7 @@ class GitDatabase extends Git {
 		$commit->parents = $parents;
 
 		$commitStamp = new GitCommitStamp;
-		$commitStamp->name = "no name";
+		$commitStamp->name = "server";
 		$commitStamp->email = "no mail";
 		$commitStamp->time = time();
 		$commitStamp->offset = 0;

@@ -28,12 +28,13 @@ class UserIdentity extends UserData {
 		return $this->contacts;
 	}
 
-	public function addContact($contact) {
-		$contactUid = $contact->getUid();
-		$path = $this->getDirectory()."/contacts/".$contactUid;
-		$contact->setDirectory($path);
+	public function createContact($contactUid) {
+		if ($contactUid == "")
+			throw new exception("invalid contact uid");
+		$contact = new Contact($this, $this->getDirectory()."/contacts/".$contactUid);
+		$contact->setUid($contactUid);
 		$this->contacts[] = $contact;
-		return true;
+		return $contact;
 	}
 	
 	public function findContact($uid) {

@@ -5,7 +5,7 @@ include_once 'XMLProtocol.php';
 
 
 class ContactMessageConst {
-	static public $kContactRequestStanza = "conctact_request";
+	static public $kContactRequestStanza = "contact_request";
 };
 
 
@@ -55,6 +55,7 @@ class ContactRequestStanzaHandler extends InStanzaHandler {
 	private $serverUser;
 	private $uid;
     private $keyId;
+    private $address;
 
     private $certificateStanzaHandler;
 	private $publicKeyStanzaHandler;
@@ -74,6 +75,7 @@ class ContactRequestStanzaHandler extends InStanzaHandler {
 		$this->serverUser =  $xml->getAttribute("serverUser");
 		$this->uid = $xml->getAttribute("uid");
 		$this->keyId = $xml->getAttribute("keyId");
+		$this->address = $xml->getAttribute("address");
 
 		if ($this->serverUser == "" || $this->uid == "" || $this->keyId == "")
 			return false;
@@ -90,12 +92,11 @@ class ContactRequestStanzaHandler extends InStanzaHandler {
 
 		$userIdentity = Session::get()->getMainUserIdentity();
 
-		$contact = new Contact($userIdentity, $userIdentity->getDirectory()."/contacts");
-		$contact->setUid($this->uid);
+		$contact = $userIdentity->createContact($this->uid);
 		$contact->addKeySet($this->keyId, $certificate, $publicKey);
 		$contact->setMainKeyId($this->keyId);
+		$contact->setAddress($this->address);
 
-		$userIdentity->addContact($contact);
 		$userIdentity->commit();
 
 		// reply
@@ -119,6 +120,7 @@ class ContactRequestStanzaHandler extends InStanzaHandler {
 
 		$stanza->addAttribute("uid", $myself->getUid());
 		$stanza->addAttribute("keyId", $mainKeyId);
+		$stanza->addAttribute("address", $myself->getAddress());
     
 		$outStream->pushChildStanza($stanza);
 		

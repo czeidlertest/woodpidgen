@@ -50,6 +50,16 @@ class Contact extends UserData {
 	public function addData($path, $data) {
 		$this->write($path, $data);
 	}
+
+	public function getAddress() {
+		$address;
+		$this->read("address", $address);
+		return $address;
+	}
+
+	public function setAddress($address) {
+		$this->write("address", $address);
+	}
 }
 
 ?>

@@ -33,6 +33,7 @@ public:
     const QString& getDirectory();
     void setDirectory(const QString &directory);
 
+    QStringList listDirectories(const QString &path) const;
 protected:
     EncryptedUserData *fDatabase;
     QString fDirectory;

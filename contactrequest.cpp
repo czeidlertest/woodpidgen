@@ -5,7 +5,7 @@
 #include "useridentity.h"
 
 
-const char *kContactRequestStanza = "conctact_request";
+const char *kContactRequestStanza = "contact_request";
 
 
 class ContactRequestHandler : public InStanzaHandler {
@@ -20,34 +20,30 @@ public:
         if (!attributes.hasAttribute("status"))
             return false;
         status = attributes.value("status").toString();
-        if (status != "accepted")
+        if (status != "ok")
             return true;
 
         if (!attributes.hasAttribute("uid"))
             return false;
-        if (!attributes.hasAttribute("nickname"))
+        if (!attributes.hasAttribute("keyId"))
             return false;
         if (!attributes.hasAttribute("address"))
             return false;
-        if (!attributes.hasAttribute("certificateSignature"))
-            return false;
-        if (!attributes.hasAttribute("keyId"))
-            return false;
 
         uid = attributes.value("uid").toString();
-        nickname = attributes.value("nickname").toString();
-        address = attributes.value("address").toString();
-        certificateSignature = attributes.value("certificateSignature").toString();
         keyId = attributes.value("keyId").toString();
+        address = attributes.value("address").toString();
+
+        if (uid == "")
+            return false;
+
         return true;
     }
 
 public:
     QString status;
     QString uid;
-    QString nickname;
     QString address;
-    QString certificateSignature;
     QString keyId;
 };
 
@@ -174,13 +170,11 @@ void ContactRequest::onRequestReply(WP::err code)
     }*/
     Contact *contact = new Contact(requestHandler->uid, requestHandler->keyId,
                                    certificateHandler->certificate, publicKeyHandler->publicKey);
-    QStringList addressParts = requestHandler->address.split("@");
-    if (addressParts.count() == 2) {
-        contact->setServerUser(addressParts[0]);
-        contact->setServer(addressParts[1]);
-    }
+    contact->setAddress(requestHandler->address);
+
     WP::err error = fUserIdentity->addContact(contact);
     if (error != WP::kOk) {
+        delete contact;
         emit contactRequestFinished(WP::kError);
         return;
     }
@@ -203,9 +197,9 @@ void ContactRequest::makeRequest(QByteArray &data, Contact *myself)
 
     OutStanza *requestStanza =  new OutStanza(kContactRequestStanza);
     requestStanza->addAttribute("serverUser", fServerUser);
-
     requestStanza->addAttribute("uid", myself->getUid());
     requestStanza->addAttribute("keyId", keyId);
+    requestStanza->addAttribute("address", myself->getAddress());
     outStream.pushChildStanza(requestStanza);
 
     OutStanza *certificateStanza = new OutStanza("certificate");

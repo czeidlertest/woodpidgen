@@ -84,7 +84,7 @@ WP::err UserIdentity::open(KeyStoreFinder *keyStoreFinder, MailboxFinder *mailbo
 
     QStringList contactNames = listDirectories("contacts");
     foreach (const QString &contactName, contactNames) {
-        QString path = getDatabaseBaseDir() + "/contacts/" + contactName;
+        QString path = "/contacts/" + contactName;
         Contact *contact = new Contact(this, path);
         WP::err error = contact->open(keyStoreFinder);
         if (error != WP::kOk) {
@@ -115,7 +115,7 @@ const QList<Contact *> &UserIdentity::getContacts()
 WP::err UserIdentity::addContact(Contact *contact)
 {
     QString contactUid = contact->getUid();
-    QString path = getDatabaseBaseDir() + "/contacts/" + contactUid;
+    QString path = "contacts/" + contactUid;
     contact->setTo(this, path);
     WP::err error = contact->writeConfig();
     if (error != WP::kOk)

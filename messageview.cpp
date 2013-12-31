@@ -25,7 +25,9 @@ fReceiver->setText("cle@localhost");
 
     connect(fSendButton, SIGNAL(clicked()), this, SLOT(onSendButtonClicked()));
 
-    setMailbox(fProfile->getIdentityList()->identityAt(0)->getMailbox());
+    IdentityListModel *identityList = fProfile->getIdentityList();
+    if (identityList->rowCount() > 0)
+        setMailbox(identityList->identityAt(0)->getMailbox());
 }
 
 void MessageView::setMailbox(Mailbox *mailbox)

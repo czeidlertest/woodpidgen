@@ -104,6 +104,7 @@ public:
     ContactKeys* getKeys();
 
     // build the mail address
+    virtual bool setAddress(const QString &address);
     virtual const QString getAddress() const;
     const QString &getServerUser() const;
     const QString &getServer() const;

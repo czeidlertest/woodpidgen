@@ -45,7 +45,7 @@ void MessageView::onSendButtonClicked()
         return;
 
     QString body = fMessageComposer->toPlainText();
-    MailMessenger *messenger = new MailMessenger(receiver, fProfile, fProfile->getIdentityList()->identityAt(0));
+    MailMessenger *messenger = new MailMessenger(fMailbox, receiver, fProfile, fProfile->getIdentityList()->identityAt(0));
     RawMailMessage *message = new RawMailMessage("header", body);
     messenger->postMessage(message);
 

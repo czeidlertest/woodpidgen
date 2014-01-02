@@ -100,6 +100,9 @@ public:
     virtual WP::err createUserIdentityContact(KeyStore *keyStore, const QString &keyId);
     virtual WP::err open(KeyStoreFinder *keyStoreFinder);
 
+    WP::err sign(const QString &keyId, const QByteArray &data, QByteArray &signature);
+    bool verify(const QString &keyId, const QByteArray &data, const QByteArray &signature);
+
     QString getUid() const;
     ContactKeys* getKeys();
 

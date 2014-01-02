@@ -128,7 +128,7 @@ QByteArray CryptoInterface::generateInitalizationVector(int size)
     return QCA::InitializationVector(size).toByteArray();
 }
 
-SecureArray CryptoInterface::generateSymetricKey(int size)
+SecureArray CryptoInterface::generateSymmetricKey(int size)
 {
     return QCA::SymmetricKey(size).toByteArray();
 }

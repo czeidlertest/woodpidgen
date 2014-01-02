@@ -98,7 +98,8 @@ Mailbox::Mailbox(DatabaseBranch *branch, const QString &baseDir) :
 
 Mailbox::~Mailbox()
 {
-
+    foreach (MessageChannel *channel, fMessageChannels)
+        delete channel;
 }
 
 WP::err Mailbox::createNewMailbox(KeyStore *keyStore, const QString &defaultKeyId, bool addUidToBaseDir)
@@ -158,6 +159,15 @@ WP::err Mailbox::readBody(const QString &messageId, QByteArray &body)
     QString path = pathForMessageId(messageId);
     path += "/body";
     return read(path, body);
+}
+
+MessageChannel *Mailbox::findMessageChannel(const QString &channelId)
+{
+    foreach (MessageChannel *channel, fMessageChannels) {
+        if (channel->getUid() == channelId)
+            return channel;
+    }
+    return NULL;
 }
 
 void Mailbox::onNewCommits(const QString &startCommit, const QString &endCommit)

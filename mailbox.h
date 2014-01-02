@@ -4,6 +4,7 @@
 #include <QAbstractListModel>
 
 #include "databaseutil.h"
+#include "mail.h"
 
 
 class Mailbox;
@@ -57,6 +58,8 @@ public:
     WP::err readHeader(const QString &messageId, QByteArray &header);
     WP::err readBody(const QString &messageId, QByteArray &body);
 
+    MessageChannel* findMessageChannel(const QString &channelId);
+
 signals:
     void databaseReadProgress(float progress);
     void databaseRead();
@@ -70,6 +73,7 @@ private:
     WP::err readMailDatabase();
 
     MessageListModel fMessageList;
+    QList<MessageChannel*> fMessageChannels;
 };
 
 

@@ -14,6 +14,7 @@ enum err {
     kBadValue,
     kContactNeeded,
     kContactRefused,
+    kChannelNotFound,
 
     kError = -1,
     kOk = 0,

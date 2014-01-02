@@ -194,7 +194,7 @@ WP::err KeyStore::create(const SecureArray &password, bool addUidToBaseDir)
                                                kMasterPasswordLength, kMasterPasswordIterations);
 
     fMasterKeyIV = fCrypto->generateInitalizationVector(kMasterPasswordLength);
-    fMasterKey = fCrypto->generateSymetricKey(kMasterPasswordLength);
+    fMasterKey = fCrypto->generateSymmetricKey(kMasterPasswordLength);
 
     QByteArray encryptedMasterKey;
     WP::err error = fCrypto->encryptSymmetric(fMasterKey, encryptedMasterKey, passwordKey, fMasterKeyIV);

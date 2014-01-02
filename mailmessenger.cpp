@@ -5,12 +5,14 @@
 #include "useridentity.h"
 
 
-MailMessenger::MailMessenger(const QString &targetAddress, Profile *profile, UserIdentity *identity) :
+MailMessenger::MailMessenger(Mailbox *mailbox, const QString &targetAddress, Profile *profile, UserIdentity *identity) :
+    fMailbox(mailbox),
     fIdentity(identity),
     fAddress(targetAddress),
     fContactRequest(NULL),
     fMessage(NULL),
-    fRemoteConnection(NULL)
+    fRemoteConnection(NULL),
+    fMessageChannel(NULL)
 {
     parseAddress(targetAddress);
     //fRemoteConnection = sPHPConnectionManager.connectionFor(QUrl(fTargetServer));
@@ -29,10 +31,12 @@ MailMessenger::~MailMessenger()
     delete fMessage;
 }
 
-WP::err MailMessenger::postMessage(const RawMailMessage *message)
+WP::err MailMessenger::postMessage(const RawMailMessage *message, const QString channelId)
 {
     delete fMessage;
     fMessage = message;
+
+    fChannelId = channelId;
 
     if (fTargetServer == "")
         return WP::kNotInit;
@@ -49,7 +53,7 @@ WP::err MailMessenger::postMessage(const RawMailMessage *message)
 
     return startContactRequest();
 }
-
+#include <QDebug>
 void MailMessenger::authConnected(WP::err error)
 {
     if (error == WP::kContactNeeded) {
@@ -58,23 +62,65 @@ void MailMessenger::authConnected(WP::err error)
     } else if (error != WP::kOk)
         return;
 
+    // channel info
+    if (fChannelId == "") {
+        //channel = new
+        fMessageChannel = new MessageChannel();
+        error = fMessageChannel->createNew(fIdentity->getMyself());
+        if (error != WP::kOk) {
+            emit sendResult(error);
+            return;
+        }
+
+    } else {
+        fMessageChannel = fMailbox->findMessageChannel(fChannelId);
+        if (fMessageChannel == NULL) {
+            emit sendResult(WP::kChannelNotFound);
+            return;
+        }
+    }
+
     QByteArray data;
     ProtocolOutStream outStream(&data);
     IqOutStanza *iqStanza = new IqOutStanza(kSet);
     outStream.pushStanza(iqStanza);
+
+    Contact *myself = fIdentity->getMyself();
     OutStanza *messageStanza =  new OutStanza("message");
+    messageStanza->addAttribute("channel_uid", fMessageChannel->getUid());
+    messageStanza->addAttribute("from", myself->getUid());
     outStream.pushChildStanza(messageStanza);
 
-    OutStanza *headerStanza =  new OutStanza("header");
-    headerStanza->setText(fMessage->getHeader());
-    outStream.pushChildStanza(headerStanza);
+    // header
+    error = envelopHeader(&outStream, fMessage->getHeader());
+    if (error != WP::kOk) {
+        emit sendResult(error);
+        return;
+    }
 
+    if (fChannelId == "") {
+        // add new channel
+        Contact *receiver = fIdentity->findContact(fAddress);
+        Q_ASSERT(receiver != NULL);
+        error = XMLSecureChannel::toPublicXML(&outStream, fMessageChannel, receiver);
+        if (error != WP::kOk) {
+            emit sendResult(error);
+            return;
+        }
+    }
+
+/*
+    // body
     OutStanza *bodyStanza =  new OutStanza("body");
-    bodyStanza->setText(fMessage->getBody());
     outStream.pushStanza(bodyStanza);
-
+    error = envelopBody(&outStream, fMessage->getBody());
+    if (error != WP::kOk) {
+        emit sendResult(error);
+        return;
+    }
+*/
     outStream.flush();
-
+qDebug() << data;
     fServerReply = fRemoteConnection->send(data);
     connect(fServerReply, SIGNAL(finished(WP::err)), this, SLOT(handleReply(WP::err)));
 }
@@ -94,6 +140,57 @@ void MailMessenger::onContactFound(WP::err error)
                 this, SLOT(authConnected(WP::err)));
         fAuthentication->login();
     }
+}
+
+WP::err MailMessenger::envelopHeader(ProtocolOutStream *outStream, const QByteArray &org)
+{
+    Contact *myself = fIdentity->getMyself();
+
+    SecureParcel *parcel = fMessageChannel->getSecureParcel();
+    QByteArray encryptedData;
+    WP::err error = parcel->cloakData(org, encryptedData);
+    if (error != WP::kOk)
+        return error;
+
+    const QString &myKeyId = myself->getKeys()->getMainKeyId();
+    QByteArray signature;
+    error = myself->sign(myKeyId, encryptedData, signature);
+    if (error != WP::kOk)
+        return error;
+
+    OutStanza *dataStanza = new OutStanza("primary_data");
+    dataStanza->addAttribute("signature_key", myKeyId);
+    dataStanza->addAttribute("signature", signature.toBase64());
+    dataStanza->setText(encryptedData.toBase64());
+    outStream->pushChildStanza(dataStanza);
+
+    outStream->cdDotDot();
+    return WP::kOk;
+}
+
+WP::err MailMessenger::envelopBody(ProtocolOutStream *outStream, const QByteArray &org)
+{
+    SecureParcel *parcel = fMessageChannel->getSecureParcel();
+    QByteArray encryptedData;
+    WP::err error = parcel->cloakData(org, encryptedData);
+    if (error != WP::kOk)
+        return error;
+
+    Contact *myself = fIdentity->getMyself();
+    const QString &myKeyId = myself->getKeys()->getMainKeyId();
+    QByteArray signature;
+    error = myself->sign(myKeyId, encryptedData, signature);
+    if (error != WP::kOk)
+        return error;
+
+    OutStanza *dataStanza = new OutStanza("data");
+    dataStanza->addAttribute("signature_key", myKeyId);
+    dataStanza->addAttribute("signature", signature.toBase64());
+    dataStanza->setText(encryptedData.toBase64());
+    outStream->pushChildStanza(dataStanza);
+
+    outStream->cdDotDot();
+    return WP::kOk;
 }
 
 void MailMessenger::handleReply(WP::err error)

@@ -83,7 +83,7 @@ WP::err Profile::createNewProfile(const SecureArray &password)
         return error;
     setKeyStore(keyStore);
 
-    SecureArray masterKey = fCrypto->generateSymetricKey(256);
+    SecureArray masterKey = fCrypto->generateSymmetricKey(256);
     QString masterKeyId;
     error = keyStore->writeSymmetricKey(masterKey, fCrypto->generateInitalizationVector(256),
                                         masterKeyId);

@@ -5,65 +5,121 @@ include_once 'XMLProtocol.php';
 
 class MessageConst {
 	static public $kMessageStanza = "message";
-	static public $kHeaderStanza = "header";
-	static public $kBodyStanza = "body";
+	static public $kChannelStanza = "channel";
+	static public $kPrimaryDataStanza = "primary_data";
 };
 
 
-class HeaderStanzaHandler extends InStanzaHandler {
-	private $text;
+class ChannelLockCKeyStanzaHandler extends InStanzaHandler {
+	public $ckey;
 
 	public function __construct() {
-		InStanzaHandler::__construct(MessageConst::$kHeaderStanza);
+		InStanzaHandler::__construct("ckey");
+	}
+
+	public function handleStanza($xml) {
+		$this->ckey = $xml->readString();
+		return true;
+	}
+};
+
+class ChannelLockIVStanzaHandler extends InStanzaHandler {
+	public $iv;
+
+	public function __construct() {
+		InStanzaHandler::__construct("iv");
+	}
+
+	public function handleStanza($xml) {
+		$this->iv = $xml->readString();
+		return true;
+	}
+};
+
+class ChannelLockStanzaHandler extends InStanzaHandler {
+	public $keyId;
+	public $ivHandler;
+	public $ckeyHandler;
+
+	public function __construct() {
+		InStanzaHandler::__construct("lock");
+		$this->ivHandler = new ChannelLockIVStanzaHandler();
+		$this->addChild($this->ivHandler, false);
+		$this->ckeyHandler = new ChannelLockCKeyStanzaHandler();
+		$this->addChild($this->ckeyHandler, false);
+	}
+
+	public function handleStanza($xml) {
+		$this->keyId = $xml->getAttribute("key_id");
+		if ($this->keyId == "")
+			return false;
+		return true;
+	}
+};
+
+class ChannelStanzaHandler extends InStanzaHandler {
+	public $uid;
+	public $channelLockStanzaHandler;
+
+	public function __construct() {
+		InStanzaHandler::__construct(MessageConst::$kChannelStanza);
+		$this->channelLockStanzaHandler = new ChannelLockStanzaHandler();
+		$this->addChild($this->channelLockStanzaHandler, false);
 	}
 	
 	public function handleStanza($xml) {
-		$this->text = $xml->readString();
+		$this->uid = $xml->getAttribute("uid");
+		if ($this->uid == "")
+			return false;
 		return true;
-	}
-
-	public function getText() {
-		return $this->text;
 	}
 };
 
 
-class BodyStanzaHandler extends InStanzaHandler {
-	private $text;
+class MessageDataStanzaHandler extends InStanzaHandler {
+	public $signatureKey;
+	public $signature;
+	public $data;
 
 	public function __construct() {
-		InStanzaHandler::__construct(MessageConst::$kBodyStanza);
+		InStanzaHandler::__construct(MessageConst::$kPrimaryDataStanza);
 	}
 	
 	public function handleStanza($xml) {
-		$this->text = $xml->readString();
+		$this->signatureKey = $xml->getAttribute("signature_key");
+		$this->signature = $xml->getAttribute("signature");
+		if ($this->signatureKey == "" || $this->signature == "")
+			return false;
+		$this->data = $xml->readString();
 		return true;
-	}
-
-	public function getText() {
-		return $this->text;
 	}
 };
 
 
 class MessageStanzaHandler extends InStanzaHandler {
 	private $inStreamReader;
-
-	private $headerStanzaHandler;
-	private $bodyStanzaHandler;
-
+	
+	public $channelUid;
+	public $from;
+	public $dataHandler;
+	private $channelStanzaHandler;
+	
 	public function __construct($inStreamReader) {
 		InStanzaHandler::__construct(MessageConst::$kMessageStanza);
 		$this->inStreamReader = $inStreamReader;
 
-		$this->headerStanzaHandler = new HeaderStanzaHandler();
-		$this->bodyStanzaHandler = new BodyStanzaHandler();
-		
-		$this->addChild($this->headerStanzaHandler);
-		$this->addChild($this->bodyStanzaHandler);
+		$this->channelStanzaHandler = new ChannelStanzaHandler();
+		$this->dataHandler = new MessageDataStanzaHandler();
+
+		$this->addChild($this->channelStanzaHandler, true);
+		$this->addChild($this->dataHandler, false);
 	}
 
 	public function handleStanza($xml) {
+		$this->channelUid = $xml->getAttribute("channel_uid");
+		$this->from = $xml->getAttribute("from");
+		if ($this->channelUid == "" || $this->from == "")
+			return false;
 		return true;
 	}
 

@@ -24,7 +24,7 @@ public:
 
     QByteArray generateSalt(const QString& value);
     QByteArray generateInitalizationVector(int size);
-    SecureArray generateSymetricKey(int size);
+    SecureArray generateSymmetricKey(int size);
 
     WP::err encryptSymmetric(const SecureArray &input, QByteArray &encrypted,
                              const SecureArray &key, const QByteArray &iv,

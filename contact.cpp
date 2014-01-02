@@ -67,6 +67,29 @@ WP::err Contact::open(KeyStoreFinder *keyStoreFinder)
     return error;
 }
 
+WP::err Contact::sign(const QString &keyId, const QByteArray &data, QByteArray &signature)
+{
+    QString certificate;
+    QString publicKey;
+    QString privateKey;
+    WP::err error = getKeys()->getKeySet(keyId, certificate, publicKey, privateKey);
+    if (error != WP::kOk)
+        return error;
+    CryptoInterface *crypto = CryptoInterfaceSingleton::getCryptoInterface();
+    return crypto->sign(data, signature, privateKey, "");
+}
+
+bool Contact::verify(const QString &keyId, const QByteArray &data, const QByteArray &signature)
+{
+    QString certificate;
+    QString publicKey;
+    WP::err error = getKeys()->getKeySet(keyId, certificate, publicKey);
+    if (error != WP::kOk)
+        return false;
+    CryptoInterface *crypto = CryptoInterfaceSingleton::getCryptoInterface();
+    return crypto->verifySignatur(data, signature, publicKey);
+}
+
 QString Contact::getUid() const
 {
     return fUid;

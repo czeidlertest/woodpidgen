@@ -29,10 +29,12 @@ class UserData {
 
 	public function write($path, $data) {
 		$this->database->write($this->branch, $this->prependBaseDir($path), $data);
+		return true;
 	}
 
 	public function read($path, &$data) {
 		$data = $this->database->readBlobContent($this->branch, $this->prependBaseDir($path));
+		return true;
 	}
 
 	public function listDirectories($path) {

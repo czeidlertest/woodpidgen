@@ -1,6 +1,7 @@
 <?php
 
 include_once 'KeyStore.php';
+include_once 'Mailbox.php';
 include_once 'UserData.php';
 include_once 'UserIdentity.php';
 
@@ -15,10 +16,16 @@ class Profile extends UserData {
 		foreach ($ids as $identityId) {
 			$branch;
 			$baseDir;
-			$this->read("user_identities/".$identityId."/database_branch", $branch);
-			$this->read("user_identities/".$identityId."/database_base_dir", $baseDir);
+			$result = $this->read("user_identities/".$identityId."/database_branch", $branch);
+			if (!$result)
+				continue;
+			$result = $this->read("user_identities/".$identityId."/database_base_dir", $baseDir);
+			if (!$result)
+				continue;
 			$identity = new UserIdentity($this->database, $branch, $baseDir);
-			$identity->open();
+			$result = $identity->open();
+			if (!$result)
+				continue;
 			$this->userIdentities[] = $identity;
 		}
 	}
@@ -36,10 +43,31 @@ class Profile extends UserData {
 			return null;
 		$branch;
 		$baseDir;
-		$this->read("key_stores/".$keyStoreId."/database_branch", $branch);
-		$this->read("key_stores/".$keyStoreId."/database_base_dir", $baseDir);
+		$result = $this->read("key_stores/".$keyStoreId."/database_branch", $branch);
+		if (!$result)
+			return null;
+		$result = $this->read("key_stores/".$keyStoreId."/database_base_dir", $baseDir);
+		if (!$result)
+			return null;
 		$keyStore = new KeyStore($this->getDatabase(), $branch, $baseDir);
 		return $keyStore;
+	}
+
+	public function getMainMailbox() {
+		$branch = "";
+		$baseDir = "";
+		$maiboxUid;
+		$result = $this->read("main_mailbox", $maiboxUid);
+		if (!$result)
+			return null;
+		$result = $this->read("mailboxes/".$maiboxUid."/database_branch", $branch);
+		if (!$result)
+			return null;
+		$result = $this->read("mailboxes/".$maiboxUid."/database_base_dir", $baseDir);
+		if (!$result)
+			return null;
+
+		return new Mailbox($this->getDatabase(), $branch, $baseDir);
 	}
 }
 

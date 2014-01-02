@@ -1,5 +1,6 @@
 <?php
 
+include_once 'Signature.php';
 include_once 'UserData.php';
 
 
@@ -16,6 +17,15 @@ class Contact extends UserData {
 		$uid;
 		$this->read("uid", $uid);
 		return $uid;
+	}
+
+	public function verify($keyId, $data, $signature) {
+		$certificate;
+		$publicKey;
+		$this->getKeySet($keyId, $certificate, $publicKey);
+
+		$signatureVerifier = new SignatureVerifier($publicKey);
+		return $signatureVerifier->verify($data, $signature);
 	}
 
 	public function getKeySet($keyId, &$certificate, &$publicKey) {

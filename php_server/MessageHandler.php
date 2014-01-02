@@ -1,5 +1,6 @@
 <?php
 
+include_once 'Mailbox.php';
 include_once 'XMLProtocol.php';
 
 
@@ -11,65 +12,68 @@ class MessageConst {
 
 
 class ChannelLockCKeyStanzaHandler extends InStanzaHandler {
-	public $ckey;
+	private $messageChannel;
 
-	public function __construct() {
+	public function __construct($messageChannel) {
 		InStanzaHandler::__construct("ckey");
+		$this->messageChannel = $messageChannel;
 	}
 
 	public function handleStanza($xml) {
-		$this->ckey = $xml->readString();
+		$this->messageChannel->setCKey($xml->readString());
 		return true;
 	}
 };
 
 class ChannelLockIVStanzaHandler extends InStanzaHandler {
-	public $iv;
+	private $messageChannel;
 
-	public function __construct() {
+	public function __construct($messageChannel) {
 		InStanzaHandler::__construct("iv");
+		$this->messageChannel = $messageChannel;
 	}
 
 	public function handleStanza($xml) {
-		$this->iv = $xml->readString();
+		$this->messageChannel->setIV($xml->readString());
 		return true;
 	}
 };
 
 class ChannelLockStanzaHandler extends InStanzaHandler {
-	public $keyId;
-	public $ivHandler;
+	private $messageChannel;
 	public $ckeyHandler;
 
-	public function __construct() {
+	public function __construct($messageChannel) {
 		InStanzaHandler::__construct("lock");
-		$this->ivHandler = new ChannelLockIVStanzaHandler();
+		$this->messageChannel = $messageChannel;
+		$this->ivHandler = new ChannelLockIVStanzaHandler($this->messageChannel);
 		$this->addChild($this->ivHandler, false);
-		$this->ckeyHandler = new ChannelLockCKeyStanzaHandler();
+		$this->ckeyHandler = new ChannelLockCKeyStanzaHandler($this->messageChannel);
 		$this->addChild($this->ckeyHandler, false);
 	}
 
 	public function handleStanza($xml) {
-		$this->keyId = $xml->getAttribute("key_id");
-		if ($this->keyId == "")
+		$this->messageChannel->setAsymKeyId($xml->getAttribute("key_id"));
+		if ($this->messageChannel->getAsymKeyId() == "")
 			return false;
 		return true;
 	}
 };
 
 class ChannelStanzaHandler extends InStanzaHandler {
-	public $uid;
-	public $channelLockStanzaHandler;
+	private $messageChannel;
+	private $channelLockStanzaHandler;
 
-	public function __construct() {
+	public function __construct($messageChannel) {
 		InStanzaHandler::__construct(MessageConst::$kChannelStanza);
-		$this->channelLockStanzaHandler = new ChannelLockStanzaHandler();
+		$this->messageChannel = $messageChannel;
+		$this->channelLockStanzaHandler = new ChannelLockStanzaHandler($this->messageChannel);
 		$this->addChild($this->channelLockStanzaHandler, false);
 	}
 	
 	public function handleStanza($xml) {
-		$this->uid = $xml->getAttribute("uid");
-		if ($this->uid == "")
+		$this->messageChannel->setUid($xml->getAttribute("uid"));
+		if ($this->messageChannel->getUid() == "")
 			return false;
 		return true;
 	}
@@ -77,20 +81,19 @@ class ChannelStanzaHandler extends InStanzaHandler {
 
 
 class MessageDataStanzaHandler extends InStanzaHandler {
-	public $signatureKey;
-	public $signature;
-	public $data;
+	private $message;
 
-	public function __construct() {
+	public function __construct($message) {
 		InStanzaHandler::__construct(MessageConst::$kPrimaryDataStanza);
+		$this->message = $message;
 	}
 	
 	public function handleStanza($xml) {
-		$this->signatureKey = $xml->getAttribute("signature_key");
-		$this->signature = $xml->getAttribute("signature");
-		if ($this->signatureKey == "" || $this->signature == "")
+		$this->message->setSignatureKey($xml->getAttribute("signature_key"));
+		$this->message->setSignature($xml->getAttribute("signature"));
+		if ($this->message->getSignatureKey() == "" || $this->message->getSignature() == "")
 			return false;
-		$this->data = $xml->readString();
+		$this->message->setData($xml->readString());
 		return true;
 	}
 };
@@ -98,140 +101,59 @@ class MessageDataStanzaHandler extends InStanzaHandler {
 
 class MessageStanzaHandler extends InStanzaHandler {
 	private $inStreamReader;
-	
-	public $channelUid;
-	public $from;
-	public $dataHandler;
+
+	private $messageChannel;
+	private $message;
+	private $dataHandler;
 	private $channelStanzaHandler;
 	
 	public function __construct($inStreamReader) {
 		InStanzaHandler::__construct(MessageConst::$kMessageStanza);
 		$this->inStreamReader = $inStreamReader;
 
-		$this->channelStanzaHandler = new ChannelStanzaHandler();
-		$this->dataHandler = new MessageDataStanzaHandler();
+		$this->messageChannel = new MessageChannel();
+		$this->message = new Message();
+
+		$this->channelStanzaHandler = new ChannelStanzaHandler($this->messageChannel);
+		$this->dataHandler = new MessageDataStanzaHandler($this->message);
 
 		$this->addChild($this->channelStanzaHandler, true);
 		$this->addChild($this->dataHandler, false);
 	}
 
 	public function handleStanza($xml) {
-		$this->channelUid = $xml->getAttribute("channel_uid");
-		$this->from = $xml->getAttribute("from");
-		if ($this->channelUid == "" || $this->from == "")
+		$this->message->setChannelUid($xml->getAttribute("channel_uid"));
+		$this->message->setFrom($xml->getAttribute("from"));
+		if ($this->message->getChannelUid() == "" || $this->message->getFrom() == "")
 			return false;
 		return true;
 	}
 
 	public function finished() {
-		$database = Session::get()->getDatabase();
-		if ($database === null)
-			throw new exception("unable to get database");
+		$profile = Session::get()->getProfile();
+		if ($profile === null)
+			throw new exception("unable to get profile");
 
-		$header = $this->headerStanzaHandler->getText();
-		$body = $this->bodyStanzaHandler->getText();
+		$mailbox = $profile->getMainMailbox($message);
+		if ($mailbox === null)
+			throw new exception("unable to get mailbox");
 
-		$branch = "";
-		$baseDir = "";
-		$this->findMailbox($database, $branch, $baseDir);
-		if ($branch == "")
-			throw new exception("unable to find mailbox");
+		$ok = $mailbox->addMessage($this->messageChannel, $this->message);
 
-		$rootTree = clone $database->getRootTree($branch);
-
-		# get message name
-		$hash = hash_init('sha1');
-		hash_update($hash, $header);
-		hash_update($hash, $body);
-
-		//foreach ($attachments as $attachment)
-		//	hash_update($hash, $attachment);
-		$messageName = sha1_hex(hash_final($hash, TRUE));
-		$path = "";
-		if ($baseDir != "")
-			$path = $baseDir."/";			
-		$path = $path.$this->pathForMessageId($messageName);
-
-		$treeBuilder = new TreeBuilder($rootTree);
-		# build new tree
-		$headerObj = $database->writeBlob($header);
-		$treeBuilder->updateFile("$path/header", $headerObj->getName());
-
-		$bodyObj = $database->writeBlob($body);
-		$treeBuilder->updateFile("$path/body", $bodyObj->getName());
-
-/*		$attachmentsObj = array();
-		foreach ($attachments as $attachment) {
-			$attachmentObj = $database->writeBlob($attachment->data);
-			$treeBuilder->updateNode(
-				"messages/$messageName/".$attachment->name, 100644,
-				$attachmentObj->getName());
-		}
-*/
-
-		$treeBuilder->write();
-		$rootTree->rehash();
-		$rootTree->write();
-
-		$this->commit($database, $rootTree->getName(), $branch);
-		
 		// produce output
 		$outStream = new ProtocolOutStream();
 		$outStream->pushStanza(new IqOutStanza(IqType::$kResult));
 
 		$stanza = new OutStanza(MessageConst::$kMessageStanza);
-		$stanza->addAttribute("status", "message_received");
+		if ($ok)
+			$stanza->addAttribute("status", "message_received");
+		else {
+			$stanza->addAttribute("status", "declined");
+			$stanza->addAttribute("error", $mailbox->getLastErrorMessage());
+		}
 		$outStream->pushChildStanza($stanza);
 
 		$this->inStreamReader->appendResponse($outStream->flush());
-	}
-
-	private function findMailbox($database, &$branch, &$dir) {
-		$branch = "";
-		$dir = "";
-		$maiboxUid = $database->readBlobContent("profile", "main_mailbox");
-		if ($maiboxUid === null)
-			return;
-		$branch = $database->readBlobContent("profile", "mailboxes/".$maiboxUid."/database_branch");
-		$dir = $database->readBlobContent("profile", "mailboxes/".$maiboxUid."/database_base_dir");
-	}
-
-	private function commit($database, $tree, $branch) {
-		# write commit
-		$parents = array();
-		try {
-			$tip = $database->getTip($branch);
-			if (strlen($tip) > 0)
-				$parents[] = $tip;
-		} catch (Exception $e) {
-		} 
-
-		$commit = new GitCommit($database);
-		$commit->tree = $tree;
-		$commit->parents = $parents;
-
-		$commitStamp = new GitCommitStamp;
-		$commitStamp->name = "no name";
-		$commitStamp->email = "no mail";
-		$commitStamp->time = time();
-		$commitStamp->offset = 0;
-
-		$commit->author = $commitStamp;
-		$commit->committer = $commitStamp;
-		$commit->summary = "Message";
-		$commit->detail = "";
-
-		$commit->rehash();
-		$commit->write();
-
-		$database->setBranchTip($branch, sha1_hex($commit->getName()));
-
-		return $commit;
-	}
-
-	private function pathForMessageId($messageId) {
-		$path = sprintf('%s/%s', substr($messageId, 0, 2), substr($messageId, 2));
-		return $path;
 	}
 }
 

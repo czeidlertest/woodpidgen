@@ -1,7 +1,6 @@
 <?php
 
 include_once 'Session.php';
-include_once 'Signature.php';
 include_once 'XMLProtocol.php';
 
 
@@ -151,25 +150,15 @@ class AccountAuthSignedStanzaHandler extends InStanzaHandler {
 	}
 
 	private function accountLogin($contact, &$roles) {
-		if (!$this->verifyContactData($contact, Session::get()->getSignatureToken(), $this->signature))
+		if (!$contact->verify($contact->getMainKeyId(), Session::get()->getSignatureToken(), $this->signature))
 			return;
 		$roles[] =  "account";
 	}
 
 	private function userLogin($contact, &$roles) {
-		if (!$this->verifyContactData($contact, Session::get()->getSignatureToken(), $this->signature))
+		if (!$contact->verify($contact->getMainKeyId(), Session::get()->getSignatureToken(), $this->signature))
 			return;
 		$roles[] = "contact_user";
-	}
-
-	private function verifyContactData($contact, $data, $signature) {
-		$mainKeyId = $contact->getMainKeyId();
-		$certificate;
-		$publicKey;
-		$contact->getKeySet($mainKeyId, $certificate, $publicKey);
-
-		$signatureVerifier = new SignatureVerifier($publicKey);
-		return $signatureVerifier->verify($data, $signature);
 	}
 }
 

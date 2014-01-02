@@ -164,7 +164,7 @@ WP::err MailMessenger::envelopHeader(ProtocolOutStream *outStream, const QByteAr
     dataStanza->setText(encryptedData.toBase64());
     outStream->pushChildStanza(dataStanza);
 
-    outStream->cdDotDot();
+//   outStream->cdDotDot();
     return WP::kOk;
 }
 

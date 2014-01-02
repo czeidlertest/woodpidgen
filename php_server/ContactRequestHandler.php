@@ -91,6 +91,10 @@ class ContactRequestStanzaHandler extends InStanzaHandler {
 		$certificate = $this->certificateStanzaHandler->getCertificate();
 
 		$userIdentity = Session::get()->getMainUserIdentity();
+		if ($userIdentity === null) {
+			$this->printError("error", "can't get user identity");
+			return;
+		}
 
 		$contact = $userIdentity->createContact($this->uid);
 		$contact->addKeySet($this->keyId, $certificate, $publicKey);

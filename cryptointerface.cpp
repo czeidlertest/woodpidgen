@@ -265,7 +265,7 @@ WP::err CryptoInterface::sign(const QByteArray &input, QByteArray &signature,
         return WP::kError;
     }
     privateKey.startSign(QCA::EMSA3_MD5);
-    privateKey.update(input); // just reuse the same message
+    privateKey.update(input);
     signature = privateKey.signature();
     return WP::kOk;
 }

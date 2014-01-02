@@ -93,7 +93,8 @@ HTTPConnectionReply::HTTPConnectionReply(QIODevice *device, QNetworkReply *reply
 
 void HTTPConnectionReply::abort()
 {
-    fReply->abort();
+    if (!fReply->isFinished())
+        fReply->abort();
 }
 
 void HTTPConnectionReply::finishedSlot()

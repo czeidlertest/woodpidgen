@@ -58,14 +58,16 @@ ProtocolOutStream::ProtocolOutStream(QIODevice *device) :
     fXMLWriter(device),
     fCurrentStanza(NULL)
 {
-    fXMLWriter.writeStartDocument();
+    fXMLWriter.setAutoFormatting(true);
+    fXMLWriter.setAutoFormattingIndent(4);
+    writeStartDocument();
 }
 
 ProtocolOutStream::ProtocolOutStream(QByteArray *data) :
     fXMLWriter(data),
     fCurrentStanza(NULL)
 {
-    fXMLWriter.writeStartDocument();
+    writeStartDocument();
 }
 
 ProtocolOutStream::~ProtocolOutStream()
@@ -118,7 +120,7 @@ void ProtocolOutStream::flush()
         delete fCurrentStanza;
         fCurrentStanza = parent;
     }
-    fXMLWriter.writeEndDocument();
+    writeEndDocument();
 }
 
 void ProtocolOutStream::writeStanze(OutStanza *stanza)
@@ -129,6 +131,16 @@ void ProtocolOutStream::writeStanze(OutStanza *stanza)
         fXMLWriter.writeAttribute(attributes.at(i));
     if (stanza->text() != "")
         fXMLWriter.writeCharacters(stanza->text());
+}
+
+void ProtocolOutStream::writeStartDocument()
+{
+    fXMLWriter.writeStartDocument();
+}
+
+void ProtocolOutStream::writeEndDocument()
+{
+    fXMLWriter.writeEndDocument();
 }
 
 
@@ -143,7 +155,8 @@ ProtocolInStream::ProtocolInStream(QIODevice *device) :
 
 ProtocolInStream::ProtocolInStream(const QByteArray &data) :
     fXMLReader(data),
-    fRoot(NULL)
+    fRoot(NULL),
+    fCurrentHandler(NULL)
 {
     fCurrentHandlerTree = &fRoot;
     fRootHandler = new InStanzaHandler("root", true);
@@ -171,6 +184,7 @@ void ProtocolInStream::parse()
         }
 
         case QXmlStreamReader::StartElement: {
+            fCurrentHandler = NULL;
             QString name = fXMLReader.name().toString();
 
             handler_tree *handlerTree = new handler_tree(fCurrentHandlerTree);
@@ -184,20 +198,18 @@ void ProtocolInStream::parse()
                if (handler->stanzaName() == name) {
                     bool handled = handler->handleStanza(fXMLReader.attributes());
                     handler->setHandled(handled);
-                    if (!handled && ! handler->isOptional())
-                        continue;
+                    if (handled)
+                        fCurrentHandler = handler;
                 }
             }
             break;
         }
 
         case QXmlStreamReader::Characters: {
-            foreach (InStanzaHandler *handler, fCurrentHandlerTree->handlers) {
-               bool handled = handler->handleText(fXMLReader.text());
-               handler->setHandled(handled);
-               if (!handled && ! handler->isOptional())
-                 continue;
-            }
+            if (fCurrentHandler == NULL)
+                break;
+            bool handled = fCurrentHandler->handleText(fXMLReader.text());
+            fCurrentHandler->setHandled(handled);
             break;
         }
 
@@ -240,7 +252,15 @@ bool InStanzaHandler::isOptional() const
 
 bool InStanzaHandler::hasBeenHandled() const
 {
-    return fHasBeenHandled;
+    if (!fHasBeenHandled)
+        return false;
+
+    foreach (InStanzaHandler *child,fChildHandlers) {
+        if (!child->isOptional() && !child->hasBeenHandled())
+            return false;
+    }
+
+    return true;
 }
 
 void InStanzaHandler::setHandled(bool handled)

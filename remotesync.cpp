@@ -93,7 +93,7 @@ public:
 class SyncPullPackHandler : public InStanzaHandler {
 public:
     SyncPullPackHandler() :
-        InStanzaHandler("pack")
+        InStanzaHandler("pack", true)
     {
     }
 

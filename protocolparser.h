@@ -60,6 +60,7 @@ private:
     QXmlStreamReader fXMLReader;
     handler_tree fRoot;
     InStanzaHandler *fRootHandler;
+    InStanzaHandler *fCurrentHandler;
     handler_tree *fCurrentHandlerTree;
 };
 
@@ -101,6 +102,8 @@ public:
 
 private:
     void writeStanze(OutStanza *stanza);
+    void writeStartDocument();
+    void writeEndDocument();
 
     OutStanza *fCurrentStanza;
     QXmlStreamWriter fXMLWriter;

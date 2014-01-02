@@ -143,7 +143,7 @@ public:
 class WatchItemsChangedHandler : public InStanzaHandler {
 public:
     WatchItemsChangedHandler() :
-        InStanzaHandler("branch")
+        InStanzaHandler("branch", true)
     {
     }
 
@@ -167,6 +167,8 @@ void SyncManager::watchReply(WP::err error)
         emit connectionError();
         return;
     }
+    if (fServerReply == NULL)
+        return;
 
     QByteArray data = fServerReply->readAll();
     fServerReply = NULL;

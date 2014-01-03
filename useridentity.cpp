@@ -84,7 +84,7 @@ WP::err UserIdentity::open(KeyStoreFinder *keyStoreFinder, MailboxFinder *mailbo
 
     QStringList contactNames = listDirectories("contacts");
     foreach (const QString &contactName, contactNames) {
-        QString path = "/contacts/" + contactName;
+        QString path = "contacts/" + contactName;
         Contact *contact = new Contact(this, path);
         WP::err error = contact->open(keyStoreFinder);
         if (error != WP::kOk) {

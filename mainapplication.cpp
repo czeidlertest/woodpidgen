@@ -68,11 +68,11 @@ MainApplication::MainApplication(int &argc, char *argv[]) :
 
     DatabaseBranch *branch = NULL;
     QList<DatabaseBranch*> &branches = fProfile->getBranches();
-    /*SyncManager *syncManager = new SyncManager(branches.at(0)->getRemoteAt(0));
+    SyncManager *syncManager = new SyncManager(branches.at(0)->getRemoteAt(0));
     foreach (branch, branches)
         syncManager->keepSynced(branch->getDatabase());
     syncManager->startWatching();
-*/
+
     fMainWindow = new MainWindow(fProfile);
     fMainWindow->show();
 /*

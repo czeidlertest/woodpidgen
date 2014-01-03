@@ -299,7 +299,9 @@ WP::err ContactKeysBuddies::writeConfig()
 
 WP::err ContactKeysBuddies::open()
 {
-    WP::err error = WP::kOk;
+    WP::err error = ContactKeys::open();
+    if (error != WP::kOk)
+        return error;
 
     QStringList keyIds = listDirectories("");
     foreach (const QString &keyId, keyIds) {

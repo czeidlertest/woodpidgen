@@ -53,7 +53,8 @@ WP::err MailMessenger::postMessage(const RawMailMessage *message, const QString 
 
     return startContactRequest();
 }
-#include <QDebug>
+
+
 void MailMessenger::authConnected(WP::err error)
 {
     if (error == WP::kContactNeeded) {
@@ -110,18 +111,8 @@ void MailMessenger::authConnected(WP::err error)
         }
     }
 
-/*
-    // body
-    OutStanza *bodyStanza =  new OutStanza("body");
-    outStream.pushStanza(bodyStanza);
-    error = envelopBody(&outStream, fMessage->getBody());
-    if (error != WP::kOk) {
-        emit sendResult(error);
-        return;
-    }
-*/
     outStream.flush();
-qDebug() << data;
+
     fServerReply = fRemoteConnection->send(data);
     connect(fServerReply, SIGNAL(finished(WP::err)), this, SLOT(handleReply(WP::err)));
 }

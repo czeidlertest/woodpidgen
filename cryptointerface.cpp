@@ -133,6 +133,14 @@ SecureArray CryptoInterface::generateSymmetricKey(int size)
     return QCA::SymmetricKey(size).toByteArray();
 }
 
+QString CryptoInterface::generateUid()
+{
+    QByteArray uid = QCA::InitializationVector(512).toByteArray();
+    QCA::Hash shaHash("sha1");
+    shaHash.update(uid);
+    return QCA::arrayToHex(shaHash.final().toByteArray());
+}
+
 WP::err CryptoInterface::encryptSymmetric(const SecureArray &input, QByteArray &encrypted,
                                       const SecureArray &key, const QByteArray &iv,
                                       const char *algo)

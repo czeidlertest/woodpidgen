@@ -5,9 +5,14 @@ include_once 'UserData.php';
 
 
 class MessageChannel {
+	private $uid;
 	private $asymKeyId;
 	private $iv;
 	private $ckey;
+
+	public function getUid() {
+		return $this->uid;
+	}
 
 	public function getAsymKeyId() {
 		return $this->asymKeyId;
@@ -19,6 +24,10 @@ class MessageChannel {
 
 	public function getCKey() {
 		return $this->ckey;
+	}
+
+	public function setUid($uid) {
+		$this->uid = $uid;
 	}
 
 	public function setAsymKeyId($asymKeyId) {
@@ -66,12 +75,17 @@ class MessageData {
 }
 
 class Message {
+	private $uid;
 	private $channelUid;
 	private $from;
 	private $primaryPart;
 	
 	public function __construct() {
 		$this->primaryPart = new MessageData();
+	}
+
+	public function getUid() {
+		return $this->uid;
 	}
 
 	public function getChannelUid() {
@@ -84,6 +98,10 @@ class Message {
 
 	public function getPrimaryPart() {
 		return $this->primaryPart;
+	}
+
+	public function setUid($uid) {
+		$this->uid = $uid;
 	}
 
 	public function setChannelUid($uid) {
@@ -100,6 +118,7 @@ class Mailbox extends UserData {
 
 	public function __construct($database, $branch, $directory) {
 		parent::__construct($database, $branch, $directory);
+
 	}
 
 	public function addMessage($messageChannel, $message) {
@@ -116,9 +135,9 @@ class Mailbox extends UserData {
 				return false;
 		}
 
-		$data = messageToXML($message);
+		$data = $this->messageToXML($message);
 		$path = $this->pathForMessageId($uid);
-		$ok= $this->write($path, $data);
+		$ok= $this->write($path."/message", $data);
 		if (!$ok)
 			return false;
 
@@ -139,8 +158,8 @@ class Mailbox extends UserData {
 		return true;
 	}
 
-	public function hasMessage($message) {
-		$path = $this->pathForMessageId($channelUId);
+	public function hasMessage($messageUid) {
+		$path = $this->pathForMessageId($messageUid);
 		$data;
 		$ok = $this->read($path, $data);
 		if (!$ok)
@@ -165,7 +184,7 @@ class Mailbox extends UserData {
 				return false;
 			}
 		} else {
-			if (!$this->hasChannel($messageChannel->getUid())) {
+			if ($this->hasChannel($messageChannel->getUid())) {
 				$this->lastErrorMessage = "message channel exist";
 				return false;
 			}
@@ -184,7 +203,9 @@ class Mailbox extends UserData {
 		$primaryPart = $message->getPrimaryPart();
 		$userIdentity = Session::get()->getMainUserIdentity();
 		$sender = $userIdentity->findContact($message->getFrom());
-		$ok = $sender->verify($primaryPart->getSignatureKey(), $primaryPart->getData(), $primaryPart->getSignature());
+		$data = url_decode($primaryPart->getData());
+		$signature = url_decode($primaryPart->getSignature());
+		$ok = $sender->verify($primaryPart->getSignatureKey(), $data, $signature);
 		if (!$ok) {
 			$this->lastErrorMessage = "bad signature";
 			return false;
@@ -195,13 +216,32 @@ class Mailbox extends UserData {
 
 	private function messageChannelToXML($messageChannel) {
 		$outStream = new ProtocolOutStream();
-		//OutStanze
+		$stanza = new OutStanza("channel");
+		$stanza->addAttribute("uid", $messageChannel->getUid());
+		$stanza->addAttribute("asym_key_id", $messageChannel->getAsymKeyId());
+		$outStream->pushStanza($stanza);
+		$stanza = new OutStanza("iv");
+		$stanza->setText($messageChannel->getIV());
+		$outStream->pushChildStanza($stanza);
+		$stanza = new OutStanza("ckey");
+		$stanza->setText($messageChannel->getCKey());
+		$outStream->pushStanza($stanza); 
 		return $outStream->flush();
 	}
-
+	
 	private function messageToXML($message) {
 		$outStream = new ProtocolOutStream();
-		// TODO
+		$stanza = new OutStanza("message");
+		$stanza->addAttribute("uid", $message->getUid());
+		$stanza->addAttribute("channel_uid", $message->getChannelUid());
+		$stanza->addAttribute("from", $message->getFrom());
+		$outStream->pushStanza($stanza); 
+		$primaryPart = $message->getPrimaryPart();
+		$stanza = new OutStanza("primary_data");
+		$stanza->addAttribute("signature_key", $primaryPart->getSignatureKey());
+		$stanza->addAttribute("signature", $primaryPart->getSignature());
+		$stanza->setText($primaryPart->getData());
+		$outStream->pushChildStanza($stanza); 
 		return $outStream->flush();
 	}
 }

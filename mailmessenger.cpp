@@ -87,12 +87,13 @@ void MailMessenger::authConnected(WP::err error)
 
     Contact *myself = fIdentity->getMyself();
     OutStanza *messageStanza =  new OutStanza("message");
+    messageStanza->addAttribute("uid", fMessage->getUid());
     messageStanza->addAttribute("channel_uid", fMessageChannel->getUid());
     messageStanza->addAttribute("from", myself->getUid());
     outStream.pushChildStanza(messageStanza);
 
     // header
-    error = envelopHeader(&outStream, fMessage->getHeader());
+    error = envelopMessage(&outStream, fMessage->getBody());
     if (error != WP::kOk) {
         emit sendResult(error);
         return;
@@ -142,7 +143,7 @@ void MailMessenger::onContactFound(WP::err error)
     }
 }
 
-WP::err MailMessenger::envelopHeader(ProtocolOutStream *outStream, const QByteArray &org)
+WP::err MailMessenger::envelopMessage(ProtocolOutStream *outStream, const QByteArray &org)
 {
     Contact *myself = fIdentity->getMyself();
 
@@ -157,39 +158,17 @@ WP::err MailMessenger::envelopHeader(ProtocolOutStream *outStream, const QByteAr
     error = myself->sign(myKeyId, encryptedData, signature);
     if (error != WP::kOk)
         return error;
+
+    encryptedData = encryptedData.toBase64();
+    signature = signature.toBase64();
 
     OutStanza *dataStanza = new OutStanza("primary_data");
     dataStanza->addAttribute("signature_key", myKeyId);
-    dataStanza->addAttribute("signature", signature.toBase64());
-    dataStanza->setText(encryptedData.toBase64());
+    dataStanza->addAttribute("signature", signature);
+    dataStanza->setText(encryptedData);
     outStream->pushChildStanza(dataStanza);
 
 //   outStream->cdDotDot();
-    return WP::kOk;
-}
-
-WP::err MailMessenger::envelopBody(ProtocolOutStream *outStream, const QByteArray &org)
-{
-    SecureParcel *parcel = fMessageChannel->getSecureParcel();
-    QByteArray encryptedData;
-    WP::err error = parcel->cloakData(org, encryptedData);
-    if (error != WP::kOk)
-        return error;
-
-    Contact *myself = fIdentity->getMyself();
-    const QString &myKeyId = myself->getKeys()->getMainKeyId();
-    QByteArray signature;
-    error = myself->sign(myKeyId, encryptedData, signature);
-    if (error != WP::kOk)
-        return error;
-
-    OutStanza *dataStanza = new OutStanza("data");
-    dataStanza->addAttribute("signature_key", myKeyId);
-    dataStanza->addAttribute("signature", signature.toBase64());
-    dataStanza->setText(encryptedData.toBase64());
-    outStream->pushChildStanza(dataStanza);
-
-    outStream->cdDotDot();
     return WP::kOk;
 }
 

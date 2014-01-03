@@ -27,9 +27,13 @@ class TreeBuilder {
 	}
 
 	public function write() {
-		foreach ($this->newTrees as $tree)
-			$tree->write();
+		foreach ($this->newTrees as $tree) {
+			$ok = $tree->write();
+			if (!$ok)
+				return false;
+		}
 		$newTrees = array();
+		return true;
 	}
 
 	public function updateFile($path, $object)
@@ -255,7 +259,9 @@ class GitDatabase extends Git {
 		$object = new GitBlob($this);
 		$object->data = $data;
 		$object->rehash();
-		$object->write();
+		$ok = $object->write();
+		if (!$ok)
+			return false;
 		return $object;
 	}
 
@@ -290,10 +296,14 @@ class GitDatabase extends Git {
 		$treeBuilder = new TreeBuilder($this->currentRootTree);
 		# build new tree
 		$object = $this->writeBlob($data);
+		if ($object === false)
+			return false;
 		$treeBuilder->updateFile($path, $object->getName());
-		$treeBuilder->write();
+		$ok = $treeBuilder->write();
+		if (!$ok)
+			return false;
 		$this->currentRootTree->rehash();
-		$this->currentRootTree->write();
+		return $this->currentRootTree->write();
 	}
 
 	public function commit($branch) {

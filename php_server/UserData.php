@@ -33,7 +33,10 @@ class UserData {
 	}
 
 	public function read($path, &$data) {
-		$data = $this->database->readBlobContent($this->branch, $this->prependBaseDir($path));
+		$blob = $this->database->readBlobContent($this->branch, $this->prependBaseDir($path));
+		if ($blob === null)
+			return false;
+		$data = $blob;
 		return true;
 	}
 

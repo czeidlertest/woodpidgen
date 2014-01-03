@@ -72,8 +72,7 @@ Profile::~Profile()
 
 WP::err Profile::createNewProfile(const SecureArray &password)
 {
-    QByteArray uid = fCrypto->generateInitalizationVector(512);
-    setUid(fCrypto->toHex(fCrypto->sha1Hash(uid)));
+    setUid(fCrypto->generateUid());
 
     // init key store and master key
     DatabaseBranch *keyStoreBranch = databaseBranchFor(fDatabaseBranch->getDatabasePath(), "key_stores");

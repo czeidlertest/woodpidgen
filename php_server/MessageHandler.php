@@ -39,41 +39,25 @@ class ChannelLockIVStanzaHandler extends InStanzaHandler {
 	}
 };
 
-class ChannelLockStanzaHandler extends InStanzaHandler {
+class ChannelStanzaHandler extends InStanzaHandler {
 	private $messageChannel;
-	public $ckeyHandler;
+	private $ivHandler;
+	private $ckeyHandler;
 
 	public function __construct($messageChannel) {
-		InStanzaHandler::__construct("lock");
+		InStanzaHandler::__construct(MessageConst::$kChannelStanza);
+		$this->messageChannel = $messageChannel;
 		$this->messageChannel = $messageChannel;
 		$this->ivHandler = new ChannelLockIVStanzaHandler($this->messageChannel);
 		$this->addChild($this->ivHandler, false);
 		$this->ckeyHandler = new ChannelLockCKeyStanzaHandler($this->messageChannel);
 		$this->addChild($this->ckeyHandler, false);
 	}
-
-	public function handleStanza($xml) {
-		$this->messageChannel->setAsymKeyId($xml->getAttribute("key_id"));
-		if ($this->messageChannel->getAsymKeyId() == "")
-			return false;
-		return true;
-	}
-};
-
-class ChannelStanzaHandler extends InStanzaHandler {
-	private $messageChannel;
-	private $channelLockStanzaHandler;
-
-	public function __construct($messageChannel) {
-		InStanzaHandler::__construct(MessageConst::$kChannelStanza);
-		$this->messageChannel = $messageChannel;
-		$this->channelLockStanzaHandler = new ChannelLockStanzaHandler($this->messageChannel);
-		$this->addChild($this->channelLockStanzaHandler, false);
-	}
 	
 	public function handleStanza($xml) {
 		$this->messageChannel->setUid($xml->getAttribute("uid"));
-		if ($this->messageChannel->getUid() == "")
+		$this->messageChannel->setAsymKeyId($xml->getAttribute("asym_key_id"));
+		if ($this->messageChannel->getUid() == "" || $this->messageChannel->getAsymKeyId() == "")
 			return false;
 		return true;
 	}
@@ -89,11 +73,12 @@ class MessageDataStanzaHandler extends InStanzaHandler {
 	}
 	
 	public function handleStanza($xml) {
-		$this->message->setSignatureKey($xml->getAttribute("signature_key"));
-		$this->message->setSignature($xml->getAttribute("signature"));
-		if ($this->message->getSignatureKey() == "" || $this->message->getSignature() == "")
+		$primaryPart = $this->message->getPrimaryPart();
+		$primaryPart->setSignatureKey($xml->getAttribute("signature_key"));
+		$primaryPart->setSignature($xml->getAttribute("signature"));
+		if ($primaryPart->getSignatureKey() == "" || $primaryPart->getSignature() == "")
 			return false;
-		$this->message->setData($xml->readString());
+		$primaryPart->setData($xml->readString());
 		return true;
 	}
 };
@@ -122,9 +107,11 @@ class MessageStanzaHandler extends InStanzaHandler {
 	}
 
 	public function handleStanza($xml) {
+		$this->message->setUid($xml->getAttribute("uid"));
 		$this->message->setChannelUid($xml->getAttribute("channel_uid"));
 		$this->message->setFrom($xml->getAttribute("from"));
-		if ($this->message->getChannelUid() == "" || $this->message->getFrom() == "")
+		if ($this->message->getUid() == "" || $this->message->getChannelUid() == ""
+			|| $this->message->getFrom() == "")
 			return false;
 		return true;
 	}
@@ -134,11 +121,14 @@ class MessageStanzaHandler extends InStanzaHandler {
 		if ($profile === null)
 			throw new exception("unable to get profile");
 
-		$mailbox = $profile->getMainMailbox($message);
+		$mailbox = $profile->getMainMailbox();
 		if ($mailbox === null)
 			throw new exception("unable to get mailbox");
 
-		$ok = $mailbox->addMessage($this->messageChannel, $this->message);
+		$messageChannel = null;
+		if ($this->channelStanzaHandler->hasBeenHandled())
+			$messageChannel = $this->messageChannel;
+		$ok = $mailbox->addMessage($messageChannel, $this->message);
 
 		// produce output
 		$outStream = new ProtocolOutStream();

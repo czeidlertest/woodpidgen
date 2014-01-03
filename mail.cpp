@@ -6,6 +6,14 @@ RawMailMessage::RawMailMessage(const QString &header, const QString &body)
 {
     fHeader.append(header);
     fBody.append(body);
+
+    CryptoInterface *crypto = CryptoInterfaceSingleton::getCryptoInterface();
+    fUid = crypto->generateUid();
+}
+
+const QString &RawMailMessage::getUid() const
+{
+    return fUid;
 }
 
 const QByteArray &RawMailMessage::getHeader() const
@@ -113,8 +121,7 @@ WP::err SecureChannel::createNew()
 {
     CryptoInterface *crypto = CryptoInterfaceSingleton::getCryptoInterface();
     // derive uid
-    QByteArray uid = crypto->generateInitalizationVector(512);
-    fUid = crypto->toHex(crypto->sha1Hash(uid));
+    fUid = crypto->generateUid();
 
     fSecureParcel = new SecureParcel();
     fSecureParcel->initNew();
@@ -172,9 +179,6 @@ void MessageChannel::setCreator(Contact *creator)
 }
 
 
-const char *kLockStanze = "lock";
-
-
 WP::err XMLSecureChannel::toPublicXML(ProtocolOutStream *outStream, SecureChannel *channel, Contact *receiver, QString keyId)
 {
     if (keyId == "")
@@ -188,21 +192,18 @@ WP::err XMLSecureChannel::toPublicXML(ProtocolOutStream *outStream, SecureChanne
 
     OutStanza *channelStanze = new OutStanza("channel");
     channelStanze->addAttribute("uid", channel->getUid());
+    channelStanze->addAttribute("asym_key_id", keyId);
     outStream->pushStanza(channelStanze);
 
-        OutStanza *lockStanze = new OutStanza(kLockStanze);
-        lockStanze->addAttribute("key_id", keyId);
-        outStream->pushChildStanza(lockStanze);
+        OutStanza *ivStanza = new OutStanza("iv");
+        ivStanza->setText(secureParcel->getIV().toBase64());
+        outStream->pushChildStanza(ivStanza);
 
-            OutStanza *ivStanza = new OutStanza("iv");
-            ivStanza->setText(secureParcel->getIV().toBase64());
-            outStream->pushStanza(ivStanza);
-
-            OutStanza *ckeyStanza = new OutStanza("ckey");
-            ckeyStanza->setText(encryptedSymmetricKey.toBase64());
-            outStream->pushStanza(ckeyStanza);
-            outStream->cdDotDot();
-
+        OutStanza *ckeyStanza = new OutStanza("ckey");
+        ckeyStanza->setText(encryptedSymmetricKey.toBase64());
+        outStream->pushStanza(ckeyStanza);
         outStream->cdDotDot();
+
+    outStream->cdDotDot();
     return WP::kOk;
 }

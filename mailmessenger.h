@@ -26,8 +26,7 @@ private slots:
     void onContactFound(WP::err error);
 
 private:
-    WP::err envelopHeader(ProtocolOutStream *outStream, const QByteArray &org);
-    WP::err envelopBody(ProtocolOutStream *outStream, const QByteArray &org);
+    WP::err envelopMessage(ProtocolOutStream *outStream, const QByteArray &org);
 
     void parseAddress(const QString &targetAddress);
     WP::err startContactRequest();

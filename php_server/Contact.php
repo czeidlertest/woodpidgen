@@ -22,8 +22,9 @@ class Contact extends UserData {
 	public function verify($keyId, $data, $signature) {
 		$certificate;
 		$publicKey;
-		$this->getKeySet($keyId, $certificate, $publicKey);
-
+		$ok = $this->getKeySet($keyId, $certificate, $publicKey);
+		if (!$ok)
+			return false;
 		$signatureVerifier = new SignatureVerifier($publicKey);
 		return $signatureVerifier->verify($data, $signature);
 	}
@@ -35,11 +36,18 @@ class Contact extends UserData {
 			$profile = Session::get()->getProfile();
 			$userIdentity = Session::get()->getMainUserIdentity();
 			$keyStore = $profile->getUserIdentityKeyStore($userIdentity);
-			$keyStore->readAsymmetricKey($keyId, $certificate, $publicKey);
+			$ok = $keyStore->readAsymmetricKey($keyId, $certificate, $publicKey);
+			if (!$ok)
+				return false;
 		} else {
-			$this->read("keys/".$keyId."/certificate", $certificate);
-			$this->read("keys/".$keyId."/public_key", $certificate);
+			$ok = $this->read("keys/".$keyId."/certificate", $certificate);
+			if (!$ok)
+				return false;
+			$ok = $this->read("keys/".$keyId."/public_key", $publicKey);
+			if (!$ok)
+				return false;
 		}
+		return true;
 	}
 
 	public function addKeySet($keyId, $certificate, $publicKey) {

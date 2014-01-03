@@ -105,8 +105,7 @@ Mailbox::~Mailbox()
 WP::err Mailbox::createNewMailbox(KeyStore *keyStore, const QString &defaultKeyId, bool addUidToBaseDir)
 {
     // derive uid
-    QByteArray uid = fCrypto->generateInitalizationVector(512);
-    QString uidHex = fCrypto->toHex(fCrypto->sha1Hash(uid));
+    QString uidHex = fCrypto->generateUid();
 
     // start creating the identity
     WP::err error = EncryptedUserData::create(uidHex, keyStore, defaultKeyId, addUidToBaseDir);

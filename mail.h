@@ -10,6 +10,8 @@ public:
     RawMailMessage(const QString &header, const QString &body);
     RawMailMessage();
 
+    const QString &getUid() const;
+
     const QByteArray& getHeader() const;
     const QByteArray& getBody() const;
 
@@ -17,6 +19,8 @@ public:
     QByteArray& getBody();
 
 private:
+    QString fUid;
+
     QByteArray fHeader;
     QByteArray fBody;
 };

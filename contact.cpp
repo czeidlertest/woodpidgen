@@ -76,7 +76,8 @@ WP::err Contact::sign(const QString &keyId, const QByteArray &data, QByteArray &
     if (error != WP::kOk)
         return error;
     CryptoInterface *crypto = CryptoInterfaceSingleton::getCryptoInterface();
-    return crypto->sign(data, signature, privateKey, "");
+    SecureArray password = "";
+    return crypto->sign(data, signature, privateKey, password);
 }
 
 bool Contact::verify(const QString &keyId, const QByteArray &data, const QByteArray &signature)

@@ -18,7 +18,7 @@ class SyncPullStanzaHandler extends InStanzaHandler {
 
 	public function handleStanza($xml) {
 		$branch = $xml->getAttribute("branch");
-		$remoteTip = $xml->getAttribute("tip");
+		$remoteTip = $xml->getAttribute("base");
 		if ($branch === null || $remoteTip === null)
 			return;
 		if (isSHA1Hex($remoteTip))
@@ -40,6 +40,9 @@ class SyncPullStanzaHandler extends InStanzaHandler {
 		$stanza = new OutStanza("sync_pull");
 		$stanza->addAttribute("branch", $branch);
 		$localTipHex = "";
+		if (strlen($remoteTip) == 20)
+			$remoteTipHex = sha1_hex($remoteTip);
+		$stanza->addAttribute("base", $remoteTipHex);
 		if (strlen($localTip) == 20)
 			$localTipHex = sha1_hex($localTip);
 		$stanza->addAttribute("tip", $localTipHex);

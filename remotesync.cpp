@@ -2,24 +2,15 @@
 
 #include "protocolparser.h"
 #include "remoteauthentication.h"
+#include "remotestorage.h"
 
 
-class SyncOutStanza : public OutStanza {
-public:
-    SyncOutStanza(const QString &branch, const QString &tipCommit) :
-        OutStanza("sync_pull")
-    {
-        addAttribute("branch", branch);
-        addAttribute("tip", tipCommit);
-    }
-};
-
-
-RemoteSync::RemoteSync(DatabaseInterface *database, RemoteAuthentication *remoteAuth, QObject *parent) :
+RemoteSync::RemoteSync(DatabaseInterface *database, RemoteDataStorage* remoteStorage, QObject *parent) :
     QObject(parent),
     fDatabase(database),
-    fAuthentication(remoteAuth),
-    fRemoteConnection(remoteAuth->getConnection()),
+    fRemoteStorage(remoteStorage),
+    fAuthentication(remoteStorage->getRemoteAuthentication()),
+    fRemoteConnection(remoteStorage->getRemoteAuthentication()->getConnection()),
     fServerReply(NULL)
 {
 }
@@ -46,7 +37,7 @@ void RemoteSync::syncConnected(WP::err code)
         return;
 
     QString branch = fDatabase->branch();
-    QString tipCommit = fDatabase->getTip();
+    QString lastSyncCommit = fDatabase->getLastSyncCommit(fRemoteStorage->getUid(), branch);
 
     QByteArray outData;
     ProtocolOutStream outStream(&outData);
@@ -54,7 +45,10 @@ void RemoteSync::syncConnected(WP::err code)
     IqOutStanza *iqStanza = new IqOutStanza(kGet);
     outStream.pushStanza(iqStanza);
 
-    SyncOutStanza *syncStanza = new SyncOutStanza(branch, tipCommit);
+    OutStanza *syncStanza = new OutStanza("sync_pull");
+    syncStanza->addAttribute("branch", branch);
+    syncStanza->addAttribute("base", lastSyncCommit);
+
     outStream.pushChildStanza(syncStanza);
 
     outStream.flush();
@@ -65,11 +59,47 @@ void RemoteSync::syncConnected(WP::err code)
     connect(fServerReply, SIGNAL(finished(WP::err)), this, SLOT(syncReply(WP::err)));
 }
 
+
+class SyncPullData {
+public:
+    QString branch;
+    QString tip;
+    QByteArray pack;
+};
+
+
+class SyncPullPackHandler : public InStanzaHandler {
+public:
+    SyncPullPackHandler(SyncPullData *d) :
+        InStanzaHandler("pack", true),
+        data(d)
+    {
+    }
+
+    bool handleStanza(const QXmlStreamAttributes &attributes)
+    {
+        return true;
+    }
+
+    bool handleText(const QStringRef &text)
+    {
+        data->pack = QByteArray::fromBase64(text.toLatin1());
+        return true;
+    }
+
+public:
+    SyncPullData *data;
+};
+
+
 class SyncPullHandler : public InStanzaHandler {
 public:
-    SyncPullHandler() :
-        InStanzaHandler("sync_pull")
+    SyncPullHandler(SyncPullData *d) :
+        InStanzaHandler("sync_pull"),
+        data(d)
     {
+        syncPullPackHandler = new SyncPullPackHandler(data);
+        addChildHandler(syncPullPackHandler);
     }
 
     bool handleStanza(const QXmlStreamAttributes &attributes)
@@ -79,32 +109,14 @@ public:
         if (!attributes.hasAttribute("tip"))
             return false;
 
-        branch = attributes.value("branch").toString();
-        tip = attributes.value("tip").toString();
+        data->branch = attributes.value("branch").toString();
+        data->tip = attributes.value("tip").toString();
         return true;
     }
 
 public:
-    QString branch;
-    QString tip;
-};
-
-
-class SyncPullPackHandler : public InStanzaHandler {
-public:
-    SyncPullPackHandler() :
-        InStanzaHandler("pack", true)
-    {
-    }
-
-    bool handleText(const QStringRef &text)
-    {
-        pack = QByteArray::fromBase64(text.toLatin1());
-        return true;
-    }
-
-public:
-    QByteArray pack;
+    SyncPullPackHandler *syncPullPackHandler;
+    SyncPullData *data;
 };
 
 
@@ -117,10 +129,9 @@ void RemoteSync::syncReply(WP::err code)
     fServerReply = NULL;
 
     IqInStanzaHandler iqHandler(kResult);
-    SyncPullHandler *syncPullHandler = new SyncPullHandler();
-    SyncPullPackHandler *syncPullPackHandler = new SyncPullPackHandler();
+    SyncPullData syncPullData;
+    SyncPullHandler *syncPullHandler = new SyncPullHandler(&syncPullData);
     iqHandler.addChildHandler(syncPullHandler);
-    syncPullHandler->addChildHandler(syncPullPackHandler);
 
     ProtocolInStream inStream(data);
     inStream.addHandler(&iqHandler);
@@ -129,32 +140,45 @@ void RemoteSync::syncReply(WP::err code)
 
     QString localBranch = fDatabase->branch();
     QString localTipCommit = fDatabase->getTip();
+    QString lastSyncCommit = fDatabase->getLastSyncCommit(fRemoteStorage->getUid(), localBranch);
 
-    if (!syncPullHandler->hasBeenHandled() || syncPullHandler->branch != localBranch) {
+    if (!syncPullHandler->hasBeenHandled() || syncPullData.branch != localBranch) {
         // error occured, the server should at least send back the branch name
         // TODO better error message
         emit syncFinished(WP::kBadValue);
         return;
     }
-    if (syncPullHandler->tip == localTipCommit) {
+    if (syncPullData.tip == localTipCommit) {
         // done
         emit syncFinished(WP::kOk);
         return;
     }
     // see if the server is ahead by checking if we got packages
-    if (syncPullPackHandler->pack.size() != 0) {
-        WP::err error = fDatabase->importPack(syncPullPackHandler->pack, localTipCommit,
-                                              syncPullHandler->tip);
-        emit syncFinished(error);
-        return;
+    if (syncPullData.pack.size() != 0) {
+        fSyncUid = syncPullData.tip;
+        WP::err error = fDatabase->importPack(syncPullData.pack, lastSyncCommit,
+                                              syncPullData.tip);
+        if (error != WP::kOk) {
+            emit syncFinished(error);
+            return;
+        }
+
+        localTipCommit = fDatabase->getTip();
+        // done? otherwise it was a merge and we have to push our merge
+        if (localTipCommit == lastSyncCommit) {
+            emit syncFinished(WP::kOk);
+            return;
+        }
     }
+
     // we are ahead of the server: push changes to the server
     QByteArray pack;
-    WP::err error = fDatabase->exportPack(pack, syncPullHandler->tip, localTipCommit);
+    WP::err error = fDatabase->exportPack(pack, lastSyncCommit, localTipCommit, fSyncUid);
     if (error != WP::kOk) {
         emit syncFinished(error);
         return;
     }
+    fSyncUid = localTipCommit;
 
     QByteArray outData;
     ProtocolOutStream outStream(&outData);
@@ -163,7 +187,7 @@ void RemoteSync::syncReply(WP::err code)
     outStream.pushStanza(iqStanza);
     OutStanza *pushStanza = new OutStanza("sync_push");
     pushStanza->addAttribute("branch", localBranch);
-    pushStanza->addAttribute("start_commit", syncPullHandler->tip);
+    pushStanza->addAttribute("start_commit", syncPullData.tip);
     pushStanza->addAttribute("last_commit", localTipCommit);
     outStream.pushChildStanza(pushStanza);
     OutStanza *pushPackStanza = new OutStanza("pack");
@@ -183,5 +207,6 @@ void RemoteSync::syncPushReply(WP::err code)
 
     QByteArray data = fServerReply->readAll();
 
+    fDatabase->updateLastSyncCommit(fRemoteStorage->getUid(), fDatabase->branch(), fSyncUid);
     emit syncFinished(WP::kOk);
 }

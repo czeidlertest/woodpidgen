@@ -36,9 +36,12 @@ public:
     virtual QString getTip() const = 0;
     virtual WP::err updateTip(const QString &commit) = 0;
 
-    virtual WP::err exportPack(QByteArray &pack, const QString &startCommit, const QString &endCommit, int format = -1) const = 0;
-    //! import pack and update the tip to endCommit
-    virtual WP::err importPack(const QByteArray &pack, const QString &startCommit, const QString &endCommit, int format = -1) = 0;
+    // sync
+    virtual QString getLastSyncCommit(const QString remoteName, const QString &remoteBranch) const = 0;
+    virtual WP::err updateLastSyncCommit(const QString remoteName, const QString &remoteBranch, const QString &uid) const = 0;
+    virtual WP::err exportPack(QByteArray &pack, const QString &startCommit, const QString &endCommit, const QString &ignoreCommit, int format = -1) const = 0;
+    //! import pack, tries to merge and update the tip
+    virtual WP::err importPack(const QByteArray &pack, const QString &baseCommit, const QString &endCommit, int format = -1) = 0;
 
 signals:
     void newCommits(const QString &startCommit, const QString &endCommit);

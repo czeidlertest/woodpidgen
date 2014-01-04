@@ -37,8 +37,10 @@ public:
     QStringList listFiles(const QString &path) const;
     QStringList listDirectories(const QString &path) const;
 
-     WP::err exportPack(QByteArray &pack, const QString &startCommit, const QString &endCommit, int format = -1) const;
-     WP::err importPack(const QByteArray &pack, const QString &startCommit, const QString &endCommit, int format = -1);
+    QString getLastSyncCommit(const QString remoteName, const QString &remoteBranch) const;
+    WP::err updateLastSyncCommit(const QString remoteName, const QString &remoteBranch, const QString &uid) const;
+    WP::err exportPack(QByteArray &pack, const QString &startCommit, const QString &endCommit, const QString &ignoreCommit, int format = -1) const;
+    WP::err importPack(const QByteArray &pack, const QString &baseCommit, const QString &endCommit, int format = -1);
 
 private:
     QStringList listDirectoryContent(const QString &path, int type = -1) const;

@@ -213,7 +213,7 @@ WP::err SyncEntry::sync()
     if (isSyncing())
         return WP::kOk;
     fOldTip = fDatabase->getTip();
-    fRemoteSync = new RemoteSync(fDatabase, fSyncManager->fAuthentication, this);
+    fRemoteSync = new RemoteSync(fDatabase, fSyncManager->fRemoteDataStorage, this);
     connect(fRemoteSync, SIGNAL(syncFinished(WP::err)), this, SLOT(onSyncFinished(WP::err)));
     WP::err error = fRemoteSync->sync();
     if (error != WP::kOk) {

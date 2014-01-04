@@ -10,8 +10,8 @@ class PackManager {
 public:
     PackManager(GitInterface *gitInterface, git_repository *repository, git_odb *objectDatabase);
 
-    WP::err exportPack(QByteArray &pack, const QString &commitOldest, const QString &endCommit, int format = -1) const;
-    WP::err importPack(const QByteArray &data, const QString &first, const QString &last);
+    WP::err exportPack(QByteArray &pack, const QString &commitOldest, const QString &endCommit, const QString &ignoreCommit, int format = -1) const;
+    WP::err importPack(const QByteArray &data, const QString &base, const QString &last);
 
 private:
     int readTill(const QByteArray &in, QString &out, int start, char stopChar);
@@ -19,10 +19,13 @@ private:
     void findMissingObjects(QList<QString> &listOld, QList<QString> &listNew, QList<QString> &missing) const;
     //! Collect all ancestors including the start $commit.
     WP::err collectAncestorCommits(const QString &commit, QList<QString> &ancestors) const;
-    WP::err collectMissingBlobs(const QString &commitStop, const QString &commitLast, QList<QString> &blobs, int type = -1) const;
+    WP::err collectMissingBlobs(const QString &commitStop, const QString &commitLast, const QString &ignoreCommit, QList<QString> &blobs, int type = -1) const;
     WP::err packObjects(const QList<QString> &objects, QByteArray &out) const;
     WP::err listTreeObjects(const git_oid *treeId, QList<QString> &objects) const;
 
+    WP::err mergeBranches(const QString &baseCommit, const QString &ours, const QString &theirs, QString &merge);
+
+    WP::err mergeCommit(const git_oid *treeOid, git_commit *parent1, git_commit *parent2);
 private:
     GitInterface *fDatabase;
     git_repository *fRepository;
@@ -50,7 +53,7 @@ PackManager::PackManager(GitInterface *gitInterface, git_repository *repository,
 {
 }
 
-WP::err PackManager::importPack(const QByteArray& data, const QString &first, const QString &last)
+WP::err PackManager::importPack(const QByteArray& data, const QString &base, const QString &last)
 {
     int objectStart = 0;
     while (objectStart < data.length()) {
@@ -70,8 +73,15 @@ WP::err PackManager::importPack(const QByteArray& data, const QString &first, co
         objectStart = objectEnd;
     }
 
+    QString currentTip = fDatabase->getTip();
+    QString newTip = last;
+    if (currentTip != base) {
+        WP::err error = mergeBranches(base, currentTip, last, newTip);
+        if (error != WP::kOk)
+            return error;
+    }
     // update tip
-    return fDatabase->updateTip(last);
+    return fDatabase->updateTip(newTip);
 }
 
 int PackManager::readTill(const QByteArray& in, QString &out, int start, char stopChar)
@@ -136,11 +146,13 @@ WP::err PackManager::collectAncestorCommits(const QString &commit, QList<QString
     return WP::kOk;
 }
 
-WP::err PackManager::collectMissingBlobs(const QString &commitStop, const QString &commitLast, QList<QString> &blobs, int type) const {
+WP::err PackManager::collectMissingBlobs(const QString &commitStop, const QString &commitLast, const QString &ignoreCommit, QList<QString> &blobs, int type) const {
     QList<QString> commits;
     QList<QString> newObjects;
     commits.append(commitLast);
     QList<QString> stopAncestorCommits;
+    if (ignoreCommit != "")
+        stopAncestorCommits.append(ignoreCommit);
     bool stopAncestorsCalculated = false;
     while (commits.count() > 0) {
         QString currentCommit = commits.takeFirst();
@@ -196,74 +208,6 @@ WP::err PackManager::collectMissingBlobs(const QString &commitStop, const QStrin
     // calculate the missing objects
     findMissingObjects(stopCommitObjects, newObjects, blobs);
     return WP::kOk;
-
-/*
-    QList<QString> handledCommits;
-    QList<QString> commits;
-    commits.append(commitLast);
-    while (true) {
-        if (commits.count() == 0)
-            break;
-        QString currentCommit = commits.takeLast();
-        if (currentCommit == commitStop && handledCommits.contains(currentCommit))
-            continue;
-        if (handledCommits.contains(currentCommit))
-            continue;
-        handledCommits.append(currentCommit);
-
-        git_commit *commitObject;
-        git_oid currentCommitOid;
-        oidFromQString(&currentCommitOid, currentCommit);
-        if (git_commit_lookup(&commitObject, fRepository, &currentCommitOid) != 0)
-            return WP::kError;
-        for (unsigned int i = 0; i < git_commit_parentcount(commitObject); i++) {
-            const git_oid *parent = git_commit_parent_id(commitObject, i);
-
-            git_commit *parentObject;
-            if (git_commit_lookup(&parentObject, fRepository, parent) != 0) {
-                git_commit_free(commitObject);
-                return WP::kError;
-            }
-
-            QList<QString> diffs;
-            QList<QString> parentObjects;
-            WP::err status = listTreeOjects(git_commit_tree_id(parentObject), parentObjects);
-            git_commit_free(parentObject);
-            if (status != WP::kOk) {
-                git_commit_free(commitObject);
-                return WP::kError;
-            }
-            QList<QString> commitObjects;
-            status = listTreeOjects(git_commit_tree_id(commitObject), commitObjects);
-            if (status != WP::kOk) {
-                git_commit_free(commitObject);
-                return WP::kError;
-            }
-            findMissingObjects(parentObjects, commitObjects, diffs);
-
-            for (int i = 0; i < diffs.count(); i++) {
-                git_object *object;
-                git_oid objectOid;
-                git_oid_fromstrn(&objectOid, diffs[i].toLatin1().data(), sizeof(objectOid.id));
-                if (git_object_lookup(&object, fRepository, &objectOid, GIT_OBJ_ANY) != 0) {
-                    git_commit_free(commitObject);
-                    return WP::kError;
-                }
-                if (type <= 0 || git_object_type(object) == type) {
-                    if (!blobs.contains(diffs[i]))
-                        blobs.append(diffs[i]);
-
-                }
-                git_object_free(object);
-            }
-
-            commits.append(oidToQString(parent));
-        }
-        git_commit_free(commitObject);
-    }
-
-    blobs.append(handledCommits);
-    return WP::kOk;*/
 }
 
 #include "zlib.h"
@@ -347,7 +291,7 @@ WP::err PackManager::packObjects(const QList<QString> &objects, QByteArray &out)
     return WP::kOk;
 }
 
-WP::err PackManager::exportPack(QByteArray &pack, const QString &commitOldest, const QString &commitLatest, int format) const
+WP::err PackManager::exportPack(QByteArray &pack, const QString &commitOldest, const QString &commitLatest, const QString &ignoreCommit, int format) const
 {
     QString commitEnd(commitLatest);
     if (commitLatest == "")
@@ -356,7 +300,7 @@ WP::err PackManager::exportPack(QByteArray &pack, const QString &commitOldest, c
         return WP::kNotInit;
 
     QList<QString> blobs;
-    collectMissingBlobs(commitOldest, commitEnd, blobs);
+    collectMissingBlobs(commitOldest, commitEnd, ignoreCommit, blobs);
     return packObjects(blobs, pack);
 }
 
@@ -397,6 +341,164 @@ WP::err PackManager::listTreeObjects(const git_oid *treeId, QList<QString> &obje
             git_tree_free(treesQueue[i]);
         return WP::kError;
     }
+    return WP::kOk;
+}
+
+// copied from libgit2:
+int git_merge_commits(
+    git_index **out,
+    git_repository *repo,
+    const git_commit *our_commit,
+    const git_commit *their_commit,
+    const git_merge_tree_opts *opts)
+{
+    git_oid ancestor_oid;
+    git_commit *ancestor_commit = NULL;
+    git_tree *our_tree = NULL, *their_tree = NULL, *ancestor_tree = NULL;
+    int error = 0;
+
+    if ((error = git_merge_base(&ancestor_oid, repo, git_commit_id(our_commit), git_commit_id(their_commit))) < 0 &&
+        error == GIT_ENOTFOUND)
+        giterr_clear();
+    else if (error < 0 ||
+        (error = git_commit_lookup(&ancestor_commit, repo, &ancestor_oid)) < 0 ||
+        (error = git_commit_tree(&ancestor_tree, ancestor_commit)) < 0)
+        goto done;
+
+    if ((error = git_commit_tree(&our_tree, our_commit)) < 0 ||
+        (error = git_commit_tree(&their_tree, their_commit)) < 0 ||
+        (error = git_merge_trees(out, repo, ancestor_tree, our_tree, their_tree, opts)) < 0)
+        goto done;
+
+done:
+    git_commit_free(ancestor_commit);
+    git_tree_free(our_tree);
+    git_tree_free(their_tree);
+    git_tree_free(ancestor_tree);
+
+    return error;
+}
+
+WP::err PackManager::mergeBranches(const QString &baseCommit, const QString &ours, const QString &theirs, QString &merge)
+{
+    git_oid oursOid;
+    git_oid theirsOid;
+    int error = git_oid_fromstr(&oursOid, ours.toLatin1());
+    if (error != 0)
+        return WP::kBadValue;
+    error = git_oid_fromstr(&theirsOid, theirs.toLatin1());
+    if (error != 0)
+        return WP::kBadValue;
+
+    git_commit *oursCommit;
+    error = git_commit_lookup(&oursCommit, fRepository, &oursOid);
+    if (error != 0)
+        return WP::kEntryNotFound;
+    git_commit *theirsCommit;
+    error = git_commit_lookup(&theirsCommit, fRepository, &theirsOid);
+    if (error != 0) {
+        git_commit_free(oursCommit);
+        return WP::kEntryNotFound;
+    }
+
+    // TODO: check if we could optimize since we know the base commit, i.e., use git_merge_trees
+    git_index *mergeIndex;
+    error = git_merge_commits(&mergeIndex, fRepository, oursCommit, theirsCommit, NULL);
+    if (error != 0)
+        return WP::kError;
+
+    // fix conflicts
+    git_index_conflict_iterator *iterator;
+    error = git_index_conflict_iterator_new(&iterator, mergeIndex);
+    if (error != 0) {
+        git_commit_free(oursCommit);
+        git_commit_free(theirsCommit);
+        git_index_free(mergeIndex);
+        return WP::kError;
+    }
+    while (true) {
+        const git_index_entry *ancestorOut;
+        const git_index_entry *ourOut;
+        const git_index_entry *theirOut;
+        error = git_index_conflict_next(&ancestorOut, &ourOut, &theirOut, iterator);
+        if (error == GIT_ITEROVER)
+            break;
+        if (error != 0 && error != GIT_ITEROVER) {
+            git_commit_free(oursCommit);
+            git_commit_free(theirsCommit);
+            git_index_conflict_iterator_free(iterator);
+            git_index_free(mergeIndex);
+            return WP::kError;
+        }
+        // solve conflict
+        const git_index_entry *selected = theirOut;
+        if (ourOut->mtime.nanoseconds > theirOut->mtime.nanoseconds)
+            selected = ourOut;
+        error = git_index_add(mergeIndex, selected);
+        if (error != 0) {
+            git_commit_free(oursCommit);
+            git_commit_free(theirsCommit);
+            git_index_conflict_iterator_free(iterator);
+            git_index_free(mergeIndex);
+            return WP::kError;
+        }
+        error = git_index_conflict_remove(mergeIndex, ourOut->path);
+        if (error != 0) {
+            git_commit_free(oursCommit);
+            git_commit_free(theirsCommit);
+            git_index_conflict_iterator_free(iterator);
+            git_index_free(mergeIndex);
+            return WP::kError;
+        }
+    }
+    git_index_conflict_iterator_free(iterator);
+
+    // write new root tree
+    git_oid newRootTree;
+    error = git_index_write_tree(&newRootTree, mergeIndex);
+    git_index_free(mergeIndex);
+    if (error != 0) {
+        git_commit_free(oursCommit);
+        git_commit_free(theirsCommit);
+        return WP::kError;
+    }
+    // commit
+    WP::err wpError = mergeCommit(&newRootTree, oursCommit, theirsCommit);
+    git_commit_free(oursCommit);
+    git_commit_free(theirsCommit);
+    if (wpError != WP::kOk)
+        return wpError;
+    merge = fDatabase->getTip();
+    return WP::kOk;
+}
+
+WP::err PackManager::mergeCommit(const git_oid *treeOid, git_commit *parent1, git_commit *parent2)
+{
+    git_tree *tree;
+    int error = git_tree_lookup(&tree, fRepository, treeOid);
+    if (error != 0)
+        return WP::kError;
+
+    QString refName = "refs/heads/";
+    refName += fDatabase->branch();
+
+    git_signature* signature;
+    git_signature_new(&signature, "PackManager", "no mail", time(NULL), 0);
+
+    git_commit *parents[2];
+    parents[0] = parent1;
+    parents[1] = parent2;
+    const int nParents = 2;
+
+    git_oid id;
+    error = git_commit_create(&id, fRepository, refName.toLatin1().data(), signature, signature,
+                              NULL, "merge", tree, nParents, (const git_commit**)parents);
+
+    git_signature_free(signature);
+    git_tree_free(tree);
+    if (error != 0)
+        return (WP::err)error;
+
     return WP::kOk;
 }
 
@@ -719,19 +821,6 @@ QString GitInterface::getTip() const
     git_strarray_free(&ref_list);
 
     return foundOid;
-
-/*
-    QString refPath = fRepositoryPath;
-    refPath += "/refs/heads/";
-    refPath += branch;
-
-    QFile file(refPath);
-    if (!file.open(QIODevice::ReadOnly))
-        return "";
-    QString oid;
-    QTextStream outstream(&file);
-    outstream >> oid;
-    return oid;*/
 }
 
 
@@ -746,19 +835,6 @@ WP::err GitInterface::updateTip(const QString &commit)
     if (status != 0)
         return WP::kError;
     return WP::kOk;
-
-   /* QString refPath = fRepositoryPath;
-    refPath += "/refs/heads/";
-    refPath += branch;
-
-    QFile file(refPath);
-    if (!file.open(QIODevice::WriteOnly))
-        return false;
-    file.resize(0);
-    QTextStream outstream(&file);
-    outstream << last << "\n";
-
-    return true;*/
 }
 
 QStringList GitInterface::listFiles(const QString &path) const
@@ -771,18 +847,57 @@ QStringList GitInterface::listDirectories(const QString &path) const
     return listDirectoryContent(path, GIT_OBJ_TREE);
 }
 
-WP::err GitInterface::exportPack(QByteArray &pack, const QString &startCommit, const QString &endCommit, int format) const
+QString GitInterface::getLastSyncCommit(const QString remoteName, const QString &remoteBranch) const
 {
-    PackManager packManager((GitInterface*)this, fRepository, fObjectDatabase);
-    return packManager.exportPack(pack, startCommit, endCommit, format);
+    QString refPath = fRepositoryPath;
+    refPath += "/refs/remotes/";
+    refPath += remoteName;
+    refPath += "/";
+    refPath += remoteBranch;
+
+    QFile file(refPath);
+    if (!file.open(QIODevice::ReadOnly))
+        return "";
+    QString oid;
+    QTextStream outstream(&file);
+    outstream >> oid;
+
+    return oid;
 }
 
-WP::err GitInterface::importPack(const QByteArray &pack, const QString &startCommit, const QString &endCommit, int format)
+WP::err GitInterface::updateLastSyncCommit(const QString remoteName, const QString &remoteBranch, const QString &uid) const
+{
+    QString refPath = fRepositoryPath;
+    refPath += "/refs/remotes/";
+    refPath += remoteName;
+    QDir directory;
+    if (!directory.mkpath(refPath))
+        return WP::kError;
+    refPath += "/";
+    refPath += remoteBranch;
+
+    QFile file(refPath);
+    if (!file.open(QIODevice::WriteOnly))
+        return WP::kError;
+    file.resize(0);
+    QTextStream outstream(&file);
+    outstream << uid << "\n";
+
+    return WP::kOk;
+}
+
+WP::err GitInterface::exportPack(QByteArray &pack, const QString &startCommit, const QString &endCommit, const QString &ignoreCommit, int format) const
+{
+    PackManager packManager((GitInterface*)this, fRepository, fObjectDatabase);
+    return packManager.exportPack(pack, startCommit, endCommit, ignoreCommit, format);
+}
+
+WP::err GitInterface::importPack(const QByteArray &pack, const QString &baseCommit, const QString &endCommit, int format)
 {
     PackManager packManager(this, fRepository, fObjectDatabase);
-    WP::err error = packManager.importPack(pack, startCommit, endCommit);
+    WP::err error = packManager.importPack(pack, baseCommit, endCommit);
     if (error == WP::kOk)
-        emit newCommits(startCommit, endCommit);
+        emit newCommits(baseCommit, getTip());
     return error;
 }
 
@@ -807,7 +922,7 @@ git_commit *GitInterface::getTipCommit() const
 {
     QString tip = getTip();
     git_oid out;
-    int error = git_oid_fromstr(&out, tip.toStdString().c_str());
+    int error = git_oid_fromstr(&out, tip.toLatin1());
     if (error != 0)
         return NULL;
     git_commit *commit;

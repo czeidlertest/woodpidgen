@@ -455,7 +455,7 @@ WP::err PackManager::mergeBranches(const QString &baseCommit, const QString &our
 
     // write new root tree
     git_oid newRootTree;
-    error = git_index_write_tree(&newRootTree, mergeIndex);
+    error = git_index_write_tree_to(&newRootTree, mergeIndex, fRepository);
     git_index_free(mergeIndex);
     if (error != 0) {
         git_commit_free(oursCommit);

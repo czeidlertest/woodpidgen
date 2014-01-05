@@ -24,6 +24,8 @@ private:
 };
 
 
+class UserIdentity;
+
 class MessageListModel : public QAbstractListModel {
 public:
     MessageListModel(QObject * parent = 0);
@@ -52,12 +54,14 @@ public:
                              bool addUidToBaseDir = true);
     WP::err open(KeyStoreFinder *keyStoreFinder);
 
+    void setOwner(UserIdentity *userIdentity);
+
     QAbstractListModel &getMessages();
 
     QStringList getMailIds();
-    WP::err readHeader(const QString &messageId, QByteArray &header);
-    WP::err readBody(const QString &messageId, QByteArray &body);
+    WP::err readMessage(const QString &messageId, QByteArray &body);
 
+    QStringList getChannelIds();
     MessageChannel* findMessageChannel(const QString &channelId);
 
 signals:
@@ -71,9 +75,13 @@ private:
     QString pathForMessageId(const QString &messageId);
 
     WP::err readMailDatabase();
+    WP::err readMessageChannels();
+
+    UserIdentity *fUserIdentity;
 
     MessageListModel fMessageList;
-    QList<MessageChannel*> fMessageChannels;
+    QStringList fMessageChannels;
+    QMap<QString, MessageChannel*> fMessageChannelCache;
 };
 
 

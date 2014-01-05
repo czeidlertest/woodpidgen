@@ -26,42 +26,6 @@ private:
 };
 
 
-/*
-<lock keyId="id">
-<iv>
-initializationVector
-</iv>
-<ckey>
-encrypted symmetric key
-</ckey>
-</lock>
-
-// public message info
-<info from="uid" time="creationTime"/>
-
-// access token; who is allowed to post to this channel
-<access>
-<key>
-key to verify
-</key>
-</access>
-
-// encrypted data
-<cdata>
-
-</cdata>
-
-Header:
-<from id="senderId" key="publicKeyId" signature="messageSignatur" />
-<meta>
-XML data encrypted using the mkey.
-<parent id="parentMessageId">
-<to .../>
-</meta>
-
-Body:
-Data encrypted using mkey
-*/
 class SecureParcel {
 public:
     SecureParcel();

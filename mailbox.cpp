@@ -73,7 +73,7 @@ MailRef::MailRef(const QString &messageId, Mailbox *mailbox) :
 const QByteArray &MailRef::getHeader()
 {
     if (fHeader.count() == 0) {
-        WP::err error = fMailbox->readHeader(fMessageId, fHeader);
+        WP::err error = fMailbox->readMessage(fMessageId, fHeader);
         if (error != WP::kOk)
             throw git_io_exception;
     }
@@ -83,7 +83,7 @@ const QByteArray &MailRef::getHeader()
 const QByteArray &MailRef::getBody()
 {
     if (fBody.count() == 0) {
-        WP::err error = fMailbox->readBody(fMessageId, fBody);
+        WP::err error = fMailbox->readMessage(fMessageId, fBody);
         if (error != WP::kOk)
             throw git_io_exception;
     }
@@ -98,8 +98,9 @@ Mailbox::Mailbox(DatabaseBranch *branch, const QString &baseDir) :
 
 Mailbox::~Mailbox()
 {
-    foreach (MessageChannel *channel, fMessageChannels)
-        delete channel;
+    QMap<QString, MessageChannel*>::iterator it= fMessageChannelCache.begin();
+    for (; it != fMessageChannelCache.end(); it++)
+        delete it.value();
 }
 
 WP::err Mailbox::createNewMailbox(KeyStore *keyStore, const QString &defaultKeyId, bool addUidToBaseDir)
@@ -125,6 +126,11 @@ WP::err Mailbox::open(KeyStoreFinder *keyStoreFinder)
     return error;
 }
 
+void Mailbox::setOwner(UserIdentity *userIdentity)
+{
+    fUserIdentity = userIdentity;
+}
+
 QAbstractListModel &Mailbox::getMessages()
 {
     return fMessageList;
@@ -136,6 +142,8 @@ QStringList Mailbox::getMailIds()
     QStringList shortIds = listDirectories("");
     for (int i = 0; i < shortIds.count(); i++) {
         const QString &shortId = shortIds.at(i);
+        if (shortId == "channels")
+            continue;
         QStringList restIds = listDirectories(shortId);
         for (int a = 0; a < restIds.count(); a++) {
             QString completeId = shortId;
@@ -146,27 +154,244 @@ QStringList Mailbox::getMailIds()
     return messageIds;
 }
 
-WP::err Mailbox::readHeader(const QString &messageId, QByteArray &header)
+class MessageData {
+public:
+    QString uid;
+    QString channelUid;
+    QString from;
+    QString signatureKey;
+    QByteArray signature;
+    QByteArray data;
+
+};
+
+class MessagePrimDataHandler : public InStanzaHandler {
+public:
+    MessagePrimDataHandler(MessageData *d) :
+        InStanzaHandler("primary_data"),
+        data(d)
+    {
+    }
+
+    bool handleStanza(const QXmlStreamAttributes &attributes)
+    {
+        if (!attributes.hasAttribute("signature_key"))
+            return false;
+        if (!attributes.hasAttribute("signature"))
+            return false;
+
+        data->signatureKey = attributes.value("signature_key").toString();
+        data->signature = QByteArray::fromBase64(attributes.value("signature").toLatin1());
+        return true;
+    }
+
+    bool handleText(const QStringRef &text)
+    {
+        data->data = QByteArray::fromBase64(text.toLatin1());
+        return true;
+    }
+
+public:
+    MessageData *data;
+};
+
+
+class MessageParserHandler : public InStanzaHandler {
+public:
+    MessageParserHandler(MessageData *d) :
+        InStanzaHandler("message"),
+        data(d)
+    {
+        addChildHandler(new MessagePrimDataHandler(data));
+    }
+
+    bool handleStanza(const QXmlStreamAttributes &attributes)
+    {
+        if (!attributes.hasAttribute("uid"))
+            return false;
+        if (!attributes.hasAttribute("channel_uid"))
+            return false;
+        if (!attributes.hasAttribute("from"))
+            return false;
+
+        data->uid = attributes.value("uid").toString();
+        data->channelUid = attributes.value("channel_uid").toString();
+        data->from = attributes.value("from").toString();
+        return true;
+    }
+
+public:
+    MessageData *data;
+};
+
+
+WP::err Mailbox::readMessage(const QString &messageId, QByteArray &body)
 {
     QString path = pathForMessageId(messageId);
-    path += "/header";
-    return read(path, header);
+    path += "/message";
+    QByteArray data;
+    WP::err error = read(path, data);
+    if (error != WP::kOk)
+        return error;
+
+
+    MessageData messageData;
+    MessageParserHandler handler(&messageData);
+    ProtocolInStream inStream(data);
+    inStream.addHandler(&handler);
+    inStream.parse();
+
+    if (!handler.hasBeenHandled())
+        return WP::kError;
+
+    Contact *myself = fUserIdentity->getMyself();
+    if (!myself->verify(messageData.signatureKey, messageData.data, messageData.signature))
+        return WP::kError;
+    MessageChannel *channel = findMessageChannel(messageData.channelUid);
+    if (channel == NULL)
+        return WP::kChannelNotFound;
+
+    return channel->getSecureParcel()->uncloakData(messageData.data, body);
 }
 
-WP::err Mailbox::readBody(const QString &messageId, QByteArray &body)
+QStringList Mailbox::getChannelIds()
 {
-    QString path = pathForMessageId(messageId);
-    path += "/body";
-    return read(path, body);
+    QStringList channelIds;
+    QStringList shortIds = listDirectories("channels");
+    for (int i = 0; i < shortIds.count(); i++) {
+        const QString &shortId = shortIds.at(i);
+        QStringList restIds = listDirectories(shortId);
+        for (int a = 0; a < restIds.count(); a++) {
+            QString completeId = shortId;
+            completeId.append(restIds.at(a));
+            channelIds.append(completeId);
+        }
+    }
+    return channelIds;
 }
+
+
+class MessageChannelData {
+public:
+    QString uid;
+    QString asymKeyId;
+    QByteArray iv;
+    QByteArray ckey;
+};
+
+class MessageChannelIVParserHandler : public InStanzaHandler {
+public:
+    MessageChannelIVParserHandler(MessageChannelData *c) :
+        InStanzaHandler("iv"),
+        data(c)
+    {
+    }
+
+    bool handleStanza(const QXmlStreamAttributes &attributes)
+    {
+       return true;
+    }
+
+    bool handleText(const QStringRef &text)
+    {
+        data->iv = QByteArray::fromBase64(text.toLatin1());
+        return true;
+    }
+
+public:
+    MessageChannelData *data;
+};
+
+class MessageChannelCKeyParserHandler : public InStanzaHandler {
+public:
+    MessageChannelCKeyParserHandler(MessageChannelData *c) :
+        InStanzaHandler("ckey"),
+        data(c)
+    {
+    }
+
+    bool handleStanza(const QXmlStreamAttributes &attributes)
+    {
+       return true;
+    }
+
+    bool handleText(const QStringRef &text)
+    {
+        data->ckey = QByteArray::fromBase64(text.toLatin1());
+        return true;
+    }
+
+public:
+    MessageChannelData *data;
+};
+
+class MessageChannelParserHandler : public InStanzaHandler {
+public:
+    MessageChannelParserHandler(MessageChannelData *c) :
+        InStanzaHandler("channel"),
+        data(c)
+    {
+        addChildHandler(new MessageChannelIVParserHandler(data));
+        addChildHandler(new MessageChannelCKeyParserHandler(data));
+    }
+
+    bool handleStanza(const QXmlStreamAttributes &attributes)
+    {
+       if (!attributes.hasAttribute("uid"))
+            return false;
+        if (!attributes.hasAttribute("asym_key_id"))
+            return false;
+
+        data->uid = attributes.value("uid").toString();
+        data->asymKeyId = attributes.value("asym_key_id").toString();
+        return true;
+    }
+
+public:
+    MessageChannelData *data;
+};
+
 
 MessageChannel *Mailbox::findMessageChannel(const QString &channelId)
 {
-    foreach (MessageChannel *channel, fMessageChannels) {
-        if (channel->getUid() == channelId)
-            return channel;
+    QMap<QString, MessageChannel*>::iterator it= fMessageChannelCache.find(channelId);
+    if (it != fMessageChannelCache.end())
+        return it.value();
+
+    if (!fMessageChannels.contains(channelId))
+        return NULL;
+
+    QString path = "channels/";
+    path += pathForMessageId(channelId);
+    QByteArray data;
+    WP::err error = read(path, data);
+    if (error != WP::kOk)
+        return NULL;
+
+    MessageChannelData channelData;
+    MessageChannelParserHandler handler(&channelData);
+    ProtocolInStream inStream(data);
+    inStream.addHandler(&handler);
+    inStream.parse();
+
+    if (!handler.hasBeenHandled())
+        return NULL;
+
+    Contact *myself = fUserIdentity->getMyself();
+    SecureParcel *secureParcel = new SecureParcel();
+    error = secureParcel->initFromPublic(myself, channelData.asymKeyId, channelData.iv, channelData.ckey);
+    if (error != WP::kOk) {
+        delete secureParcel;
+        return NULL;
     }
-    return NULL;
+
+    MessageChannel *channel = new MessageChannel();
+    channel->setUid(channelData.uid);
+    channel->setSecureParcel(secureParcel);
+
+    fMessageChannelCache[channelId] = channel;
+
+    return channel;
 }
 
 void Mailbox::onNewCommits(const QString &startCommit, const QString &endCommit)
@@ -184,6 +409,8 @@ QString Mailbox::pathForMessageId(const QString &messageId)
 
 WP::err Mailbox::readMailDatabase()
 {
+    readMessageChannels();
+
     fMessageList.clear();
 
     QStringList mails = getMailIds();
@@ -193,6 +420,18 @@ WP::err Mailbox::readMailDatabase()
         fMessageList.addMessage(ref);
     }
     emit databaseRead();
+    return WP::kOk;
+}
+
+WP::err Mailbox::readMessageChannels()
+{
+    QMap<QString, MessageChannel*>::iterator it= fMessageChannelCache.begin();
+    for (; it != fMessageChannelCache.end(); it++)
+        delete it.value();
+    fMessageChannelCache.clear();
+
+    fMessageChannels = getChannelIds();
+
     return WP::kOk;
 }
 

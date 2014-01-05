@@ -76,6 +76,7 @@ WP::err UserIdentity::open(KeyStoreFinder *keyStoreFinder, MailboxFinder *mailbo
     fMailbox = mailboxFinder->find(mailboxId);
     if (fMailbox == NULL)
         return WP::kEntryNotFound;
+    fMailbox->setOwner(this);
 
     fMyselfContact = new Contact(this, "myself");
     error = fMyselfContact->open(keyStoreFinder);

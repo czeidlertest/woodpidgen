@@ -48,13 +48,6 @@ public:
     void generateDHParam(QString &prime, QString &base, QString &secret, QString &pub);
     SecureArray sharedDHKey(const QString &prime, const QString &base, const QString &secret);
 
-    // TODO remove
-    int sign(const QByteArray& input, QByteArray &signatur, const char* privateKeyFile, const char *keyPassword);
-    bool verifySignatur(const QByteArray& message, const QByteArray &signatur, const char* publicKeyFile);
-    void encryptionTest(const char* certificateFile, const char* publicKeyFile, const char* privateKeyFile, const char *keyPassword);
-    bool encyrptMessage(const QByteArray& input, QByteArray& encrypted, const char* certificateFile);
-    bool decryptMessage(const QByteArray& input, QByteArray& plain,
-                               const char* privateKeyFile, const char *keyPassword, const char* certificateFile);
 private:
     class Private;
     Private* fPrivate;

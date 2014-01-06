@@ -47,6 +47,7 @@ public:
 
     WP::err addContact(Contact *contact);
     Contact *findContact(const QString &address);
+    Contact *findContactByUid(const QString &uid);
 
 private:
     WP::err writePublicSignature(const QString &filename, const QString &publicKey);

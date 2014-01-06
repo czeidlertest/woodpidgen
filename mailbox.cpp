@@ -251,7 +251,14 @@ WP::err Mailbox::readMessage(const QString &messageId, QByteArray &body)
     if (channel == NULL)
         return WP::kChannelNotFound;
 
-    return channel->getSecureParcel()->uncloakData(messageData.data, body);
+    error = channel->getSecureParcel()->uncloakData(messageData.data, body);
+    if (error != WP::kOk)
+        return error;
+
+    Contact *sender = fUserIdentity->findContactByUid(messageData.from);
+    if (sender != NULL)
+        body.prepend(QString(sender->getAddress() + ": ").toLatin1());
+    return WP::kOk;
 }
 
 QStringList Mailbox::getChannelIds()

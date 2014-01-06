@@ -134,6 +134,15 @@ Contact *UserIdentity::findContact(const QString &address)
     return NULL;
 }
 
+Contact *UserIdentity::findContactByUid(const QString &uid)
+{
+    foreach (Contact *contact, fContacts) {
+        if (contact->getUid() == uid)
+            return contact;
+    }
+    return NULL;
+}
+
 WP::err UserIdentity::writePublicSignature(const QString &filename, const QString &publicKey)
 {
     QFile file(filename);

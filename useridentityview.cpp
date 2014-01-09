@@ -8,8 +8,8 @@
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 
-#include <profile.h>
-
+#include "profile.h"
+#include "useridentity.h"
 
 class UserIdentityDetailsView : public QWidget
 {
@@ -19,22 +19,23 @@ public:
     void setTo(UserIdentity *identity);
 private:
     UserIdentity *fIdentity;
-    QLineEdit *fIdentityName;
+    QLineEdit *fServerUserName;
 };
 
 UserIdentityDetailsView::UserIdentityDetailsView(QWidget *parent) :
     QWidget(parent),
     fIdentity(NULL)
 {
-    fIdentityName = new QLineEdit(this);
+    fServerUserName = new QLineEdit(this);
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
-    mainLayout->addWidget(fIdentityName);
+    mainLayout->addWidget(fServerUserName);
 }
 
 void UserIdentityDetailsView::setTo(UserIdentity *identity)
 {
     fIdentity = identity;
+    fServerUserName->setText(fIdentity->getMyself()->getServerUser());
 }
 
 UserIdentityView::UserIdentityView(IdentityListModel *listModel, QWidget *parent) :
@@ -49,6 +50,7 @@ UserIdentityView::UserIdentityView(IdentityListModel *listModel, QWidget *parent
     fIdentityList = new QListView(identityListWidget);
     fIdentityList->setViewMode(QListView::ListMode);
     fIdentityList->setModel(fIdentityListModel);
+    connect(fIdentityList, SIGNAL(clicked(QModelIndex)), this, SLOT(onIdentitySelected(QModelIndex)));
 
     // add remove buttons
     QHBoxLayout* manageIdentitiesLayout = new QHBoxLayout();
@@ -68,5 +70,11 @@ UserIdentityView::UserIdentityView(IdentityListModel *listModel, QWidget *parent
 
     addWidget(identityListWidget);
     addWidget(fDisplayStack);
+}
+
+void UserIdentityView::onIdentitySelected(QModelIndex index)
+{
+    UserIdentity *identity = fIdentityListModel->identityAt(index.row());
+    fDetailView->setTo(identity);
 }
 

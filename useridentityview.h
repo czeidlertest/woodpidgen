@@ -1,6 +1,7 @@
 #ifndef USERIDENTITYVIEW_H
 #define USERIDENTITYVIEW_H
 
+#include <QModelIndex>
 #include <QSplitter>
 
 class QListView;
@@ -19,7 +20,8 @@ public:
 signals:
     
 public slots:
-    
+    void onIdentitySelected(QModelIndex index);
+
 private:
     QListView* fIdentityList;
     QPushButton *fAddIdentity;

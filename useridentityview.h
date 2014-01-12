@@ -24,8 +24,6 @@ public slots:
 
 private:
     QListView* fIdentityList;
-    QPushButton *fAddIdentity;
-    QPushButton *fRemoveIdentity;
     IdentityListModel *fIdentityListModel;
 
     QStackedWidget *fDisplayStack;

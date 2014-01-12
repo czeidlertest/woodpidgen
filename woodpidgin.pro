@@ -44,7 +44,9 @@ SOURCES += main.cpp \
     contactrequest.cpp \
     contact.cpp \
     mailmessenger.cpp \
-    mail.cpp
+    mail.cpp \
+    createprofiledialog.cpp \
+    passworddialog.cpp
 
 # Installation path
 # target.path =
@@ -79,10 +81,14 @@ HEADERS += \
     contactrequest.h \
     contact.h \
     mailmessenger.h \
-    mail.h
+    mail.h \
+    createprofiledialog.h \
+    passworddialog.h
 
 FORMS += \
-    mainwindow.ui
+    mainwindow.ui \
+    createprofiledialog.ui \
+    passworddialog.ui
 
 unix: LIBS += -L$$PWD/../libgit2/build -lgit2 -lz
 

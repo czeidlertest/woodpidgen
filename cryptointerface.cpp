@@ -138,7 +138,7 @@ WP::err CryptoInterface::decryptSymmetric(const QByteArray &input, SecureArray &
     QCA::Cipher decoder(algo, QCA::Cipher::CBC, QCA::Cipher::DefaultPadding, QCA::Decode, key, iv);
     decrypted = decoder.process(input).toByteArray();
     if (!decoder.ok())
-        return WP::kError;
+        return WP::kBadKey;
     return WP::kOk;
 }
 

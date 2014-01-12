@@ -30,6 +30,7 @@ UserIdentityDetailsView::UserIdentityDetailsView(QWidget *parent) :
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
 
     mainLayout->addWidget(fServerUserName);
+    mainLayout->addStretch();
 }
 
 void UserIdentityDetailsView::setTo(UserIdentity *identity)
@@ -50,18 +51,9 @@ UserIdentityView::UserIdentityView(IdentityListModel *listModel, QWidget *parent
     fIdentityList = new QListView(identityListWidget);
     fIdentityList->setViewMode(QListView::ListMode);
     fIdentityList->setModel(fIdentityListModel);
-    connect(fIdentityList, SIGNAL(clicked(QModelIndex)), this, SLOT(onIdentitySelected(QModelIndex)));
-
-    // add remove buttons
-    QHBoxLayout* manageIdentitiesLayout = new QHBoxLayout();
-    fAddIdentity = new QPushButton("Create", identityListWidget);
-    fRemoveIdentity = new QPushButton("Remove", identityListWidget);
-    manageIdentitiesLayout->addStretch();
-    manageIdentitiesLayout->addWidget(fAddIdentity);
-    manageIdentitiesLayout->addWidget(fRemoveIdentity);
+    connect(fIdentityList, SIGNAL(currentChanged(QModelIndex)), this, SLOT(onIdentitySelected(QModelIndex)));
 
     identityListLayout->addWidget(fIdentityList);
-    identityListLayout->addItem(manageIdentitiesLayout);
 
     // right side
     fDisplayStack = new QStackedWidget(this);
@@ -70,6 +62,11 @@ UserIdentityView::UserIdentityView(IdentityListModel *listModel, QWidget *parent
 
     addWidget(identityListWidget);
     addWidget(fDisplayStack);
+
+    if (fIdentityListModel->rowCount() > 0) {
+        fIdentityList->setCurrentIndex(fIdentityListModel->index(0));
+        onIdentitySelected(fIdentityListModel->index(0));
+    }
 }
 
 void UserIdentityView::onIdentitySelected(QModelIndex index)

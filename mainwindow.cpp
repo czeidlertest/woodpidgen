@@ -14,7 +14,7 @@ MainWindow::MainWindow(Profile *profile, QWidget *parent) :
 
     ui->toolBar->setMovable(false);
 
-    QAction *accountAction = ui->toolBar->addAction("Accounts");
+    QAction *accountAction = ui->toolBar->addAction("Profile");
     accountAction->setCheckable(true);
     QAction *messageAction = ui->toolBar->addAction("Messages");
     messageAction->setCheckable(true);

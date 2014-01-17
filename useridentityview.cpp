@@ -51,7 +51,7 @@ UserIdentityView::UserIdentityView(IdentityListModel *listModel, QWidget *parent
     fIdentityList = new QListView(identityListWidget);
     fIdentityList->setViewMode(QListView::ListMode);
     fIdentityList->setModel(fIdentityListModel);
-    connect(fIdentityList, SIGNAL(currentChanged(QModelIndex)), this, SLOT(onIdentitySelected(QModelIndex)));
+    connect(fIdentityList, SIGNAL(activated(QModelIndex)), this, SLOT(onIdentitySelected(QModelIndex)));
 
     identityListLayout->addWidget(fIdentityList);
 

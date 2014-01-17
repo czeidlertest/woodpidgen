@@ -1,16 +1,12 @@
 #ifndef MESSAGEVIEW_H
 #define MESSAGEVIEW_H
 
-#include <QPushButton>
-#include <QLineEdit>
 #include <QListView>
 #include <QSplitter>
-#include <QTextEdit>
-#include <QWidget>
 
-#include "mailbox.h"
-#include "profile.h"
-
+class Mailbox;
+class Profile;
+class ThreadView;
 
 class MessageView : public QSplitter
 {
@@ -20,21 +16,13 @@ public:
     
     void setMailbox(Mailbox *mailbox);
 
-signals:
-    
-public slots:
-    
-private slots:
-    void onSendButtonClicked();
-
 private:
-    QListView *fMessageDisplay;
-    QLineEdit *fReceiver;
-    QTextEdit *fMessageComposer;
-    QPushButton *fSendButton;
-
     Profile *fProfile;
     Mailbox *fMailbox;
+
+    QListView *fThreadListView;
+
+    ThreadView *fThreadView;
 };
 
 #endif // MESSAGEVIEW_H

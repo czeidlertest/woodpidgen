@@ -73,10 +73,6 @@ WP::err UserIdentity::open(KeyStoreFinder *keyStoreFinder, MailboxFinder *mailbo
     error = read(kPathMailboxId, mailboxId);
     if (error != WP::kOk)
         return error;
-    fMailbox = mailboxFinder->find(mailboxId);
-    if (fMailbox == NULL)
-        return WP::kEntryNotFound;
-    fMailbox->setOwner(this);
 
     fMyselfContact = new Contact(this, "myself");
     error = fMyselfContact->open(keyStoreFinder);
@@ -95,6 +91,10 @@ WP::err UserIdentity::open(KeyStoreFinder *keyStoreFinder, MailboxFinder *mailbo
         fContacts.append(contact);
     }
 
+    fMailbox = mailboxFinder->find(mailboxId);
+        if (fMailbox == NULL)
+            return WP::kEntryNotFound;
+    fMailbox->setOwner(this);
     return error;
 }
 

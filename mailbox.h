@@ -5,22 +5,51 @@
 
 #include "databaseutil.h"
 #include "mail.h"
+#include "messagethreaddatamodel.h"
 
 
 class Mailbox;
 
-class MailRef {
+class MessageData {
 public:
-    MailRef(const QString &messageId, Mailbox *mailbox);
+    MessageData(Mailbox *mailbox);
+    ~MessageData();
 
-    const QByteArray &getHeader();
-    const QByteArray &getBody();
+    WP::err load(const QString &uid);
+
+    const QString &getUid() const;
+    const QString &getChannelUid() const;
+    const QString &getFrom() const;
+    const QString &getSignatureKey() const;
+
+    const QByteArray &getSignature() const;
+    const QByteArray &getData() const;
+
 private:
-    QString fMessageId;
-    Mailbox *fMailbox;
+    friend class MessageParserHandler;
+    friend class MessagePrimDataHandler;
 
-    QByteArray fHeader;
-    QByteArray fBody;
+    void setUid(const QString &uid);
+    void setChannelUid(const QString &channelUid);
+    void setFrom(const QString &from);
+    void setSignatureKey(const QString &signatureKey);
+
+    void setSignature(const QByteArray &signature);
+    void setData(const QByteArray &data);
+
+    QString pathForMessageId(const QString &messageId);
+
+private:
+    Mailbox *fMailbox;
+    MessageThread *fThread;
+
+    QString fUid;
+    QString fChannelUid;
+    QString fFrom;
+    QString fSignatureKey;
+    QByteArray fSignature;
+    QByteArray fData;
+
 };
 
 
@@ -33,14 +62,15 @@ public:
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
     int rowCount(const QModelIndex & parent = QModelIndex()) const;
 
-    void addMessage(MailRef *messageRef);
-    void removeMessage(MailRef *messageRef);
-    MailRef *removeMessageAt(int index);
-    MailRef *messageAt(int index);
+    int getMessageCount() const;
+    void addMessage(MessageData *messageRef);
+    bool removeMessage(MessageData *message);
+    MessageData *removeMessageAt(int index);
+    MessageData *messageAt(int index);
 
     void clear();
 private:
-    QList<MailRef*> fMessages;
+    QList<MessageData*> fMessages;
 };
 
 class Mailbox : public EncryptedUserData
@@ -55,6 +85,7 @@ public:
     WP::err open(KeyStoreFinder *keyStoreFinder);
 
     void setOwner(UserIdentity *userIdentity);
+    UserIdentity *getOwner() const;
 
     QAbstractListModel &getMessages();
 
@@ -62,7 +93,8 @@ public:
     WP::err readMessage(const QString &messageId, QByteArray &body);
 
     QStringList getChannelIds();
-    MessageChannel* findMessageChannel(const QString &channelId);
+    MessageData *findMessage(const QString &uid);
+    MessageThread *findMessageThread(const QString &channelId);
 
 signals:
     void databaseReadProgress(float progress);
@@ -73,6 +105,7 @@ private slots:
 
 private:
     QString pathForMessageId(const QString &messageId);
+    MessageChannel* readChannel(const QString &channelId);
 
     WP::err readMailDatabase();
     WP::err readMessageChannels();
@@ -80,8 +113,7 @@ private:
     UserIdentity *fUserIdentity;
 
     MessageListModel fMessageList;
-    QStringList fMessageChannels;
-    QMap<QString, MessageChannel*> fMessageChannelCache;
+    MessageThreadDataModel fThreadList;
 };
 
 

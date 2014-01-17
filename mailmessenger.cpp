@@ -74,7 +74,7 @@ void MailMessenger::authConnected(WP::err error)
         }
 
     } else {
-        fMessageChannel = fMailbox->findMessageChannel(fChannelId);
+        fMessageChannel = fMailbox->findMessageThread(fChannelId)->getMessageChannel();
         if (fMessageChannel == NULL) {
             emit sendResult(WP::kChannelNotFound);
             return;

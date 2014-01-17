@@ -46,7 +46,10 @@ SOURCES += main.cpp \
     mailmessenger.cpp \
     mail.cpp \
     createprofiledialog.cpp \
-    passworddialog.cpp
+    passworddialog.cpp \
+    threadview.cpp \
+    logger.cpp \
+    messagethreaddatamodel.cpp
 
 # Installation path
 # target.path =
@@ -83,7 +86,10 @@ HEADERS += \
     mailmessenger.h \
     mail.h \
     createprofiledialog.h \
-    passworddialog.h
+    passworddialog.h \
+    threadview.h \
+    logger.h \
+    messagethreaddatamodel.h
 
 FORMS += \
     mainwindow.ui \

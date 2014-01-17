@@ -40,6 +40,7 @@ class SyncPullStanzaHandler extends InStanzaHandler {
 		$stanza = new OutStanza("sync_pull");
 		$stanza->addAttribute("branch", $branch);
 		$localTipHex = "";
+		$remoteTipHex = "";
 		if (strlen($remoteTip) == 20)
 			$remoteTipHex = sha1_hex($remoteTip);
 		$stanza->addAttribute("base", $remoteTipHex);

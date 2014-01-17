@@ -16,6 +16,8 @@ public:
     
     void setMailbox(Mailbox *mailbox);
 
+private slots:
+    void onThreadSelected(QModelIndex index);
 private:
     Profile *fProfile;
     Mailbox *fMailbox;

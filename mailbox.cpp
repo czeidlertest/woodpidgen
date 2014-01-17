@@ -128,9 +128,14 @@ UserIdentity *Mailbox::getOwner() const
     return fUserIdentity;
 }
 
-QAbstractListModel &Mailbox::getMessages()
+MessageListModel &Mailbox::getMessages()
 {
     return fMessageList;
+}
+
+MessageThreadDataModel &Mailbox::getThreads()
+{
+    return fThreadList;
 }
 
 QStringList Mailbox::getMailIds()
@@ -298,9 +303,9 @@ QString Mailbox::pathForMessageId(const QString &messageId)
 
 WP::err Mailbox::readMailDatabase()
 {
-    readMessageChannels();
-
     fMessageList.clear();
+
+    readMessageChannels();
 
     QStringList mails = getMailIds();
     for (int i = 0; i < mails.count(); i++) {

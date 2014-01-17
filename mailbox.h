@@ -87,7 +87,8 @@ public:
     void setOwner(UserIdentity *userIdentity);
     UserIdentity *getOwner() const;
 
-    QAbstractListModel &getMessages();
+    MessageListModel &getMessages();
+    MessageThreadDataModel &getThreads();
 
     QStringList getMailIds();
     WP::err readMessage(const QString &messageId, QByteArray &body);

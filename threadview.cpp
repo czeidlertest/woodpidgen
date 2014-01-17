@@ -10,8 +10,8 @@
 
 ThreadView::ThreadView(Profile *profile, QWidget *parent) :
     QSplitter(Qt::Vertical, parent),
-    fProfile(profile),
-    fMailbox(NULL)
+    fMailbox(NULL),
+    fProfile(profile)
 {
     fMessageDisplay = new QListView(this);
     QWidget *composerWidget = new QWidget(this);
@@ -30,17 +30,16 @@ fReceiver->setText("lec@localhost");
     composerLayout->addWidget(fSendButton);
 
     connect(fSendButton, SIGNAL(clicked()), this, SLOT(onSendButtonClicked()));
-
-    IdentityListModel *identityList = fProfile->getIdentityList();
-    if (identityList->rowCount() > 0)
-        setMailbox(identityList->identityAt(0)->getMailbox());
 }
 
 void ThreadView::setMailbox(Mailbox *mailbox)
 {
     fMailbox = mailbox;
-    QAbstractListModel &listModel = fMailbox->getMessages();
-    fMessageDisplay->setModel(&listModel);
+}
+
+void ThreadView::setMessages(MessageListModel *messages)
+{
+    fMessageDisplay->setModel(messages);
 }
 
 void ThreadView::onSendButtonClicked()

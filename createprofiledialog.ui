@@ -101,6 +101,13 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>serverUserEdit</tabstop>
+  <tabstop>serverEdit</tabstop>
+  <tabstop>passwordEdit1</tabstop>
+  <tabstop>passwordEdit2</tabstop>
+  <tabstop>buttonBox</tabstop>
+ </tabstops>
  <resources/>
  <connections>
   <connection>

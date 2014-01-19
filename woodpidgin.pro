@@ -17,88 +17,85 @@ QT += network
 
 # The .cpp file which was generated for your project. Feel free to hack it.
 SOURCES += main.cpp \
-    mainwindow.cpp \
-    gitinterface.cpp \
     messagereceiver.cpp \
-    cryptointerface.cpp \
     useridentity.cpp \
-    useridentityview.cpp \
-    messageview.cpp \
     profile.cpp \
-    databaseutil.cpp \
     mainapplication.cpp \
-    BigInteger/BigUnsigned.cpp \
-    BigInteger/BigIntegerUtils.cpp \
-    BigInteger/BigIntegerAlgorithms.cpp \
-    BigInteger/BigInteger.cpp \
-    BigInteger/BigUnsignedInABase.cc \
-    databaseinterface.cpp \
     remotesync.cpp \
-    protocolparser.cpp \
     remotestorage.cpp \
     remoteconnection.cpp \
     remoteauthentication.cpp \
     mailbox.cpp \
     syncmanager.cpp \
-    message.cpp \
     contactrequest.cpp \
     contact.cpp \
     mailmessenger.cpp \
     mail.cpp \
-    createprofiledialog.cpp \
-    passworddialog.cpp \
-    threadview.cpp \
-    logger.cpp \
-    messagethreaddatamodel.cpp
+    messagethreaddatamodel.cpp \
+    gui/createprofiledialog.cpp \
+    gui/mainwindow.cpp \
+    gui/messageview.cpp \
+    gui/passworddialog.cpp \
+    gui/threadview.cpp \
+    gui/useridentityview.cpp \
+    support/cryptointerface.cpp \
+    support/databaseinterface.cpp \
+    support/databaseutil.cpp \
+    support/gitinterface.cpp \
+    support/logger.cpp \
+    support/protocolparser.cpp \
+    support/BigInteger/BigUnsigned.cpp \
+    support/BigInteger/BigIntegerUtils.cpp \
+    support/BigInteger/BigIntegerAlgorithms.cpp \
+    support/BigInteger/BigInteger.cpp \
+    support/BigInteger/BigUnsignedInABase.cc
 
 # Installation path
 # target.path =
 
 HEADERS += \
-    mainwindow.h \
-    gitinterface.h \
     messagereceiver.h \
-    cryptointerface.h \
     useridentity.h \
-    databaseinterface.h \
-    useridentityview.h \
-    messageview.h \
     profile.h \
-    databaseutil.h \
     mainapplication.h \
-    BigInteger/BigUnsigned.hh \
-    BigInteger/BigIntegerUtils.hh \
-    BigInteger/BigIntegerAlgorithms.hh \
-    BigInteger/BigInteger.hh \
-    BigInteger/NumberlikeArray.hh \
-    BigInteger/BigUnsignedInABase.hh \
-    error_codes.h \
     remotesync.h \
-    protocolparser.h \
     remotestorage.h \
     remoteconnection.h \
     remoteauthentication.h \
     mailbox.h \
     syncmanager.h \
-    message.h \
     contactrequest.h \
     contact.h \
     mailmessenger.h \
     mail.h \
-    createprofiledialog.h \
-    passworddialog.h \
-    threadview.h \
-    logger.h \
-    messagethreaddatamodel.h
-
+    messagethreaddatamodel.h \
+    gui/createprofiledialog.h \
+    gui/mainwindow.h \
+    gui/messageview.h \
+    gui/passworddialog.h \
+    gui/threadview.h \
+    gui/useridentityview.h \
+    support/cryptointerface.h \
+    support/databaseinterface.h \
+    support/databaseutil.h \
+    support/error_codes.h \
+    support/gitinterface.h \
+    support/logger.h \
+    support/protocolparser.h \
+    support/BigInteger/BigUnsigned.hh \
+    support/BigInteger/BigIntegerUtils.hh \
+    support/BigInteger/BigIntegerAlgorithms.hh \
+    support/BigInteger/BigInteger.hh \
+    support/BigInteger/NumberlikeArray.hh \
+    support/BigInteger/BigUnsignedInABase.hh
 FORMS += \
-    mainwindow.ui \
-    createprofiledialog.ui \
-    passworddialog.ui
+    gui/mainwindow.ui \
+    gui/createprofiledialog.ui \
+    gui/passworddialog.ui
 
 unix: LIBS += -L$$PWD/../libgit2/build -lgit2 -lz
 
-INCLUDEPATH += $$PWD/../libgit2/include
+INCLUDEPATH += $$PWD/../libgit2/include gui support
 DEPENDPATH += $$PWD/../libgit2
 
 #unix: PRE_TARGETDEPS += $$PWD/../libgit2/.a

@@ -74,7 +74,7 @@ MessageThread *MessageThreadDataModel::channelAt(int index) const
 MessageThread *MessageThreadDataModel::findChannel(const QString &channelId) const
 {
     foreach (MessageThread *thread, channelMessages) {
-        if (thread->getMessageChannel()->getChannleId() == channelId)
+        if (thread->getMessageChannel()->getUid() == channelId)
             return thread;
     }
     return NULL;

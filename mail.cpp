@@ -62,7 +62,7 @@ const Contact *DataParcel::getSender() const
     return sender;
 }
 
-const QString DataParcel::getUid() const
+QString DataParcel::getUid() const
 {
     return uid;
 }
@@ -303,7 +303,7 @@ WP::err SecureChannel::readMainData(QBuffer &mainData)
     return parcelCrypto.initFromPublic(receiver, asymmetricKeyId, iv, encryptedSymmetricKey);
 }
 
-const QString &SecureChannel::getChannleId() const
+QString SecureChannel::getUid() const
 {
     QByteArray data;
     data += parcelCrypto.getIV();
@@ -320,7 +320,7 @@ MessageChannel::MessageChannel(Contact *receiver) :
 
 MessageChannel::MessageChannel(Contact *receiver, const QString &asymKeyId, MessageChannel *parent) :
     SecureChannel(receiver, asymKeyId),
-    parentChannelUid(parent->getChannleId())
+    parentChannelUid(parent->getUid())
 {
 
 }

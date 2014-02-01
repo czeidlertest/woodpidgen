@@ -248,7 +248,7 @@ WP::err Mailbox::readMailDatabase()
         fMessageList.addMessage(message);
 
         // add to thread
-        MessageThread *thread = findMessageThread(message->getChannel()->getChannleId());
+        MessageThread *thread = findMessageThread(message->getChannel()->getUid());
         if (thread != NULL)
             thread->getMessages()->addMessage(message);
     }

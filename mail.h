@@ -36,8 +36,7 @@ public:
     const QString getSignatureKey() const;
     const Contact *getSender() const;
 
-    // returns the sha1 hash of the encapsulated data
-    const QString getUid() const;
+    virtual QString getUid() const;
 
     virtual WP::err toRawData(Contact *sender, const QString &signatureKey, QIODevice &rawData);
     virtual WP::err fromRawData(ContactFinder *contactFinder, QIODevice &rawData);
@@ -66,7 +65,7 @@ public:
     /*! The id should be the same for all users. Thus the asym part can't be part of the hash.
     At the moment the channel id is just the sha1 hash of the iv.
     */
-    virtual const QString &getChannleId() const;
+    virtual QString getUid() const;
 
     virtual WP::err writeDataSecure(QDataStream &stream, const QByteArray &data);
     virtual WP::err readDataSecure(QDataStream &stream, QByteArray &data);

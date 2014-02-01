@@ -6,46 +6,47 @@
 
 
 MailMessenger::MailMessenger(Mailbox *mailbox, const QString &targetAddress, Profile *profile, UserIdentity *identity) :
-    fMailbox(mailbox),
-    fIdentity(identity),
-    fAddress(targetAddress),
-    fContactRequest(NULL),
-    fMessage(NULL),
-    fRemoteConnection(NULL),
-    fMessageChannel(NULL)
+    mailbox(mailbox),
+    userIdentity(identity),
+    address(targetAddress),
+    targetContact(NULL),
+    contactRequest(NULL),
+    rawMessage(NULL),
+    remoteConnection(NULL),
+    messageChannel(NULL)
 {
     parseAddress(targetAddress);
     //fRemoteConnection = sPHPConnectionManager.connectionFor(QUrl(fTargetServer));
-    fRemoteConnection = ConnectionManager::connectionHTTPFor(QUrl(fTargetServer));
-    if (fRemoteConnection == NULL)
+    remoteConnection = ConnectionManager::connectionHTTPFor(QUrl(targetServer));
+    if (remoteConnection == NULL)
         return;
-    fAuthentication = new SignatureAuthentication(fRemoteConnection, profile, identity->getMyself()->getUid(),
+    authentication = new SignatureAuthentication(remoteConnection, profile, identity->getMyself()->getUid(),
                                                   identity->getKeyStore()->getUid(),
-                                                  identity->getMyself()->getKeys()->getMainKeyId(), fTargetUser);
+                                                  identity->getMyself()->getKeys()->getMainKeyId(), targetUser);
 }
 
 MailMessenger::~MailMessenger()
 {
-    delete fAuthentication;
-    delete fRemoteConnection;
-    delete fMessage;
+    delete authentication;
+    delete remoteConnection;
+    delete rawMessage;
 }
 
-WP::err MailMessenger::postMessage(const RawMailMessage *message, const QString channelId)
+WP::err MailMessenger::postMessage(const RawMessage *message, const QString _channelId)
 {
-    delete fMessage;
-    fMessage = message;
+    delete message;
+    message = message;
 
-    fChannelId = channelId;
+    channelId = _channelId;
 
-    if (fTargetServer == "")
+    if (targetServer == "")
         return WP::kNotInit;
-    if (fRemoteConnection == NULL)
+    if (remoteConnection == NULL)
         return WP::kNotInit;
-    if (fAuthentication == NULL)
+    if (authentication == NULL)
         return WP::kNotInit;
 
-    Contact *targetContact = fIdentity->findContact(fAddress);
+    targetContact = userIdentity->findContact(address);
     if (targetContact != NULL) {
         onContactFound(WP::kOk);
         return WP::kOk;
@@ -64,47 +65,41 @@ void MailMessenger::authConnected(WP::err error)
         return;
 
     // channel info
-    if (fChannelId == "") {
-        //channel = new
-        fMessageChannel = new MessageChannel();
-        error = fMessageChannel->createNew(fIdentity->getMyself());
-        if (error != WP::kOk) {
-            emit sendResult(error);
-            return;
-        }
-
+    if (channelId == "") {
+        messageChannel = new MessageChannel(targetContact, targetContact->getKeys()->getMainKeyId());
     } else {
-        fMessageChannel = fMailbox->findMessageThread(fChannelId)->getMessageChannel();
-        if (fMessageChannel == NULL) {
+        messageChannel = mailbox->findMessageThread(channelId)->getMessageChannel();
+        if (messageChannel == NULL) {
             emit sendResult(WP::kChannelNotFound);
             return;
         }
     }
+
+    Message *message = new Message(messageChannel);
+    message->setBody(rawMessage->body);
 
     QByteArray data;
     ProtocolOutStream outStream(&data);
     IqOutStanza *iqStanza = new IqOutStanza(kSet);
     outStream.pushStanza(iqStanza);
 
-    Contact *myself = fIdentity->getMyself();
-    OutStanza *messageStanza =  new OutStanza("message");
-    messageStanza->addAttribute("uid", fMessage->getUid());
-    messageStanza->addAttribute("channel_uid", fMessageChannel->getUid());
+    Contact *myself = userIdentity->getMyself();
+    OutStanza *messageStanza =  new OutStanza("put_message");
+    messageStanza->addAttribute("uid", message->getUid());
     messageStanza->addAttribute("from", myself->getUid());
     outStream.pushChildStanza(messageStanza);
 
-    // header
-    error = envelopMessage(&outStream, fMessage->getBody());
+    QString signatureKeyId = myself->getKeys()->getMainKeyId();
+
+    error = XMLSecureParcel::write(&outStream, myself, signatureKeyId, message, "message");
     if (error != WP::kOk) {
         emit sendResult(error);
         return;
     }
 
-    if (fChannelId == "") {
+    if (channelId == "") {
         // add new channel
-        Contact *receiver = fIdentity->findContact(fAddress);
-        Q_ASSERT(receiver != NULL);
-        error = XMLSecureChannel::toPublicXML(&outStream, fMessageChannel, receiver);
+        error = XMLSecureParcel::write(&outStream, myself, signatureKeyId, messageChannel, "channel");
         if (error != WP::kOk) {
             emit sendResult(error);
             return;
@@ -113,59 +108,32 @@ void MailMessenger::authConnected(WP::err error)
 
     outStream.flush();
 
-    fServerReply = fRemoteConnection->send(data);
-    connect(fServerReply, SIGNAL(finished(WP::err)), this, SLOT(handleReply(WP::err)));
+    serverReply = remoteConnection->send(data);
+    connect(serverReply, SIGNAL(finished(WP::err)), this, SLOT(handleReply(WP::err)));
 }
 
 void MailMessenger::onContactFound(WP::err error)
 {
-    delete fContactRequest;
-    fContactRequest = NULL;
+    delete contactRequest;
+    contactRequest = NULL;
 
     if (error != WP::kOk)
         return;
 
-    if (fAuthentication->verified())
+    targetContact = userIdentity->findContact(address);
+
+    if (authentication->verified())
         authConnected(WP::kOk);
     else {
-        connect(fAuthentication, SIGNAL(authenticationAttemptFinished(WP::err)),
+        connect(authentication, SIGNAL(authenticationAttemptFinished(WP::err)),
                 this, SLOT(authConnected(WP::err)));
-        fAuthentication->login();
+        authentication->login();
     }
-}
-
-WP::err MailMessenger::envelopMessage(ProtocolOutStream *outStream, const QByteArray &org)
-{
-    Contact *myself = fIdentity->getMyself();
-
-    SecureParcel *parcel = fMessageChannel->getSecureParcel();
-    QByteArray encryptedData;
-    WP::err error = parcel->cloakData(org, encryptedData);
-    if (error != WP::kOk)
-        return error;
-
-    const QString &myKeyId = myself->getKeys()->getMainKeyId();
-    QByteArray signature;
-    error = myself->sign(myKeyId, encryptedData, signature);
-    if (error != WP::kOk)
-        return error;
-
-    encryptedData = encryptedData.toBase64();
-    signature = signature.toBase64();
-
-    OutStanza *dataStanza = new OutStanza("primary_data");
-    dataStanza->addAttribute("signature_key", myKeyId);
-    dataStanza->addAttribute("signature", signature);
-    dataStanza->setText(encryptedData);
-    outStream->pushChildStanza(dataStanza);
-
-//   outStream->cdDotDot();
-    return WP::kOk;
 }
 
 void MailMessenger::handleReply(WP::err error)
 {
-    QByteArray data = fServerReply->readAll();
+    QByteArray data = serverReply->readAll();
 }
 
 void MailMessenger::parseAddress(const QString &targetAddress)
@@ -174,15 +142,15 @@ void MailMessenger::parseAddress(const QString &targetAddress)
     QStringList parts = address.split("@");
     if (parts.count() != 2)
         return;
-    fTargetUser = parts[0];
-    fTargetServer = "http://";
-    fTargetServer += parts[1];
-    fTargetServer += "/php_server/portal.php";
+    targetUser = parts[0];
+    targetServer = "http://";
+    targetServer += parts[1];
+    targetServer += "/php_server/portal.php";
 }
 
 WP::err MailMessenger::startContactRequest()
 {
-    fContactRequest = new ContactRequest(fRemoteConnection, fTargetUser, fIdentity, this);
-    connect(fContactRequest, SIGNAL(contactRequestFinished(WP::err)), this, SLOT(onContactFound(WP::err)));
-    return fContactRequest->postRequest();
+    contactRequest = new ContactRequest(remoteConnection, targetUser, userIdentity, this);
+    connect(contactRequest, SIGNAL(contactRequestFinished(WP::err)), this, SLOT(onContactFound(WP::err)));
+    return contactRequest->postRequest();
 }

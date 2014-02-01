@@ -28,7 +28,7 @@ QVariant
 MessageListModel::data(const QModelIndex &index, int role) const
 {
     if (role == Qt::DisplayRole)
-        return fMessages.at(index.row())->getData();
+        return fMessages.at(index.row())->getBody();
 
     return QVariant();
 }
@@ -43,7 +43,7 @@ int MessageListModel::getMessageCount() const
     return fMessages.count();
 }
 
-void MessageListModel::addMessage(MessageData *messageRef)
+void MessageListModel::addMessage(Message *messageRef)
 {
     int count = fMessages.count();
     beginInsertRows(QModelIndex(), count, count);
@@ -51,7 +51,7 @@ void MessageListModel::addMessage(MessageData *messageRef)
     endInsertRows();
 }
 
-bool MessageListModel::removeMessage(MessageData *message)
+bool MessageListModel::removeMessage(Message *message)
 {
     int index = fMessages.indexOf(message);
     if (index < 0)
@@ -60,16 +60,16 @@ bool MessageListModel::removeMessage(MessageData *message)
     return true;
 }
 
-MessageData *MessageListModel::removeMessageAt(int index)
+Message *MessageListModel::removeMessageAt(int index)
 {
-    MessageData *entry = fMessages.at(index);
+    Message *entry = fMessages.at(index);
     beginRemoveRows(QModelIndex(), index, index);
     fMessages.removeAt(index);
     endRemoveRows();
     return entry;
 }
 
-MessageData *MessageListModel::messageAt(int index)
+Message *MessageListModel::messageAt(int index)
 {
     return fMessages.at(index);
 }
@@ -77,7 +77,7 @@ MessageData *MessageListModel::messageAt(int index)
 void MessageListModel::clear()
 {
     beginRemoveRows(QModelIndex(), 0, fMessages.count() - 1);
-    foreach (MessageData *ref, fMessages)
+    foreach (Message *ref, fMessages)
         delete ref;
     fMessages.clear();
     endRemoveRows();
@@ -86,7 +86,8 @@ void MessageListModel::clear()
 
 Mailbox::Mailbox(DatabaseBranch *branch, const QString &baseDir) :
     fUserIdentity(NULL),
-    fMessageList(this)
+    fMessageList(this),
+    channelFinder(&fThreadList)
 {
     setToDatabase(branch, baseDir);
 }
@@ -158,15 +159,15 @@ QStringList Mailbox::getMailIds()
 
 WP::err Mailbox::readMessage(const QString &messageId, QByteArray &body)
 {
-    MessageData *message = findMessage(messageId);
+    Message *message = findMessage(messageId);
     if (message == NULL)
         return WP::kEntryNotFound;
 
-    Contact *sender = fUserIdentity->findContactByUid(message->getFrom());
+    Contact *sender = fUserIdentity->findContactByUid(message->getSender()->getUid());
     if (sender != NULL)
         body.append(QString(sender->getAddress() + ": ").toLatin1());
 
-    body.append(message->getData());
+    body.append(message->getBody());
     return WP::kOk;
 }
 
@@ -186,97 +187,15 @@ QStringList Mailbox::getChannelIds()
     return channelIds;
 }
 
-MessageData *Mailbox::findMessage(const QString &uid)
+Message *Mailbox::findMessage(const QString &uid)
 {
     for (int i = 0; i < fMessageList.getMessageCount(); i++) {
-        MessageData *message = fMessageList.messageAt(i);
+        Message *message = fMessageList.messageAt(i);
         if (message->getUid() == uid)
             return message;
     }
-    return false;
+    return NULL;
 }
-
-
-class MessageChannelData {
-public:
-    QString uid;
-    QString asymKeyId;
-    QByteArray iv;
-    QByteArray ckey;
-};
-
-class MessageChannelIVParserHandler : public InStanzaHandler {
-public:
-    MessageChannelIVParserHandler(MessageChannelData *c) :
-        InStanzaHandler("iv"),
-        data(c)
-    {
-    }
-
-    bool handleStanza(const QXmlStreamAttributes &attributes)
-    {
-       return true;
-    }
-
-    bool handleText(const QStringRef &text)
-    {
-        data->iv = QByteArray::fromBase64(text.toLatin1());
-        return true;
-    }
-
-public:
-    MessageChannelData *data;
-};
-
-class MessageChannelCKeyParserHandler : public InStanzaHandler {
-public:
-    MessageChannelCKeyParserHandler(MessageChannelData *c) :
-        InStanzaHandler("ckey"),
-        data(c)
-    {
-    }
-
-    bool handleStanza(const QXmlStreamAttributes &attributes)
-    {
-       return true;
-    }
-
-    bool handleText(const QStringRef &text)
-    {
-        data->ckey = QByteArray::fromBase64(text.toLatin1());
-        return true;
-    }
-
-public:
-    MessageChannelData *data;
-};
-
-class MessageChannelParserHandler : public InStanzaHandler {
-public:
-    MessageChannelParserHandler(MessageChannelData *c) :
-        InStanzaHandler("channel"),
-        data(c)
-    {
-        addChildHandler(new MessageChannelIVParserHandler(data));
-        addChildHandler(new MessageChannelCKeyParserHandler(data));
-    }
-
-    bool handleStanza(const QXmlStreamAttributes &attributes)
-    {
-       if (!attributes.hasAttribute("uid"))
-            return false;
-        if (!attributes.hasAttribute("asym_key_id"))
-            return false;
-
-        data->uid = attributes.value("uid").toString();
-        data->asymKeyId = attributes.value("asym_key_id").toString();
-        return true;
-    }
-
-public:
-    MessageChannelData *data;
-};
-
 
 MessageThread *Mailbox::findMessageThread(const QString &channelId)
 {
@@ -310,12 +229,28 @@ WP::err Mailbox::readMailDatabase()
     QStringList mails = getMailIds();
     for (int i = 0; i < mails.count(); i++) {
         const QString &mailId = mails.at(i);
-        MessageData *data = new MessageData(this);
-        if (data->load(mailId) != WP::kOk) {
-            delete data;
+        Message *message = new Message(&channelFinder);
+
+        QString path = pathForMessageId(mailId);
+        path += "/message";
+        QByteArray data;
+        WP::err error = read(path, data);
+        if (error != WP::kOk)
+            continue;
+
+        QBuffer dataBuffer(&data);
+        error = message->fromRawData(fUserIdentity->getContactFinder(), dataBuffer);
+        if (error != WP::kOk) {
+            delete message;
             continue;
         }
-        fMessageList.addMessage(data);
+
+        fMessageList.addMessage(message);
+
+        // add to thread
+        MessageThread *thread = findMessageThread(message->getChannel()->getChannleId());
+        if (thread != NULL)
+            thread->getMessages()->addMessage(message);
     }
 
     emit databaseRead();
@@ -343,206 +278,27 @@ MessageChannel* Mailbox::readChannel(const QString &channelId) {
     if (error != WP::kOk)
         return NULL;
 
-    MessageChannelData channelData;
-    MessageChannelParserHandler handler(&channelData);
-    ProtocolInStream inStream(data);
-    inStream.addHandler(&handler);
-    inStream.parse();
-
-    if (!handler.hasBeenHandled())
-        return NULL;
-
     Contact *myself = fUserIdentity->getMyself();
-    SecureParcel *secureParcel = new SecureParcel();
-    error = secureParcel->initFromPublic(myself, channelData.asymKeyId, channelData.iv, channelData.ckey);
+    MessageChannel *channel = new MessageChannel(myself);
+    QBuffer dataBuffer(&data);
+    error = channel->fromRawData(fUserIdentity->getContactFinder(), dataBuffer);
     if (error != WP::kOk) {
-        delete secureParcel;
+        delete channel;
         return NULL;
     }
-
-    MessageChannel *channel = new MessageChannel();
-    channel->setUid(channelData.uid);
-    channel->setSecureParcel(secureParcel);
-
     return channel;
 }
 
-
-class MessagePrimDataHandler : public InStanzaHandler {
-public:
-    MessagePrimDataHandler(MessageData *d) :
-        InStanzaHandler("primary_data"),
-        data(d)
-    {
-    }
-
-    bool handleStanza(const QXmlStreamAttributes &attributes)
-    {
-        if (!attributes.hasAttribute("signature_key"))
-            return false;
-        if (!attributes.hasAttribute("signature"))
-            return false;
-
-        data->setSignatureKey(attributes.value("signature_key").toString());
-        data->setSignature(QByteArray::fromBase64(attributes.value("signature").toLatin1()));
-        return true;
-    }
-
-    bool handleText(const QStringRef &text)
-    {
-        data->setData(QByteArray::fromBase64(text.toLatin1()));
-        return true;
-    }
-
-public:
-    MessageData *data;
-};
-
-
-class MessageParserHandler : public InStanzaHandler {
-public:
-    MessageParserHandler(MessageData *d) :
-        InStanzaHandler("message"),
-        data(d)
-    {
-        addChildHandler(new MessagePrimDataHandler(data));
-    }
-
-    bool handleStanza(const QXmlStreamAttributes &attributes)
-    {
-        if (!attributes.hasAttribute("uid"))
-            return false;
-        if (!attributes.hasAttribute("channel_uid"))
-            return false;
-        if (!attributes.hasAttribute("from"))
-            return false;
-
-        data->setUid(attributes.value("uid").toString());
-        data->setChannelUid(attributes.value("channel_uid").toString());
-        data->setFrom(attributes.value("from").toString());
-        return true;
-    }
-
-public:
-    MessageData *data;
-};
-
-
-MessageData::MessageData(Mailbox *mailbox) :
-    fMailbox(mailbox),
-    fThread(NULL)
+Mailbox::MailboxMessageChannelFinder::MailboxMessageChannelFinder(MessageThreadDataModel *_threads) :
+    threads(_threads)
 {
 
 }
 
-MessageData::~MessageData()
+MessageChannel *Mailbox::MailboxMessageChannelFinder::find(const QString &channelUid)
 {
-    if (fThread != NULL)
-        fThread->getMessages()->removeMessage(this);
-}
-
-WP::err MessageData::load(const QString &uid)
-{
-    fUid = uid;
-
-    QString path = pathForMessageId(fUid);
-    path += "/message";
-    QByteArray data;
-    WP::err error = fMailbox->read(path, data);
-    if (error != WP::kOk)
-        return error;
-
-
-    MessageParserHandler handler(this);
-    ProtocolInStream inStream(data);
-    inStream.addHandler(&handler);
-    inStream.parse();
-
-    if (!handler.hasBeenHandled())
-        return WP::kError;
-
-    UserIdentity *userIdentity = fMailbox->getOwner();
-    Contact *myself = userIdentity->getMyself();
-    if (!myself->verify(fSignatureKey, fData, fSignature))
-        return WP::kError;
-
-    fThread = fMailbox->findMessageThread(fChannelUid);
-    if (fThread == NULL)
-        return WP::kChannelNotFound;
-    fThread->getMessages()->addMessage(this);
-
-    MessageChannel *channel = fThread->getMessageChannel();
-    error = channel->getSecureParcel()->uncloakData(fData, fData);
-    if (error != WP::kOk)
-        return error;
-
-    return WP::kOk;
-}
-
-const QString &MessageData::getUid() const
-{
-    return fUid;
-}
-
-const QString &MessageData::getChannelUid() const
-{
-    return fChannelUid;
-}
-
-const QString &MessageData::getFrom() const
-{
-    return fFrom;
-}
-
-const QString &MessageData::getSignatureKey() const
-{
-    return fSignatureKey;
-}
-
-const QByteArray &MessageData::getSignature() const
-{
-    return fSignature;
-}
-
-const QByteArray &MessageData::getData() const
-{
-    return fData;
-}
-
-void MessageData::setUid(const QString &uid)
-{
-    fUid = uid;
-}
-
-void MessageData::setChannelUid(const QString &channelUid)
-{
-    fChannelUid = channelUid;
-}
-
-void MessageData::setFrom(const QString &from)
-{
-    fFrom = from;
-}
-
-void MessageData::setSignatureKey(const QString &signatureKey)
-{
-    fSignatureKey = signatureKey;
-}
-
-void MessageData::setSignature(const QByteArray &signature)
-{
-    fSignature = signature;
-}
-
-void MessageData::setData(const QByteArray &data)
-{
-    fData = data;
-}
-
-QString MessageData::pathForMessageId(const QString &messageId)
-{
-    QString path = messageId.left(2);
-    path += "/";
-    path += messageId.mid(2);
-    return path;
+    MessageThread *thread = threads->findChannel(channelUid);
+    if (thread == NULL)
+        return NULL;
+    return thread->getMessageChannel();
 }

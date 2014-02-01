@@ -32,11 +32,11 @@ public:
     void addChannel(MessageThread *channel);
     MessageThread *removeChannelAt(int index);
     MessageThread *channelAt(int index) const;
-
+    MessageThread *findChannel(const QString &channelId) const;
     void clear();
 
 private:
-    QList<MessageThread*> fChannelMessages;
+    QList<MessageThread*> channelMessages;
 };
 
 #endif // MESSAGETHREADDATAMODEL_H

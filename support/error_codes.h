@@ -12,6 +12,7 @@ enum err {
     kIsConnected,
     kEntryExist,
     kBadValue,
+    kContactNotFound,
     kContactNeeded,
     kContactRefused,
     kChannelNotFound,

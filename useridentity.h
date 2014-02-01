@@ -49,13 +49,24 @@ public:
     Contact *findContact(const QString &address);
     Contact *findContactByUid(const QString &uid);
 
+    ContactFinder *getContactFinder();
 private:
+    class UserIdContactFinder : public ContactFinder {
+    public:
+        UserIdContactFinder(QList<Contact *> &contactList);
+        virtual Contact *find(const QString &uid);
+    private:
+        QList<Contact *> &contacts;
+    };
+
     WP::err writePublicSignature(const QString &filename, const QString &publicKey);
 
     Mailbox *fMailbox;
 
     Contact *fMyselfContact;
     QList<Contact *> fContacts;
+
+    UserIdContactFinder contactFinder;
 };
 
 #endif // USERIDENTITY_H

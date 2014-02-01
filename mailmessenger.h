@@ -9,13 +9,18 @@
 class Profile;
 class UserIdentity;
 
+class RawMessage {
+public:
+    QByteArray body;
+};
+
 class MailMessenger : QObject {
 Q_OBJECT
 public:
     MailMessenger(Mailbox *mailbox, const QString &targetAddress, Profile *profile, UserIdentity *identity);
     ~MailMessenger();
 
-    WP::err postMessage(const RawMailMessage *message, const QString channelId = "");
+    WP::err postMessage(const RawMessage *rawMessage, const QString channelId = "");
 
 signals:
     void sendResult(WP::err error);
@@ -26,26 +31,27 @@ private slots:
     void onContactFound(WP::err error);
 
 private:
-    WP::err envelopMessage(ProtocolOutStream *outStream, const QByteArray &org);
-
     void parseAddress(const QString &targetAddress);
     WP::err startContactRequest();
 
-    Mailbox *fMailbox;
+    Mailbox *mailbox;
 
-    UserIdentity *fIdentity;
-    QString fAddress;
-    QString fTargetServer;
-    QString fTargetUser;
-    QString fChannelId;
+    UserIdentity *userIdentity;
+    QString address;
+    QString targetServer;
+    QString targetUser;
+    QString channelId;
 
-    MessageChannel *fMessageChannel;
-    ContactRequest* fContactRequest;
+    Contact *targetContact;
 
-    const RawMailMessage *fMessage;
-    RemoteConnection *fRemoteConnection;
-    RemoteConnectionReply *fServerReply;
-    RemoteAuthentication *fAuthentication;
+    MessageChannel *messageChannel;
+    ContactRequest* contactRequest;
+
+    const RawMessage *rawMessage;
+
+    RemoteConnection *remoteConnection;
+    RemoteConnectionReply *serverReply;
+    RemoteAuthentication *authentication;
 };
 
 

@@ -39,6 +39,7 @@ public:
                     const SecureArray &keyPassword, const QString& certificate);
 
     QByteArray sha1Hash(const QByteArray &string) const;
+    QByteArray sha2Hash(const QByteArray &string) const;
     QString toHex(const QByteArray& string) const;
 
     WP::err sign(const QByteArray& input, QByteArray &signature, const QString &privateKeyString,

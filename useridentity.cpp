@@ -11,7 +11,8 @@ const char* kPathIdentityKeyId = "identity_key_id";
 
 UserIdentity::UserIdentity(DatabaseBranch *branch, const QString &baseDir) :
     fMailbox(NULL),
-    fMyselfContact(NULL)
+    fMyselfContact(NULL),
+    contactFinder(fContacts)
 {
     setToDatabase(branch, baseDir);
 }
@@ -136,11 +137,12 @@ Contact *UserIdentity::findContact(const QString &address)
 
 Contact *UserIdentity::findContactByUid(const QString &uid)
 {
-    foreach (Contact *contact, fContacts) {
-        if (contact->getUid() == uid)
-            return contact;
-    }
-    return NULL;
+    return contactFinder.find(uid);
+}
+
+ContactFinder *UserIdentity::getContactFinder()
+{
+    return &contactFinder;
 }
 
 WP::err UserIdentity::writePublicSignature(const QString &filename, const QString &publicKey)
@@ -152,4 +154,20 @@ WP::err UserIdentity::writePublicSignature(const QString &filename, const QStrin
     if (file.write(data, count) != count)
         return WP::kError;
     return WP::kOk;
+}
+
+
+UserIdentity::UserIdContactFinder::UserIdContactFinder(QList<Contact *> &contactList) :
+    contacts(contactList)
+{
+
+}
+
+Contact *UserIdentity::UserIdContactFinder::find(const QString &uid)
+{
+    foreach (Contact *contact, contacts) {
+        if (contact->getUid() == uid)
+            return contact;
+    }
+    return NULL;
 }

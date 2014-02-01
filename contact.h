@@ -129,4 +129,10 @@ private:
 };
 
 
+class ContactFinder {
+public:
+    virtual ~ContactFinder() {}
+    virtual Contact *find(const QString &uid) = 0;
+};
+
 #endif // CONTACT_H

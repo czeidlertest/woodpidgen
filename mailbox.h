@@ -8,51 +8,6 @@
 #include "messagethreaddatamodel.h"
 
 
-class Mailbox;
-
-class MessageData {
-public:
-    MessageData(Mailbox *mailbox);
-    ~MessageData();
-
-    WP::err load(const QString &uid);
-
-    const QString &getUid() const;
-    const QString &getChannelUid() const;
-    const QString &getFrom() const;
-    const QString &getSignatureKey() const;
-
-    const QByteArray &getSignature() const;
-    const QByteArray &getData() const;
-
-private:
-    friend class MessageParserHandler;
-    friend class MessagePrimDataHandler;
-
-    void setUid(const QString &uid);
-    void setChannelUid(const QString &channelUid);
-    void setFrom(const QString &from);
-    void setSignatureKey(const QString &signatureKey);
-
-    void setSignature(const QByteArray &signature);
-    void setData(const QByteArray &data);
-
-    QString pathForMessageId(const QString &messageId);
-
-private:
-    Mailbox *fMailbox;
-    MessageThread *fThread;
-
-    QString fUid;
-    QString fChannelUid;
-    QString fFrom;
-    QString fSignatureKey;
-    QByteArray fSignature;
-    QByteArray fData;
-
-};
-
-
 class UserIdentity;
 
 class MessageListModel : public QAbstractListModel {
@@ -63,14 +18,14 @@ public:
     int rowCount(const QModelIndex & parent = QModelIndex()) const;
 
     int getMessageCount() const;
-    void addMessage(MessageData *messageRef);
-    bool removeMessage(MessageData *message);
-    MessageData *removeMessageAt(int index);
-    MessageData *messageAt(int index);
+    void addMessage(Message *message);
+    bool removeMessage(Message *message);
+    Message *removeMessageAt(int index);
+    Message *messageAt(int index);
 
     void clear();
 private:
-    QList<MessageData*> fMessages;
+    QList<Message*> fMessages;
 };
 
 class Mailbox : public EncryptedUserData
@@ -94,7 +49,7 @@ public:
     WP::err readMessage(const QString &messageId, QByteArray &body);
 
     QStringList getChannelIds();
-    MessageData *findMessage(const QString &uid);
+    Message *findMessage(const QString &uid);
     MessageThread *findMessageThread(const QString &channelId);
 
 signals:
@@ -105,6 +60,14 @@ private slots:
     virtual void onNewCommits(const QString &startCommit, const QString &endCommit);
 
 private:
+    class MailboxMessageChannelFinder : public MessageChannelFinder {
+    public:
+        MailboxMessageChannelFinder(MessageThreadDataModel *threads);
+        virtual MessageChannel *find(const QString &channelUid);
+    private:
+        MessageThreadDataModel *threads;
+    };
+
     QString pathForMessageId(const QString &messageId);
     MessageChannel* readChannel(const QString &channelId);
 
@@ -115,6 +78,7 @@ private:
 
     MessageListModel fMessageList;
     MessageThreadDataModel fThreadList;
+    MailboxMessageChannelFinder channelFinder;
 };
 
 

@@ -34,7 +34,7 @@ MessageThreadDataModel::MessageThreadDataModel(QObject *parent) :
 QVariant MessageThreadDataModel::data(const QModelIndex &index, int role) const
 {
     if (role == Qt::DisplayRole)
-        return fChannelMessages.at(index.row())->getMessageChannel()->getUid();
+        return channelMessages.at(index.row())->getMessageChannel()->getUid();
 
     return QVariant();
 }
@@ -46,37 +46,46 @@ int MessageThreadDataModel::rowCount(const QModelIndex &parent) const
 
 int MessageThreadDataModel::getChannelCount() const
 {
-    return fChannelMessages.count();
+    return channelMessages.count();
 }
 
 void MessageThreadDataModel::addChannel(MessageThread *channel)
 {
-    int count = fChannelMessages.count();
+    int count = channelMessages.count();
     beginInsertRows(QModelIndex(), count, count);
-    fChannelMessages.append(channel);
+    channelMessages.append(channel);
     endInsertRows();
 }
 
 MessageThread *MessageThreadDataModel::removeChannelAt(int index)
 {
-    MessageThread *channel = fChannelMessages.at(index);
+    MessageThread *channel = channelMessages.at(index);
     beginRemoveRows(QModelIndex(), index, index);
-    fChannelMessages.removeAt(index);
+    channelMessages.removeAt(index);
     endRemoveRows();
     return channel;
 }
 
 MessageThread *MessageThreadDataModel::channelAt(int index) const
 {
-    return fChannelMessages.at(index);
+    return channelMessages.at(index);
+}
+
+MessageThread *MessageThreadDataModel::findChannel(const QString &channelId) const
+{
+    foreach (MessageThread *thread, channelMessages) {
+        if (thread->getMessageChannel()->getChannleId() == channelId)
+            return thread;
+    }
+    return NULL;
 }
 
 void MessageThreadDataModel::clear()
 {
-    beginRemoveRows(QModelIndex(), 0, fChannelMessages.count() - 1);
-    foreach (MessageThread *ref, fChannelMessages)
+    beginRemoveRows(QModelIndex(), 0, channelMessages.count() - 1);
+    foreach (MessageThread *ref, channelMessages)
         delete ref;
-    fChannelMessages.clear();
+    channelMessages.clear();
     endRemoveRows();
 }
 

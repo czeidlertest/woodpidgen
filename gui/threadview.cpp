@@ -50,7 +50,8 @@ void ThreadView::onSendButtonClicked()
 
     QString body = fMessageComposer->toPlainText();
     MailMessenger *messenger = new MailMessenger(fMailbox, receiver, fProfile, fProfile->getIdentityList()->identityAt(0));
-    RawMailMessage *message = new RawMailMessage("header", body);
+    RawMessage *message = new RawMessage();
+    message->body = body.toLatin1();
     messenger->postMessage(message);
 
     // todo progress bar

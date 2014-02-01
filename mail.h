@@ -1,35 +1,14 @@
 #ifndef MAIL_H
 #define MAIL_H
 
+#include <QBuffer>
+
 #include "contact.h"
 #include "protocolparser.h"
 
 
-class RawMailMessage {
+class ParcelCrypto {
 public:
-    RawMailMessage(const QString &header, const QString &body);
-    RawMailMessage();
-
-    const QString &getUid() const;
-
-    const QByteArray& getHeader() const;
-    const QByteArray& getBody() const;
-
-    QByteArray& getHeader();
-    QByteArray& getBody();
-
-private:
-    QString fUid;
-
-    QByteArray fHeader;
-    QByteArray fBody;
-};
-
-
-class SecureParcel {
-public:
-    SecureParcel();
-
     void initNew();
     WP::err initFromPublic(Contact *receiver, const QString &keyId, const QByteArray &iv, const QByteArray &encryptedSymmetricKey);
     void initFromPrivate(const QByteArray &iv, const QByteArray &symmetricKey);
@@ -42,52 +21,142 @@ public:
     WP::err getEncryptedSymmetricKey(Contact *receiver, const QString &keyId, QByteArray &encryptedSymmetricKey);
 
 protected:
-    const int kSymmetricKeySize = 256;
+    const static int kSymmetricKeySize = 256;
 
-    QByteArray fIV;
-    QByteArray fSymmetricKey;
+    QByteArray iv;
+    QByteArray symmetricKey;
 };
 
-class SecureChannel {
+
+class DataParcel {
 public:
-    SecureChannel(SecureChannel *parent = NULL);
-    virtual ~SecureChannel();
+    virtual ~DataParcel() {}
 
-    virtual WP::err createNew();
+    const QString getSignature() const;
+    const QString getSignatureKey() const;
+    const Contact *getSender() const;
 
-    void setSecureParcel(SecureParcel *parcel);
-    SecureParcel *getSecureParcel();
+    // returns the sha1 hash of the encapsulated data
+    const QString getUid() const;
 
-    const QString &getUid() const;
-    void setUid(const QString &value);
+    virtual WP::err toRawData(Contact *sender, const QString &signatureKey, QIODevice &rawData);
+    virtual WP::err fromRawData(ContactFinder *contactFinder, QIODevice &rawData);
 
 protected:
-    SecureChannel *fParent;
+    virtual WP::err writeMainData(QDataStream &stream) = 0;
+    virtual WP::err readMainData(QBuffer &mainData) = 0;
+
+protected:
+    QByteArray signature;
+    QString signatureKey;
+    Contact *sender;
+
+    QString uid;
+};
+
+
+class SecureChannel : public DataParcel {
+public:
+    // incoming
+    SecureChannel(Contact *receiver);
+    // outgoing
+    SecureChannel(Contact *receiver, const QString &asymKeyId);
+    virtual ~SecureChannel();
+
+    /*! The id should be the same for all users. Thus the asym part can't be part of the hash.
+    At the moment the channel id is just the sha1 hash of the iv.
+    */
+    virtual const QString &getChannleId() const;
+
+    virtual WP::err writeDataSecure(QDataStream &stream, const QByteArray &data);
+    virtual WP::err readDataSecure(QDataStream &stream, QByteArray &data);
+
+protected:
+    virtual WP::err writeMainData(QDataStream &stream);
+    virtual WP::err readMainData(QBuffer &mainData);
 
 private:
-    QString fUid;
-    SecureParcel *fSecureParcel;
+    Contact *receiver;
+
+    QString asymmetricKeyId;
+    ParcelCrypto parcelCrypto;
+};
+
+
+class ChannelParcel : public DataParcel {
+public:
+    // outgoing
+    ChannelParcel(SecureChannel *channel = NULL);
+
+    SecureChannel *getChannel() const;
+
+protected:
+    virtual WP::err writeMainData(QDataStream &stream);
+    virtual WP::err readMainData(QBuffer &mainData);
+
+    virtual WP::err writeConfidentData(QDataStream &stream) = 0;
+    virtual WP::err readConfidentData(QBuffer &mainData) = 0;
+
+    virtual SecureChannel *findChannel(const QString &channelUid) = 0;
+
+protected:
+    SecureChannel *channel;
+};
+
+
+class MessageChannel;
+
+class MessageChannelFinder {
+public:
+    virtual ~MessageChannelFinder() {}
+    virtual MessageChannel *find(const QString &channelUid) = 0;
 };
 
 
 class MessageChannel : public SecureChannel {
 public:
-    MessageChannel(MessageChannel *parent = NULL);
+    // incoming:
+    MessageChannel(Contact *receiver);
+    // outgoing:
+    MessageChannel(Contact *receiver, const QString &asymKeyId, MessageChannel *parentChannel = NULL);
 
-    virtual WP::err createNew(Contact *creator);
-
-    Contact *getCreator() const;
-    void setCreator(Contact *creator);
+    QString getParentChannelUid() const;
 
 protected:
-    Contact *fCreator;
+    virtual WP::err writeMainData(QDataStream &stream);
+    virtual WP::err readMainData(QBuffer &mainData);
+
+    virtual WP::err writeConfidentData(QDataStream &stream);
+    virtual WP::err readConfidentData(QBuffer &mainData);
+
+private:
+    QString parentChannelUid;
 };
 
-
-class XMLSecureChannel {
+class Message : public ChannelParcel {
 public:
-    // ready to send out to a receiver
-    static WP::err toPublicXML(ProtocolOutStream *outStream, SecureChannel* channel, Contact *receiver, QString keyId = "");
+    Message(MessageChannelFinder *channelFinder);
+    Message(MessageChannel *channel);
+
+    const QByteArray& getBody() const;
+    void setBody(const QByteArray &body);
+
+protected:
+    virtual WP::err writeConfidentData(QDataStream &stream);
+    virtual WP::err readConfidentData(QBuffer &mainData);
+
+    virtual SecureChannel *findChannel(const QString &channelUid);
+
+private:
+    QByteArray body;
+    MessageChannelFinder *channelFinder;
+};
+
+class XMLSecureParcel {
+public:
+    static WP::err write(ProtocolOutStream *outStream, Contact *sender,
+                         const QString &signatureKeyId, DataParcel *parcel,
+                         const QString &stanzaName);
 };
 
 

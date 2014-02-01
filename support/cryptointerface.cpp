@@ -232,6 +232,13 @@ QByteArray CryptoInterface::sha1Hash(const QByteArray &string) const
     return shaHash.final().toByteArray();
 }
 
+QByteArray CryptoInterface::sha2Hash(const QByteArray &string) const
+{
+    QCA::Hash shaHash("sha2");
+    shaHash.update(string);
+    return shaHash.final().toByteArray();
+}
+
 QString CryptoInterface::toHex(const QByteArray &string) const
 {
     return QCA::arrayToHex(string);

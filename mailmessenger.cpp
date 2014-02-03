@@ -32,10 +32,10 @@ MailMessenger::~MailMessenger()
     delete rawMessage;
 }
 
-WP::err MailMessenger::postMessage(const RawMessage *message, const QString _channelId)
+WP::err MailMessenger::postMessage(const RawMessage *_message, const QString _channelId)
 {
-    delete message;
-    message = message;
+    delete rawMessage;
+    rawMessage = _message;
 
     channelId = _channelId;
 
@@ -75,8 +75,8 @@ void MailMessenger::authConnected(WP::err error)
         }
     }
 
-    Message *message = new Message(messageChannel);
-    message->setBody(rawMessage->body);
+    Message message(messageChannel);
+    message.setBody(rawMessage->body);
 
     QByteArray data;
     ProtocolOutStream outStream(&data);
@@ -85,13 +85,11 @@ void MailMessenger::authConnected(WP::err error)
 
     Contact *myself = userIdentity->getMyself();
     OutStanza *messageStanza =  new OutStanza("put_message");
-    messageStanza->addAttribute("uid", message->getUid());
-    messageStanza->addAttribute("from", myself->getUid());
     outStream.pushChildStanza(messageStanza);
 
     QString signatureKeyId = myself->getKeys()->getMainKeyId();
 
-    error = XMLSecureParcel::write(&outStream, myself, signatureKeyId, message, "message");
+    error = XMLSecureParcel::write(&outStream, myself, signatureKeyId, &message, "message");
     if (error != WP::kOk) {
         emit sendResult(error);
         return;

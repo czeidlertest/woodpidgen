@@ -5,80 +5,26 @@ include_once 'XMLProtocol.php';
 
 
 class MessageConst {
+	static public $kPutMessageStanza = "put_message";
 	static public $kMessageStanza = "message";
 	static public $kChannelStanza = "channel";
-	static public $kPrimaryDataStanza = "primary_data";
 };
 
 
-class ChannelLockCKeyStanzaHandler extends InStanzaHandler {
-	private $messageChannel;
-
-	public function __construct($messageChannel) {
-		InStanzaHandler::__construct("ckey");
-		$this->messageChannel = $messageChannel;
-	}
-
-	public function handleStanza($xml) {
-		$this->messageChannel->setCKey($xml->readString());
-		return true;
-	}
-};
-
-class ChannelLockIVStanzaHandler extends InStanzaHandler {
-	private $messageChannel;
-
-	public function __construct($messageChannel) {
-		InStanzaHandler::__construct("iv");
-		$this->messageChannel = $messageChannel;
-	}
-
-	public function handleStanza($xml) {
-		$this->messageChannel->setIV($xml->readString());
-		return true;
-	}
-};
-
-class ChannelStanzaHandler extends InStanzaHandler {
-	private $messageChannel;
-	private $ivHandler;
-	private $ckeyHandler;
-
-	public function __construct($messageChannel) {
-		InStanzaHandler::__construct(MessageConst::$kChannelStanza);
-		$this->messageChannel = $messageChannel;
-		$this->messageChannel = $messageChannel;
-		$this->ivHandler = new ChannelLockIVStanzaHandler($this->messageChannel);
-		$this->addChild($this->ivHandler, false);
-		$this->ckeyHandler = new ChannelLockCKeyStanzaHandler($this->messageChannel);
-		$this->addChild($this->ckeyHandler, false);
+class SignedPackageStanzaHandler extends InStanzaHandler {
+	private $signedPackage;
+	
+	public function __construct($signedPackage, $stanzaName) {
+		InStanzaHandler::__construct($stanzaName);
+		$this->signedPackage = $signedPackage;
 	}
 	
 	public function handleStanza($xml) {
-		$this->messageChannel->setUid($xml->getAttribute("uid"));
-		$this->messageChannel->setAsymKeyId($xml->getAttribute("asym_key_id"));
-		if ($this->messageChannel->getUid() == "" || $this->messageChannel->getAsymKeyId() == "")
-			return false;
-		return true;
-	}
-};
-
-
-class MessageDataStanzaHandler extends InStanzaHandler {
-	private $message;
-
-	public function __construct($message) {
-		InStanzaHandler::__construct(MessageConst::$kPrimaryDataStanza);
-		$this->message = $message;
-	}
-	
-	public function handleStanza($xml) {
-		$primaryPart = $this->message->getPrimaryPart();
-		$primaryPart->setSignatureKey($xml->getAttribute("signature_key"));
-		$primaryPart->setSignature($xml->getAttribute("signature"));
-		if ($primaryPart->getSignatureKey() == "" || $primaryPart->getSignature() == "")
-			return false;
-		$primaryPart->setData($xml->readString());
+		$this->signedPackage->uid = $xml->getAttribute("uid");
+		$this->signedPackage->sender =$xml->getAttribute("sender");
+		$this->signedPackage->signatureKey = $xml->getAttribute("signatureKey");
+		$this->signedPackage->signature = base64_decode($xml->getAttribute("signature"));
+		$this->signedPackage->data = base64_decode($xml->readString());
 		return true;
 	}
 };
@@ -89,30 +35,24 @@ class MessageStanzaHandler extends InStanzaHandler {
 
 	private $messageChannel;
 	private $message;
-	private $dataHandler;
+	private $messageStanzaHandler;
 	private $channelStanzaHandler;
 	
 	public function __construct($inStreamReader) {
-		InStanzaHandler::__construct(MessageConst::$kMessageStanza);
+		InStanzaHandler::__construct(MessageConst::$kPutMessageStanza);
 		$this->inStreamReader = $inStreamReader;
 
-		$this->messageChannel = new MessageChannel();
-		$this->message = new Message();
+		$this->messageChannel = new SignedPackage();
+		$this->message = new SignedPackage();
 
-		$this->channelStanzaHandler = new ChannelStanzaHandler($this->messageChannel);
-		$this->dataHandler = new MessageDataStanzaHandler($this->message);
+		$this->channelStanzaHandler = new SignedPackageStanzaHandler($this->messageChannel, MessageConst::$kChannelStanza);
+		$this->messageStanzaHandler = new SignedPackageStanzaHandler($this->message, MessageConst::$kMessageStanza);
 
 		$this->addChild($this->channelStanzaHandler, true);
-		$this->addChild($this->dataHandler, false);
+		$this->addChild($this->messageStanzaHandler, false);
 	}
 
 	public function handleStanza($xml) {
-		$this->message->setUid($xml->getAttribute("uid"));
-		$this->message->setChannelUid($xml->getAttribute("channel_uid"));
-		$this->message->setFrom($xml->getAttribute("from"));
-		if ($this->message->getUid() == "" || $this->message->getChannelUid() == ""
-			|| $this->message->getFrom() == "")
-			return false;
 		return true;
 	}
 

@@ -27,17 +27,13 @@ void Message::setBody(const QByteArray &_body)
 
 WP::err Message::writeConfidentData(QDataStream &stream)
 {
-    stream << body;
+    stream.device()->write(body);
     return WP::kOk;
 }
 
 WP::err Message::readConfidentData(QBuffer &mainData)
 {
-    char *buffer;
-    QDataStream stream(&mainData);
-    stream >> buffer;
-    body = buffer;
-    delete[] buffer;
+    body = readString(mainData).toLatin1();
     return WP::kOk;
 }
 
@@ -47,7 +43,7 @@ SecureChannel *Message::findChannel(const QString &channelUid)
 }
 
 
-const QString DataParcel::getSignature() const
+const QByteArray DataParcel::getSignature() const
 {
     return signature;
 }
@@ -74,56 +70,77 @@ WP::err DataParcel::toRawData(Contact *_sender, const QString &_signatureKey, QI
 
     CryptoInterface *crypto = CryptoInterfaceSingleton::getCryptoInterface();
 
-    QDataStream stream(&rawData);
 
     QByteArray containerData;
-    QDataStream containerDataStream(containerData);
+    QDataStream containerDataStream(&containerData, QIODevice::WriteOnly);
 
-    containerDataStream << sender->getUid().toLatin1();
-    containerDataStream << "\0";
-    containerDataStream << signatureKey.toLatin1();
-    containerDataStream << "\0";
+    containerDataStream.device()->write(sender->getUid().toLatin1());
+    containerDataStream << (qint8)0;
+    containerDataStream.device()->write(signatureKey.toLatin1());
+    containerDataStream << (qint8)0;
 
     QByteArray mainData;
-    QDataStream mainDataStream(mainData);
+    QDataStream mainDataStream(&mainData, QIODevice::WriteOnly);
+
     WP::err error = writeMainData(mainDataStream);
     if (error != WP::kOk)
         return error;
     uid = crypto->toHex(crypto->sha1Hash(mainData));
 
     containerDataStream << mainData.length();
-    containerDataStream << "\0";
     if (containerDataStream.device()->write(mainData) != mainData.length())
         return WP::kError;
 
-    QByteArray signatureHash = crypto->sha2Hash(containerData);
+    QByteArray signatureHash = crypto->toHex(crypto->sha2Hash(containerData)).toLatin1();
     error = sender->sign(signatureKey, signatureHash, signature);
     if (error != WP::kOk)
         return error;
 
     // write signature header
-    stream << signature;
-    stream << "\0";
+    QDataStream rawDataStream(&rawData);
+    rawDataStream << signature.length();
+    if (rawData.write(signature) != signature.length())
+        return WP::kError;
     if (rawData.write(containerData) != containerData.length())
         return WP::kError;
 
     return WP::kOk;
 }
 
-WP::err DataParcel::fromRawData(ContactFinder *contactFinder, QIODevice &rawData)
+QString DataParcel::readString(QIODevice &data) const
 {
-    char *buffer;
-    QDataStream stream(&rawData);
-    stream >> buffer;
-    signature = buffer;
+    QString string;
+    char c;
+    while (data.getChar(&c)) {
+        if (c == '\0')
+            break;
+        string += c;
+    }
+    return string;
+}
+
+WP::err DataParcel::fromRawData(ContactFinder *contactFinder, QByteArray &rawData)
+{
+    QDataStream stream(&rawData, QIODevice::ReadOnly);
+    quint32 signatureLength;
+    stream >> signatureLength;
+    if (signatureLength <= 0 || signatureLength >= rawData.size())
+        return WP::kBadValue;
+
+    char *buffer = new char[signatureLength];
+    stream.device()->read(buffer, signatureLength);
+    signature.clear();
+    signature.append(buffer, signatureLength);
     delete[] buffer;
-    stream >> buffer;
-    QString senderUid;
-    senderUid = buffer;
-    delete[] buffer;
-    stream >> buffer;
-    signatureKey = buffer;
-    delete[] buffer;
+
+    int position = stream.device()->pos();
+    QByteArray signedData;
+    signedData.setRawData(rawData.data() + position, rawData.length() - position);
+    CryptoInterface *crypto = CryptoInterfaceSingleton::getCryptoInterface();
+    QByteArray signatureHash = crypto->sha2Hash(signedData);
+
+    QString senderUid = readString(*stream.device());
+    signatureKey = readString(*stream.device());
 
     sender = contactFinder->find(senderUid);
     if (sender == NULL)
@@ -133,21 +150,18 @@ WP::err DataParcel::fromRawData(ContactFinder *contactFinder, QIODevice &rawData
     stream >> mainDataLength;
 
     // TODO do proper QIODevice reading
-    QByteArray mainData = rawData.read(mainDataLength);
+    QByteArray mainData = stream.device()->read(mainDataLength);
     if (mainData.length() != mainDataLength)
         return WP::kError;
-
+    uid = crypto->toHex(crypto->sha1Hash(mainData));
 
     QBuffer mainDataBuffer(&mainData);
+    mainDataBuffer.open(QBuffer::ReadOnly);
     WP::err error = readMainData(mainDataBuffer);
     if (error != WP::kOk)
         return error;
 
     // validate data
-    CryptoInterface *crypto = CryptoInterfaceSingleton::getCryptoInterface();
-    QByteArray signatureHash = crypto->sha2Hash(mainData);
-    uid = crypto->toHex(crypto->sha1Hash(mainData));
-
     if (!sender->verify(signatureKey, signatureHash, signature))
         return WP::kBadValue;
 
@@ -251,7 +265,6 @@ WP::err SecureChannel::writeDataSecure(QDataStream &stream, const QByteArray &da
         return error;
 
     stream << encryptedData.length();
-    stream << "\0";
     if (stream.device()->write(encryptedData) != encryptedData.length())
         return WP::kError;
     return WP::kOk;
@@ -273,12 +286,12 @@ WP::err SecureChannel::writeMainData(QDataStream &stream)
     if (error != WP::kOk)
         return error;
 
-    stream << asymmetricKeyId.toLatin1();
-    stream << "\0";
-    stream << encryptedSymmetricKey;
-    stream << "\0";
-    stream << parcelCrypto.getIV();
-    stream << "\0";
+    stream.device()->write(asymmetricKeyId.toLatin1());
+    stream << (qint8)0;
+    stream << encryptedSymmetricKey.length();
+    stream.device()->write(encryptedSymmetricKey);
+    stream << parcelCrypto.getIV().length();
+    stream.device()->write(parcelCrypto.getIV());
     return WP::kOk;
 }
 
@@ -288,16 +301,21 @@ WP::err SecureChannel::readMainData(QBuffer &mainData)
 
     char *buffer;
 
-    inStream >> buffer;
-    asymmetricKeyId = buffer;
+    asymmetricKeyId = readString(mainData);
+
+    int length;
+    inStream >> length;
+    buffer = new char[length];
+    inStream.device()->read(buffer, length);
+    QByteArray encryptedSymmetricKey;
+    encryptedSymmetricKey.append(buffer, length);
     delete[] buffer;
 
-    inStream >> buffer;
-    QByteArray encryptedSymmetricKey = buffer;
-    delete[] buffer;
-
-    inStream >> buffer;
-    QByteArray iv = buffer;
+    inStream >> length;
+    buffer = new char[length];
+    inStream.device()->read(buffer, length);
+    QByteArray iv;
+    iv.append(buffer, length);
     delete[] buffer;
 
     return parcelCrypto.initFromPublic(receiver, asymmetricKeyId, iv, encryptedSymmetricKey);
@@ -319,10 +337,10 @@ MessageChannel::MessageChannel(Contact *receiver) :
 }
 
 MessageChannel::MessageChannel(Contact *receiver, const QString &asymKeyId, MessageChannel *parent) :
-    SecureChannel(receiver, asymKeyId),
-    parentChannelUid(parent->getUid())
+    SecureChannel(receiver, asymKeyId)
 {
-
+    if (parent != NULL)
+        parentChannelUid =parent->getUid();
 }
 
 WP::err MessageChannel::writeMainData(QDataStream &stream)
@@ -332,7 +350,7 @@ WP::err MessageChannel::writeMainData(QDataStream &stream)
         return error;
 
     QByteArray extra;
-    QDataStream extraStream(extra);
+    QDataStream extraStream(&extra, QIODevice::WriteOnly);
     error = writeConfidentData(extraStream);
     if (error != WP::kOk)
         return error;
@@ -353,25 +371,21 @@ WP::err MessageChannel::readMainData(QBuffer &mainData)
         return error;
 
     QBuffer extraBuffer(&extra);
+    extraBuffer.open(QBuffer::ReadOnly);
     return readConfidentData(extraBuffer);
 }
 
 WP::err MessageChannel::writeConfidentData(QDataStream &stream)
 {
-    stream << parentChannelUid;
-    stream << "\0";
+    stream.device()->write(parentChannelUid.toLatin1());
+    stream << (qint8)0;
 
     return WP::kOk;
 }
 
 WP::err MessageChannel::readConfidentData(QBuffer &mainData)
 {
-    QDataStream inStream(&mainData);
-
-    char *buffer;
-    inStream >> buffer;
-    parentChannelUid = buffer;
-    delete[] buffer;
+    parentChannelUid = readString(mainData);
 
     return WP::kOk;
 }
@@ -386,6 +400,7 @@ WP::err XMLSecureParcel::write(ProtocolOutStream *outStream, Contact *sender,
                                const QString &stanzaName)
 {
     QBuffer data;
+    data.open(QBuffer::WriteOnly);
     WP::err error = parcel->toRawData(sender, signatureKeyId, data);
     if (error != WP::kOk)
         return error;
@@ -394,7 +409,7 @@ WP::err XMLSecureParcel::write(ProtocolOutStream *outStream, Contact *sender,
     parcelStanza->addAttribute("uid", parcel->getUid());
     parcelStanza->addAttribute("sender", parcel->getSender()->getUid());
     parcelStanza->addAttribute("signatureKey", parcel->getSignatureKey());
-    parcelStanza->addAttribute("signature", parcel->getSignature());
+    parcelStanza->addAttribute("signature", parcel->getSignature().toBase64());
 
     parcelStanza->setText(data.buffer().toBase64());
 
@@ -417,11 +432,11 @@ SecureChannel *ChannelParcel::getChannel() const
 
 WP::err ChannelParcel::writeMainData(QDataStream &stream)
 {
-    stream << channel->getUid();
-    stream << "\0";
+    stream.device()->write(channel->getUid().toLatin1());
+    stream << (qint8)0;
 
     QByteArray secureData;
-    QDataStream secureStream(secureData);
+    QDataStream secureStream(&secureData, QIODevice::WriteOnly);
     WP::err error = writeConfidentData(secureStream);
     if (error != WP::kOk)
         return error;
@@ -433,11 +448,7 @@ WP::err ChannelParcel::readMainData(QBuffer &mainData)
 {
     QDataStream inStream(&mainData);
 
-    char *buffer;
-    inStream >> buffer;
-    QString channelId = buffer;
-    delete[] buffer;
-
+    QString channelId = readString(mainData);
     channel = findChannel(channelId);
     if (channel == NULL)
         return WP::kError;
@@ -448,5 +459,6 @@ WP::err ChannelParcel::readMainData(QBuffer &mainData)
         return error;
 
     QBuffer confidentDataBuffer(&confidentData);
+    confidentDataBuffer.open(QBuffer::ReadOnly);
     return readConfidentData(confidentDataBuffer);
 }

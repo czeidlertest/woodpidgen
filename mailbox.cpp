@@ -238,8 +238,7 @@ WP::err Mailbox::readMailDatabase()
         if (error != WP::kOk)
             continue;
 
-        QBuffer dataBuffer(&data);
-        error = message->fromRawData(fUserIdentity->getContactFinder(), dataBuffer);
+        error = message->fromRawData(fUserIdentity->getContactFinder(), data);
         if (error != WP::kOk) {
             delete message;
             continue;
@@ -264,6 +263,10 @@ WP::err Mailbox::readMessageChannels()
     QStringList messageChannels = getChannelIds();
     foreach (const QString & uid, messageChannels) {
         MessageChannel* channel = readChannel(uid);
+        if (channel == NULL) {
+            delete channel;
+            continue;
+        }
         fThreadList.addChannel(new MessageThread(channel));
     }
 
@@ -280,8 +283,7 @@ MessageChannel* Mailbox::readChannel(const QString &channelId) {
 
     Contact *myself = fUserIdentity->getMyself();
     MessageChannel *channel = new MessageChannel(myself);
-    QBuffer dataBuffer(&data);
-    error = channel->fromRawData(fUserIdentity->getContactFinder(), dataBuffer);
+    error = channel->fromRawData(fUserIdentity->getContactFinder(), data);
     if (error != WP::kOk) {
         delete channel;
         return NULL;

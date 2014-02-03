@@ -234,7 +234,7 @@ QByteArray CryptoInterface::sha1Hash(const QByteArray &string) const
 
 QByteArray CryptoInterface::sha2Hash(const QByteArray &string) const
 {
-    QCA::Hash shaHash("sha2");
+    QCA::Hash shaHash("sha256");
     shaHash.update(string);
     return shaHash.final().toByteArray();
 }

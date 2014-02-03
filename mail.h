@@ -32,18 +32,20 @@ class DataParcel {
 public:
     virtual ~DataParcel() {}
 
-    const QString getSignature() const;
+    const QByteArray getSignature() const;
     const QString getSignatureKey() const;
     const Contact *getSender() const;
 
     virtual QString getUid() const;
 
     virtual WP::err toRawData(Contact *sender, const QString &signatureKey, QIODevice &rawData);
-    virtual WP::err fromRawData(ContactFinder *contactFinder, QIODevice &rawData);
+    virtual WP::err fromRawData(ContactFinder *contactFinder, QByteArray &rawData);
 
 protected:
     virtual WP::err writeMainData(QDataStream &stream) = 0;
     virtual WP::err readMainData(QBuffer &mainData) = 0;
+
+    QString readString(QIODevice &data) const;
 
 protected:
     QByteArray signature;

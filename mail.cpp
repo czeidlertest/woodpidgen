@@ -137,7 +137,7 @@ WP::err DataParcel::fromRawData(ContactFinder *contactFinder, QByteArray &rawDat
     QByteArray signedData;
     signedData.setRawData(rawData.data() + position, rawData.length() - position);
     CryptoInterface *crypto = CryptoInterfaceSingleton::getCryptoInterface();
-    QByteArray signatureHash = crypto->sha2Hash(signedData);
+    QByteArray signatureHash = crypto->toHex(crypto->sha2Hash(signedData)).toLatin1();
 
     QString senderUid = readString(*stream.device());
     signatureKey = readString(*stream.device());

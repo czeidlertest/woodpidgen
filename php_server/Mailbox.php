@@ -93,12 +93,11 @@ class Mailbox extends UserData {
 
 		$userIdentity = Session::get()->getMainUserIdentity();
 		$sender = $userIdentity->findContact($package->sender);
-
 		if ($sender === null) {
 			$this->lastErrorMessage = "sender unknown";
 			return false;
 		}
-
+	
 		$ok = $sender->verify($package->signatureKey, $hash, $package->signature);
 		if (!$ok)
 			$this->lastErrorMessage = "bad signature";

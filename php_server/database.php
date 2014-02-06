@@ -259,9 +259,7 @@ class GitDatabase extends Git {
 		$object = new GitBlob($this);
 		$object->data = $data;
 		$object->rehash();
-		$ok = $object->write();
-		if (!$ok)
-			return false;
+		$object->write();
 		return $object;
 	}
 
@@ -296,8 +294,6 @@ class GitDatabase extends Git {
 		$treeBuilder = new TreeBuilder($this->currentRootTree);
 		# build new tree
 		$object = $this->writeBlob($data);
-		if ($object === false)
-			return false;
 		$treeBuilder->updateFile($path, $object->getName());
 		$ok = $treeBuilder->write();
 		if (!$ok)

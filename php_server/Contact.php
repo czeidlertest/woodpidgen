@@ -52,7 +52,7 @@ class Contact extends UserData {
 
 	public function addKeySet($keyId, $certificate, $publicKey) {
 		$this->write("keys/".$keyId."/certificate", $certificate);
-		$this->write("keys/".$keyId."/public_key", $certificate);
+		$this->write("keys/".$keyId."/public_key", $publicKey);
 	}
 
 	public function setMainKeyId($mainKeyId) {

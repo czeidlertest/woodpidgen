@@ -327,7 +327,7 @@ class GitDatabase extends Git {
 
 		$commit->author = $commitStamp;
 		$commit->committer = $commitStamp;
-		$commit->summary = "commit";
+		$commit->summary = "server commit";
 		$commit->detail = "";
 
 		$commit->rehash();

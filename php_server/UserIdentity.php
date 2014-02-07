@@ -18,6 +18,7 @@ class UserIdentity extends UserData {
 			return true;
 		foreach ($contactNames as $contactName) {
 			$path = $this->getDirectory()."/contacts/".$contactName;
+	
 			$contact = new Contact($this, $path);
 			$this->contacts[] = $contact;
         }

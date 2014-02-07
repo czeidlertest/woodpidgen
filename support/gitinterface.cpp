@@ -5,7 +5,6 @@
 #include <QFile>
 #include <QTextStream>
 
-
 class PackManager {
 public:
     PackManager(GitInterface *gitInterface, git_repository *repository, git_odb *objectDatabase);
@@ -416,6 +415,7 @@ WP::err PackManager::mergeBranches(const QString &baseCommit, const QString &our
         git_index_free(mergeIndex);
         return WP::kError;
     }
+    QList<const git_index_entry*> resolvedEntries;
     while (true) {
         const git_index_entry *ancestorOut;
         const git_index_entry *ourOut;
@@ -423,7 +423,7 @@ WP::err PackManager::mergeBranches(const QString &baseCommit, const QString &our
         error = git_index_conflict_next(&ancestorOut, &ourOut, &theirOut, iterator);
         if (error == GIT_ITEROVER)
             break;
-        if (error != 0 && error != GIT_ITEROVER) {
+        if (error != 0) {
             git_commit_free(oursCommit);
             git_commit_free(theirsCommit);
             git_index_conflict_iterator_free(iterator);
@@ -431,27 +431,32 @@ WP::err PackManager::mergeBranches(const QString &baseCommit, const QString &our
             return WP::kError;
         }
         // solve conflict
-        const git_index_entry *selected = theirOut;
-        if (ourOut->mtime.nanoseconds > theirOut->mtime.nanoseconds)
+        const git_index_entry *selected = (theirOut != NULL) ? theirOut : ourOut;
+        if (ourOut != NULL && theirOut != NULL
+                && ourOut->mtime.nanoseconds > theirOut->mtime.nanoseconds)
             selected = ourOut;
-        error = git_index_add(mergeIndex, selected);
+
+        resolvedEntries.append(selected);
+    }
+    git_index_conflict_iterator_free(iterator);
+
+    // resolve index
+    foreach (const git_index_entry *entry, resolvedEntries) {
+        error = git_index_add(mergeIndex, entry);
         if (error != 0) {
             git_commit_free(oursCommit);
             git_commit_free(theirsCommit);
-            git_index_conflict_iterator_free(iterator);
             git_index_free(mergeIndex);
             return WP::kError;
         }
-        error = git_index_conflict_remove(mergeIndex, ourOut->path);
+        error = git_index_conflict_remove(mergeIndex, entry->path);
         if (error != 0) {
             git_commit_free(oursCommit);
             git_commit_free(theirsCommit);
-            git_index_conflict_iterator_free(iterator);
             git_index_free(mergeIndex);
             return WP::kError;
         }
     }
-    git_index_conflict_iterator_free(iterator);
 
     // write new root tree
     git_oid newRootTree;

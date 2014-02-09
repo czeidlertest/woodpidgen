@@ -55,7 +55,6 @@ WP::err MailMessenger::postMessage(const RawMessage *_message, const QString _ch
     return startContactRequest();
 }
 
-
 void MailMessenger::authConnected(WP::err error)
 {
     if (error == WP::kContactNeeded) {

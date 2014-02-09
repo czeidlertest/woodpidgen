@@ -48,7 +48,8 @@ SOURCES += main.cpp \
     support/BigInteger/BigIntegerUtils.cpp \
     support/BigInteger/BigIntegerAlgorithms.cpp \
     support/BigInteger/BigInteger.cpp \
-    support/BigInteger/BigUnsignedInABase.cc
+    support/BigInteger/BigUnsignedInABase.cc \
+    gui/newmessageview.cpp
 
 # Installation path
 # target.path =
@@ -87,7 +88,8 @@ HEADERS += \
     support/BigInteger/BigIntegerAlgorithms.hh \
     support/BigInteger/BigInteger.hh \
     support/BigInteger/NumberlikeArray.hh \
-    support/BigInteger/BigUnsignedInABase.hh
+    support/BigInteger/BigUnsignedInABase.hh \
+    gui/newmessageview.h
 FORMS += \
     gui/mainwindow.ui \
     gui/createprofiledialog.ui \

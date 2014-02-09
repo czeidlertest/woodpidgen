@@ -1,10 +1,13 @@
 #ifndef MESSAGEVIEW_H
 #define MESSAGEVIEW_H
 
+#include <QPushButton>
 #include <QListView>
 #include <QSplitter>
+#include <QStackedWidget>
 
 class Mailbox;
+class NewMessageView;
 class Profile;
 class ThreadView;
 
@@ -18,13 +21,18 @@ public:
 
 private slots:
     void onThreadSelected(QModelIndex index);
+    void onSendButtonClicked();
+
 private:
-    Profile *fProfile;
-    Mailbox *fMailbox;
+    Profile *profile;
+    Mailbox *mailbox;
 
-    QListView *fThreadListView;
+    QListView *threadListView;
+    QPushButton *newThreadButton;
 
-    ThreadView *fThreadView;
+    QStackedWidget *stackedWidget;
+    ThreadView *threadView;
+    NewMessageView *newMessageView;
 };
 
 #endif // MESSAGEVIEW_H

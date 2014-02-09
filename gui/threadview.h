@@ -9,6 +9,7 @@
 
 class Mailbox;
 class MessageListModel;
+class MessageThread;
 class Profile;
 
 class ThreadView: public QSplitter
@@ -18,7 +19,7 @@ public:
     explicit ThreadView(Profile *profile, QWidget *parent = 0);
 
     void setMailbox(Mailbox *mailbox);
-    void setMessages(MessageListModel *messages);
+    void setMessageThread(MessageThread *thread);
 
 signals:
 
@@ -28,13 +29,14 @@ private slots:
     void onSendButtonClicked();
 
 private:
-    QListView *fMessageDisplay;
-    QLineEdit *fReceiver;
-    QTextEdit *fMessageComposer;
-    QPushButton *fSendButton;
+    QListView *messageDisplay;
+    QLineEdit *receiver;
+    QTextEdit *messageComposer;
+    QPushButton *sendButton;
 
-    Mailbox *fMailbox;
-    Profile *fProfile;
+    Mailbox *mailbox;
+    Profile *profile;
+    MessageThread* messageThread;
 };
 
 #endif // THREADVIEW_H

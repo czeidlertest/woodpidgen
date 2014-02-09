@@ -10,10 +10,10 @@
 
 ThreadView::ThreadView(Profile *profile, QWidget *parent) :
     QSplitter(Qt::Vertical, parent),
-    fMailbox(NULL),
-    fProfile(profile)
+    mailbox(NULL),
+    profile(profile)
 {
-    fMessageDisplay = new QListView(this);
+    messageDisplay = new QListView(this);
     QWidget *composerWidget = new QWidget(this);
     setStretchFactor(0, 5);
     setStretchFactor(1, 2);
@@ -21,39 +21,41 @@ ThreadView::ThreadView(Profile *profile, QWidget *parent) :
     QVBoxLayout* composerLayout = new QVBoxLayout();
     composerWidget->setLayout(composerLayout);
 
-    fReceiver = new QLineEdit(composerWidget);
-fReceiver->setText("lec@localhost");
-    fMessageComposer = new QTextEdit(composerWidget);
-    fSendButton = new QPushButton("Send", composerWidget);
-    composerLayout->addWidget(fReceiver);
-    composerLayout->addWidget(fMessageComposer);
-    composerLayout->addWidget(fSendButton);
+    receiver = new QLineEdit(composerWidget);
+receiver->setText("lec@localhost");
+    messageComposer = new QTextEdit(composerWidget);
+    sendButton = new QPushButton("Send", composerWidget);
+    composerLayout->addWidget(receiver);
+    composerLayout->addWidget(messageComposer);
+    composerLayout->addWidget(sendButton);
 
-    connect(fSendButton, SIGNAL(clicked()), this, SLOT(onSendButtonClicked()));
+    connect(sendButton, SIGNAL(clicked()), this, SLOT(onSendButtonClicked()));
 }
 
-void ThreadView::setMailbox(Mailbox *mailbox)
+void ThreadView::setMailbox(Mailbox *box)
 {
-    fMailbox = mailbox;
+    mailbox = box;
 }
 
-void ThreadView::setMessages(MessageListModel *messages)
+void ThreadView::setMessageThread(MessageThread *thread)
 {
-    fMessageDisplay->setModel(messages);
+    messageDisplay->setModel(thread->getMessages());
+    messageThread = thread;
 }
 
 void ThreadView::onSendButtonClicked()
 {
-    QString receiver = fReceiver->text();
-    if (receiver == "")
+    QString address = receiver->text();
+    if (address == "")
         return;
 
-    QString body = fMessageComposer->toPlainText();
-    MailMessenger *messenger = new MailMessenger(fMailbox, receiver, fProfile, fProfile->getIdentityList()->identityAt(0));
+    QString body = messageComposer->toPlainText();
+    MailMessenger *messenger = new MailMessenger(mailbox, address, profile, profile->getIdentityList()->identityAt(0));
     RawMessage *message = new RawMessage();
     message->body = body.toLatin1();
-    messenger->postMessage(message);
+    QString messageChannel = messageThread->getMessageChannel()->getUid();
+    messenger->postMessage(message, messageChannel);
 
     // todo progress bar
-    fMessageComposer->clear();
+    messageComposer->clear();
 }

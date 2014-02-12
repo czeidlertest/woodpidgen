@@ -371,6 +371,11 @@ EncryptedPHPConnectionReply::~EncryptedPHPConnectionReply()
 ConnectionBucket<HTTPConnection> ConnectionManager::sHTTPConnectionBucket;
 ConnectionBucket<EncryptedPHPConnection> ConnectionManager::sPHPConnectionBucket;
 
+RemoteConnection *ConnectionManager::defaultConnectionFor(const QUrl &url)
+{
+    return connectionHTTPFor(url);
+}
+
 HTTPConnection *ConnectionManager::connectionHTTPFor(const QUrl &url)
 {
     return sHTTPConnectionBucket.connectionFor(url);

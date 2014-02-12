@@ -178,6 +178,7 @@ private:
 
 class ConnectionManager {
 public:
+   static RemoteConnection *defaultConnectionFor(const QUrl &url);
    static HTTPConnection *connectionHTTPFor(const QUrl &url);
    static EncryptedPHPConnection *connectionPHPFor(const QUrl &url);
 

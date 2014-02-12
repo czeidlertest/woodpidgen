@@ -5,6 +5,7 @@
 #include <QList>
 
 class MessageChannel;
+class MessageChannelInfo;
 class MessageListModel;
 
 
@@ -14,10 +15,13 @@ public:
     ~MessageThread();
 
     MessageChannel *getMessageChannel() const;
-    MessageListModel *getMessages() const;
+    MessageListModel &getMessages() const;
+    QList<MessageChannelInfo *> &getChannelInfos();
+
 private:
-    MessageChannel *fChannel;
-    MessageListModel *fMessages;
+    MessageChannel *channel;
+    MessageListModel *messages;
+    QList<MessageChannelInfo*> channelInfoList;
 };
 
 class MessageThreadDataModel : public QAbstractListModel {

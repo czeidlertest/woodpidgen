@@ -86,7 +86,6 @@ void MessageListModel::clear()
 
 Mailbox::Mailbox(DatabaseBranch *branch, const QString &baseDir) :
     fUserIdentity(NULL),
-    fMessageList(this),
     channelFinder(&fThreadList)
 {
     setToDatabase(branch, baseDir);
@@ -129,23 +128,18 @@ UserIdentity *Mailbox::getOwner() const
     return fUserIdentity;
 }
 
-MessageListModel &Mailbox::getMessages()
-{
-    return fMessageList;
-}
-
 MessageThreadDataModel &Mailbox::getThreads()
 {
     return fThreadList;
 }
 
-QStringList Mailbox::getMailIds()
+QStringList Mailbox::getParcelIds(QString path)
 {
     QStringList messageIds;
-    QStringList shortIds = listDirectories("");
+    QStringList shortIds = listDirectories(path);
     for (int i = 0; i < shortIds.count(); i++) {
         const QString &shortId = shortIds.at(i);
-        if (shortId == "channels")
+        if (shortId.size() != 2)
             continue;
         QStringList restIds = listDirectories(shortId);
         for (int a = 0; a < restIds.count(); a++) {
@@ -155,20 +149,6 @@ QStringList Mailbox::getMailIds()
         }
     }
     return messageIds;
-}
-
-WP::err Mailbox::readMessage(const QString &messageId, QByteArray &body)
-{
-    Message *message = findMessage(messageId);
-    if (message == NULL)
-        return WP::kEntryNotFound;
-
-    Contact *sender = fUserIdentity->findContactByUid(message->getSender()->getUid());
-    if (sender != NULL)
-        body.append(QString(sender->getAddress() + ": ").toLatin1());
-
-    body.append(message->getBody());
-    return WP::kOk;
 }
 
 QStringList Mailbox::getChannelIds()
@@ -187,16 +167,6 @@ QStringList Mailbox::getChannelIds()
     return channelIds;
 }
 
-Message *Mailbox::findMessage(const QString &uid)
-{
-    for (int i = 0; i < fMessageList.getMessageCount(); i++) {
-        Message *message = fMessageList.messageAt(i);
-        if (message->getUid() == uid)
-            return message;
-    }
-    return NULL;
-}
-
 MessageThread *Mailbox::findMessageThread(const QString &channelId)
 {
     for (int i = 0; i < fThreadList.getChannelCount(); i++) {
@@ -212,51 +182,25 @@ void Mailbox::onNewCommits(const QString &startCommit, const QString &endCommit)
     readMailDatabase();
 }
 
-QString Mailbox::pathForMessageId(const QString &messageId)
+QString Mailbox::pathForChannelId(const QString &threadId)
 {
-    QString path = messageId.left(2);
+    QString path = threadId.left(2);
+    path += "/";
+    path += threadId.mid(2);
+    return path;
+}
+
+QString Mailbox::pathForThreadParcelId(const QString &threadId, const QString &messageId)
+{
+    QString path = pathForChannelId(threadId);
+    path += "/";
+    path = messageId.left(2);
     path += "/";
     path += messageId.mid(2);
     return path;
 }
 
 WP::err Mailbox::readMailDatabase()
-{
-    fMessageList.clear();
-
-    readMessageChannels();
-
-    QStringList mails = getMailIds();
-    for (int i = 0; i < mails.count(); i++) {
-        const QString &mailId = mails.at(i);
-        Message *message = new Message(&channelFinder);
-
-        QString path = pathForMessageId(mailId);
-        path += "/message";
-        QByteArray data;
-        WP::err error = read(path, data);
-        if (error != WP::kOk)
-            continue;
-
-        error = message->fromRawData(fUserIdentity->getContactFinder(), data);
-        if (error != WP::kOk) {
-            delete message;
-            continue;
-        }
-
-        fMessageList.addMessage(message);
-
-        // add to thread
-        MessageThread *thread = findMessageThread(message->getChannel()->getUid());
-        if (thread != NULL)
-            thread->getMessages()->addMessage(message);
-    }
-
-    emit databaseRead();
-    return WP::kOk;
-}
-
-WP::err Mailbox::readMessageChannels()
 {
     fThreadList.clear();
 
@@ -267,15 +211,58 @@ WP::err Mailbox::readMessageChannels()
             delete channel;
             continue;
         }
-        fThreadList.addChannel(new MessageThread(channel));
+        MessageThread *thread = new MessageThread(channel);
+        readThreadContent(uid, thread);
+        fThreadList.addChannel(thread);
+    }
+    return WP::kOk;
+}
+
+
+WP::err Mailbox::readThreadContent(const QString &threadUid, MessageThread *thread)
+{
+    MessageListModel &messages = thread->getMessages();
+    QList<MessageChannelInfo*> &infos = thread->getChannelInfos();
+
+
+    QStringList parcels = getParcelIds(threadUid);
+    for (int i = 0; i < parcels.count(); i++) {
+        const QString &parcelId = parcels.at(i);
+        QString path = pathForThreadParcelId(threadUid, parcelId);
+        QByteArray data;
+        WP::err error = read(path, data);
+        if (error != WP::kOk)
+            return error;
+
+        // test for message
+        Message *message = new Message(&channelFinder);
+        error = message->fromRawData(fUserIdentity->getContactFinder(), data);
+        if (error == WP::kOk) {
+            messages.addMessage(message);
+            continue;
+        }
+        delete message;
+
+        // test for channel info
+        MessageChannelInfo *info = new MessageChannelInfo(&channelFinder);
+        error = info->fromRawData(fUserIdentity->getContactFinder(), data);
+        if (error == WP::kOk) {
+            infos.append(info);
+            continue;
+        }
+        delete info;
+
+        // unknown object!
+        continue;
     }
 
+    emit databaseRead();
     return WP::kOk;
 }
 
 MessageChannel* Mailbox::readChannel(const QString &channelId) {
-    QString path = "channels/";
-    path += pathForMessageId(channelId);
+    QString path = pathForChannelId(channelId);
+    path += "r";
     QByteArray data;
     WP::err error = read(path, data);
     if (error != WP::kOk)
@@ -288,6 +275,7 @@ MessageChannel* Mailbox::readChannel(const QString &channelId) {
         delete channel;
         return NULL;
     }
+
     return channel;
 }
 
@@ -297,10 +285,15 @@ Mailbox::MailboxMessageChannelFinder::MailboxMessageChannelFinder(MessageThreadD
 
 }
 
-MessageChannel *Mailbox::MailboxMessageChannelFinder::find(const QString &channelUid)
+MessageChannel *Mailbox::MailboxMessageChannelFinder::findChannel(const QString &channelUid)
 {
     MessageThread *thread = threads->findChannel(channelUid);
     if (thread == NULL)
         return NULL;
     return thread->getMessageChannel();
+}
+
+MessageParcel *Mailbox::MailboxMessageChannelFinder::findParcel(const QString &channelUid, const QString &parcelUid)
+{
+
 }

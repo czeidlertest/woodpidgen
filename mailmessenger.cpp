@@ -5,40 +5,32 @@
 #include "useridentity.h"
 
 
-MailMessenger::MailMessenger(Mailbox *mailbox, const QString &targetAddress, Profile *profile, UserIdentity *identity) :
+MailMessenger::MailMessenger(Mailbox *mailbox, const MessageChannelInfo::Participant *_receiver, Profile *profile) :
     mailbox(mailbox),
-    userIdentity(identity),
-    address(targetAddress),
+    userIdentity(mailbox->getOwner()),
+    receiver(_receiver),
     targetContact(NULL),
     contactRequest(NULL),
-    rawMessage(NULL),
-    remoteConnection(NULL),
-    messageChannel(NULL)
+    message(NULL),
+    remoteConnection(NULL)
 {
-    parseAddress(targetAddress);
-    //fRemoteConnection = sPHPConnectionManager.connectionFor(QUrl(fTargetServer));
-    remoteConnection = ConnectionManager::connectionHTTPFor(QUrl(targetServer));
+    parseAddress(receiver->address);
+    remoteConnection = ConnectionManager::defaultConnectionFor(QUrl(targetServer));
     if (remoteConnection == NULL)
         return;
-    authentication = new SignatureAuthentication(remoteConnection, profile, identity->getMyself()->getUid(),
-                                                  identity->getKeyStore()->getUid(),
-                                                  identity->getMyself()->getKeys()->getMainKeyId(), targetUser);
+    authentication = new SignatureAuthentication(remoteConnection, profile, userIdentity->getMyself()->getUid(),
+                                                  userIdentity->getKeyStore()->getUid(),
+                                                  userIdentity->getMyself()->getKeys()->getMainKeyId(), targetUser);
 }
 
 MailMessenger::~MailMessenger()
 {
     delete authentication;
     delete remoteConnection;
-    delete rawMessage;
 }
 
-WP::err MailMessenger::postMessage(const RawMessage *_message, const QString _channelId)
+WP::err MailMessenger::postMessage(Message *message)
 {
-    delete rawMessage;
-    rawMessage = _message;
-
-    channelId = _channelId;
-
     if (targetServer == "")
         return WP::kNotInit;
     if (remoteConnection == NULL)
@@ -46,10 +38,16 @@ WP::err MailMessenger::postMessage(const RawMessage *_message, const QString _ch
     if (authentication == NULL)
         return WP::kNotInit;
 
-    targetContact = userIdentity->findContact(address);
+    targetContact = userIdentity->findContact(receiver->address);
     if (targetContact != NULL) {
         onContactFound(WP::kOk);
         return WP::kOk;
+    } else if (receiver->uid != "") {
+        targetContact = userIdentity->findContactByUid(receiver->uid);
+        if (targetContact != NULL) {
+            onContactFound(WP::kOk);
+            return WP::kOk;
+        }
     }
 
     return startContactRequest();
@@ -63,19 +61,13 @@ void MailMessenger::authConnected(WP::err error)
     } else if (error != WP::kOk)
         return;
 
+    MessageChannel *newMessageChannel = NULL;
     // channel info
-    if (channelId == "") {
-        messageChannel = new MessageChannel(targetContact, targetContact->getKeys()->getMainKeyId());
-    } else {
-        messageChannel = mailbox->findMessageThread(channelId)->getMessageChannel();
-        if (messageChannel == NULL) {
-            emit sendResult(WP::kChannelNotFound);
-            return;
-        }
+    if (message->getChannel() == NULL) {
+        newMessageChannel = new MessageChannel(targetContact, targetContact->getKeys()->getMainKeyId());
+        message->setChannel(newMessageChannel);
+        message->getChannelInfo()->setChannel(newMessageChannel);
     }
-
-    Message message(messageChannel);
-    message.setBody(rawMessage->body);
 
     QByteArray data;
     ProtocolOutStream outStream(&data);
@@ -88,15 +80,25 @@ void MailMessenger::authConnected(WP::err error)
 
     QString signatureKeyId = myself->getKeys()->getMainKeyId();
 
-    error = XMLSecureParcel::write(&outStream, myself, signatureKeyId, &message, "message");
+    // write message
+    error = XMLSecureParcel::write(&outStream, myself, signatureKeyId, message, "message");
     if (error != WP::kOk) {
         emit sendResult(error);
         return;
     }
 
-    if (channelId == "") {
-        // add new channel
-        error = XMLSecureParcel::write(&outStream, myself, signatureKeyId, messageChannel, "channel");
+    // write new channel
+    if (newMessageChannel != NULL) {
+        error = XMLSecureParcel::write(&outStream, myself, signatureKeyId, message->getChannel(), "channel");
+        if (error != WP::kOk) {
+            emit sendResult(error);
+            return;
+        }
+    }
+
+    // write new channel info
+    if (message->getChannelInfo()->isNewLocale()) {
+        error = XMLSecureParcel::write(&outStream, myself, signatureKeyId, message->getChannelInfo(), "info");
         if (error != WP::kOk) {
             emit sendResult(error);
             return;
@@ -104,6 +106,10 @@ void MailMessenger::authConnected(WP::err error)
     }
 
     outStream.flush();
+
+    delete message;
+    message = NULL;
+    delete newMessageChannel;
 
     serverReply = remoteConnection->send(data);
     connect(serverReply, SIGNAL(finished(WP::err)), this, SLOT(handleReply(WP::err)));
@@ -116,8 +122,6 @@ void MailMessenger::onContactFound(WP::err error)
 
     if (error != WP::kOk)
         return;
-
-    targetContact = userIdentity->findContact(address);
 
     if (authentication->verified())
         authConnected(WP::kOk);
@@ -150,4 +154,54 @@ WP::err MailMessenger::startContactRequest()
     contactRequest = new ContactRequest(remoteConnection, targetUser, userIdentity, this);
     connect(contactRequest, SIGNAL(contactRequestFinished(WP::err)), this, SLOT(onContactFound(WP::err)));
     return contactRequest->postRequest();
+}
+
+
+MultiMailMessenger::MultiMailMessenger(Mailbox *_mailbox, Profile *_profile) :
+    mailMessenger(NULL),
+    message(NULL),
+    mailbox(_mailbox),
+    messageChannelInfo(NULL),
+    profile(_profile),
+    lastParticipantIndex(-1)
+{
+
+}
+
+MultiMailMessenger::~MultiMailMessenger()
+{
+    delete mailMessenger;
+    delete message;
+}
+
+WP::err MultiMailMessenger::postMessage(Message *message)
+{
+    delete this->message;
+    this->message = message;
+
+    messageChannelInfo = message->getChannelInfo();
+
+    onSendResult(WP::kOk);
+
+    return WP::kOk;
+}
+
+void MultiMailMessenger::onSendResult(WP::err error)
+{
+    if (error != WP::kOk) {
+        // todo
+    }
+
+    lastParticipantIndex++;
+    if (lastParticipantIndex == messageChannelInfo->getParticipants().size()) {
+        emit messagesSent();
+        return;
+    }
+    const MessageChannelInfo::Participant *participant = &messageChannelInfo->getParticipants().at(lastParticipantIndex);
+
+    delete mailMessenger;
+    mailMessenger = new MailMessenger(mailbox, participant, profile);
+    mailMessenger->postMessage(message);
+
+    connect(mailMessenger, SIGNAL(sendResult(WP::err)), this, SLOT(onSendResult(WP::err)));
 }

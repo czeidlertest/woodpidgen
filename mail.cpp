@@ -3,45 +3,6 @@
 #include <QBuffer>
 #include <QString>
 
-Message::Message(MessageChannelFinder *_channelFinder) :
-    channelFinder(_channelFinder)
-{
-
-}
-
-Message::Message(MessageChannel *channel) :
-    ChannelParcel(channel)
-{
-
-}
-
-const QByteArray &Message::getBody() const
-{
-    return body;
-}
-
-void Message::setBody(const QByteArray &_body)
-{
-    body = _body;
-}
-
-WP::err Message::writeConfidentData(QDataStream &stream)
-{
-    stream.device()->write(body);
-    return WP::kOk;
-}
-
-WP::err Message::readConfidentData(QBuffer &mainData)
-{
-    body = readString(mainData).toLatin1();
-    return WP::kOk;
-}
-
-SecureChannel *Message::findChannel(const QString &channelUid)
-{
-    return channelFinder->find(channelUid);
-}
-
 
 const QByteArray DataParcel::getSignature() const
 {
@@ -240,13 +201,15 @@ WP::err ParcelCrypto::getEncryptedSymmetricKey(Contact *receiver, const QString 
     return error;
 }
 
-SecureChannel::SecureChannel(Contact *_receiver) :
+SecureChannel::SecureChannel(qint8 type, Contact *_receiver) :
+    AbstractSecureDataParcel(type),
     receiver(_receiver)
 {
 
 }
 
-SecureChannel::SecureChannel(Contact *_receiver, const QString &asymKeyId) :
+SecureChannel::SecureChannel(qint8 type, Contact *_receiver, const QString &asymKeyId) :
+    AbstractSecureDataParcel(type),
     asymmetricKeyId(asymKeyId),
     receiver(_receiver)
 {
@@ -330,14 +293,112 @@ QString SecureChannel::getUid() const
 }
 
 
+SecureChannelParcel::SecureChannelParcel(qint8 type, SecureChannel *_channel) :
+    AbstractSecureDataParcel(type),
+    channel(_channel)
+{
+    timestamp = time(NULL);
+}
+
+void SecureChannelParcel::setChannel(SecureChannel *channel)
+{
+    this->channel = channel;
+}
+
+SecureChannel *SecureChannelParcel::getChannel() const
+{
+    return channel;
+}
+
+time_t SecureChannelParcel::getTimestamp() const
+{
+    return timestamp;
+}
+
+WP::err SecureChannelParcel::writeMainData(QDataStream &stream)
+{
+    stream.device()->write(channel->getUid().toLatin1());
+    stream << (qint8)0;
+
+    QByteArray secureData;
+    QDataStream secureStream(&secureData, QIODevice::WriteOnly);
+    WP::err error = writeConfidentData(secureStream);
+    if (error != WP::kOk)
+        return error;
+
+    return channel->writeDataSecure(stream, secureData);
+}
+
+WP::err SecureChannelParcel::readMainData(QBuffer &mainData)
+{
+    QDataStream stream(&mainData);
+
+    QString channelId = readString(mainData);
+    channel = findChannel(channelId);
+    if (channel == NULL)
+        return WP::kError;
+
+    QByteArray confidentData;
+    WP::err error = channel->readDataSecure(stream, confidentData);
+    if (error != WP::kOk)
+        return error;
+
+    QBuffer confidentDataBuffer(&confidentData);
+    confidentDataBuffer.open(QBuffer::ReadOnly);
+    return readConfidentData(confidentDataBuffer);
+}
+
+WP::err SecureChannelParcel::writeConfidentData(QDataStream &stream)
+{
+    stream << (qint32)timestamp;
+
+    return WP::kOk;
+}
+
+WP::err SecureChannelParcel::readConfidentData(QBuffer &mainData)
+{
+    QDataStream stream(&mainData);
+
+    qint32 time;
+    stream >> time;
+    timestamp = time;
+
+    return WP::kOk;
+}
+
+
+WP::err XMLSecureParcel::write(ProtocolOutStream *outStream, Contact *sender,
+                               const QString &signatureKeyId, DataParcel *parcel,
+                               const QString &stanzaName)
+{
+    QBuffer data;
+    data.open(QBuffer::WriteOnly);
+    WP::err error = parcel->toRawData(sender, signatureKeyId, data);
+    if (error != WP::kOk)
+        return error;
+
+    OutStanza *parcelStanza = new OutStanza(stanzaName);
+    parcelStanza->addAttribute("uid", parcel->getUid());
+    parcelStanza->addAttribute("sender", parcel->getSender()->getUid());
+    parcelStanza->addAttribute("signatureKey", parcel->getSignatureKey());
+    parcelStanza->addAttribute("signature", parcel->getSignature().toBase64());
+
+    parcelStanza->setText(data.buffer().toBase64());
+
+    outStream->pushChildStanza(parcelStanza);
+    outStream->cdDotDot();
+    return WP::kOk;
+}
+
+
 MessageChannel::MessageChannel(Contact *receiver) :
-    SecureChannel(receiver)
+    SecureChannel(kMessageChannelId, receiver)
 {
 
 }
 
 MessageChannel::MessageChannel(Contact *receiver, const QString &asymKeyId, MessageChannel *parent) :
-    SecureChannel(receiver, asymKeyId)
+    SecureChannel(kMessageChannelId, receiver, asymKeyId)
 {
     if (parent != NULL)
         parentChannelUid =parent->getUid();
@@ -377,6 +438,10 @@ WP::err MessageChannel::readMainData(QBuffer &mainData)
 
 WP::err MessageChannel::writeConfidentData(QDataStream &stream)
 {
+    WP::err error = SecureChannel::writeConfidentData(stream);
+    if (error != WP::kOk)
+        return error;
+
     stream.device()->write(parentChannelUid.toLatin1());
     stream << (qint8)0;
 
@@ -385,6 +450,10 @@ WP::err MessageChannel::writeConfidentData(QDataStream &stream)
 
 WP::err MessageChannel::readConfidentData(QBuffer &mainData)
 {
+    WP::err error = SecureChannel::readConfidentData(mainData);
+    if (error != WP::kOk)
+        return error;
+
     parentChannelUid = readString(mainData);
 
     return WP::kOk;
@@ -395,70 +464,196 @@ QString MessageChannel::getParentChannelUid() const
     return parentChannelUid;
 }
 
-WP::err XMLSecureParcel::write(ProtocolOutStream *outStream, Contact *sender,
-                               const QString &signatureKeyId, DataParcel *parcel,
-                               const QString &stanzaName)
+
+MessageChannelInfo::MessageChannelInfo(MessageChannelFinder *_channelFinder) :
+    SecureChannelParcel(kMessageChannelInfoId, NULL),
+    channelFinder(_channelFinder),
+    newLocaleInfo(true)
 {
-    QBuffer data;
-    data.open(QBuffer::WriteOnly);
-    WP::err error = parcel->toRawData(sender, signatureKeyId, data);
+
+}
+
+MessageChannelInfo::MessageChannelInfo(SecureChannel *channel) :
+    SecureChannelParcel(kMessageChannelInfoId, channel),
+    channelFinder(NULL),
+    newLocaleInfo(true)
+{
+
+}
+
+void MessageChannelInfo::setSubject(const QString &subject)
+{
+    this->subject = subject;
+}
+
+void MessageChannelInfo::addParticipant(const QString &address, const QString &uid)
+{
+    Participant participant;
+    participant.address = address;
+    participant.uid = uid;
+    participants.append(participant);
+}
+
+bool MessageChannelInfo::isNewLocale() const
+{
+    return newLocaleInfo;
+}
+
+QVector<MessageChannelInfo::Participant> &MessageChannelInfo::getParticipants()
+{
+    return participants;
+}
+
+WP::err MessageChannelInfo::writeConfidentData(QDataStream &stream)
+{
+    WP::err error = SecureChannelParcel::writeConfidentData(stream);
     if (error != WP::kOk)
         return error;
 
-    OutStanza *parcelStanza = new OutStanza(stanzaName);
-    parcelStanza->addAttribute("uid", parcel->getUid());
-    parcelStanza->addAttribute("sender", parcel->getSender()->getUid());
-    parcelStanza->addAttribute("signatureKey", parcel->getSignatureKey());
-    parcelStanza->addAttribute("signature", parcel->getSignature().toBase64());
+    if (subject != "") {
+        stream << (qint8)kSubject;
+        stream.device()->write(subject.toLatin1());
+        stream << (qint8)0;
+    }
 
-    parcelStanza->setText(data.buffer().toBase64());
+    if (participants.count() > 0) {
+        stream << (qint8)kParticipants;
+        stream << (qint32)participants.count();
+        foreach (const Participant &participant, participants) {
+            stream.device()->write(participant.address.toLatin1());
+            stream << (qint8)0;
+            stream.device()->write(participant.uid.toLatin1());
+            stream << (qint8)0;
+        }
+    }
+    return WP::kOk;
+}
 
-    outStream->pushChildStanza(parcelStanza);
-    outStream->cdDotDot();
+WP::err MessageChannelInfo::readConfidentData(QBuffer &mainData)
+{
+    WP::err error = SecureChannelParcel::readConfidentData(mainData);
+    if (error != WP::kOk)
+        return error;
+
+    QDataStream stream(&mainData);
+
+    while (!stream.atEnd()) {
+        qint32 partId;
+        stream >> partId;
+        if (partId == kSubject) {
+            subject = readString(mainData);
+        } else if (partId == kParticipants) {
+            WP::err error = readParticipants(stream);
+            if (error != WP::kOk)
+                return error;
+        } else
+            return WP::kBadValue;
+    }
+    newLocaleInfo = false;
+    return WP::kOk;
+}
+
+SecureChannel *MessageChannelInfo::findChannel(const QString &channelUid)
+{
+    return channelFinder->findChannel(channelUid);
+}
+
+WP::err MessageChannelInfo::readParticipants(QDataStream &stream) {
+    qint32 numberOfParticipants;
+    stream >> numberOfParticipants;
+    for (int i = 0; i < numberOfParticipants; i++) {
+        Participant participant;
+        participant.address = readString(*stream.device());
+        if (participant.address == "")
+            return WP::kBadValue;
+        participant.uid = readString(*stream.device());
+        if (participant.uid == "")
+            return WP::kBadValue;
+        participants.append(participant);
+    }
     return WP::kOk;
 }
 
 
-ChannelParcel::ChannelParcel(SecureChannel *_channel) :
-    channel(_channel)
+Message::Message(MessageChannelFinder *_channelFinder) :
+    SecureChannelParcel(kMessageChannelId),
+    channelFinder(_channelFinder),
+    channelInfo(NULL)
 {
 
 }
 
-SecureChannel *ChannelParcel::getChannel() const
+Message::Message(MessageChannelInfo *info) :
+    SecureChannelParcel(kMessageChannelId, info->getChannel()),
+    channelInfo(info)
 {
-    return channel;
+
 }
 
-WP::err ChannelParcel::writeMainData(QDataStream &stream)
+MessageChannelInfo *Message::getChannelInfo() const
 {
-    stream.device()->write(channel->getUid().toLatin1());
-    stream << (qint8)0;
+    return channelInfo;
+}
 
-    QByteArray secureData;
-    QDataStream secureStream(&secureData, QIODevice::WriteOnly);
-    WP::err error = writeConfidentData(secureStream);
+const QByteArray &Message::getBody() const
+{
+    return body;
+}
+
+void Message::setBody(const QByteArray &_body)
+{
+    body = _body;
+}
+
+WP::err Message::writeConfidentData(QDataStream &stream)
+{
+    WP::err error = SecureChannelParcel::writeConfidentData(stream);
     if (error != WP::kOk)
         return error;
 
-    return channel->writeDataSecure(stream, secureData);
+    stream.device()->write(body);
+    return WP::kOk;
 }
 
-WP::err ChannelParcel::readMainData(QBuffer &mainData)
+WP::err Message::readConfidentData(QBuffer &mainData)
 {
-    QDataStream inStream(&mainData);
-
-    QString channelId = readString(mainData);
-    channel = findChannel(channelId);
-    if (channel == NULL)
-        return WP::kError;
-
-    QByteArray confidentData;
-    WP::err error = channel->readDataSecure(inStream, confidentData);
+    WP::err error = SecureChannelParcel::readConfidentData(mainData);
     if (error != WP::kOk)
         return error;
 
-    QBuffer confidentDataBuffer(&confidentData);
-    confidentDataBuffer.open(QBuffer::ReadOnly);
-    return readConfidentData(confidentDataBuffer);
+    body = readString(mainData).toLatin1();
+    return WP::kOk;
+}
+
+SecureChannel *Message::findChannel(const QString &channelUid)
+{
+    return channelFinder->findChannel(channelUid);
+}
+
+
+AbstractSecureDataParcel::AbstractSecureDataParcel(qint8 type) :
+    typeId(type)
+{
+
+}
+
+qint8 AbstractSecureDataParcel::getType() const
+{
+    return typeId;
+}
+
+WP::err AbstractSecureDataParcel::writeConfidentData(QDataStream &stream)
+{
+    stream << (qint8)typeId;
+    return WP::kOk;
+}
+
+WP::err AbstractSecureDataParcel::readConfidentData(QBuffer &mainData)
+{
+    QDataStream stream(&mainData);
+    qint8 type;
+    stream >> type;
+    if (type != typeId)
+        return WP::kBadValue;
+    return WP::kOk;
 }

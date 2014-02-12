@@ -39,7 +39,7 @@ void ThreadView::setMailbox(Mailbox *box)
 
 void ThreadView::setMessageThread(MessageThread *thread)
 {
-    messageDisplay->setModel(thread->getMessages());
+    messageDisplay->setModel(&thread->getMessages());
     messageThread = thread;
 }
 
@@ -49,12 +49,13 @@ void ThreadView::onSendButtonClicked()
     if (address == "")
         return;
 
+    MessageChannelInfo *info = messageThread->getChannelInfos().at(0);
+    Message *message = new Message(info);
     QString body = messageComposer->toPlainText();
-    MailMessenger *messenger = new MailMessenger(mailbox, address, profile, profile->getIdentityList()->identityAt(0));
-    RawMessage *message = new RawMessage();
-    message->body = body.toLatin1();
-    QString messageChannel = messageThread->getMessageChannel()->getUid();
-    messenger->postMessage(message, messageChannel);
+    message->setBody(body.toLatin1());
+
+    MultiMailMessenger *messenger = new MultiMailMessenger(mailbox, profile);
+    messenger->postMessage(message);
 
     // todo progress bar
     messageComposer->clear();

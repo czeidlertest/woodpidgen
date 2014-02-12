@@ -7,6 +7,7 @@
 #include "protocolparser.h"
 
 
+
 class ParcelCrypto {
 public:
     void initNew();
@@ -56,12 +57,56 @@ protected:
 };
 
 
-class SecureChannel : public DataParcel {
+class SecureChannel;
+
+
+class AbstractSecureDataParcel : public DataParcel {
+public:
+    AbstractSecureDataParcel(qint8 type);
+
+    qint8 getType() const;
+
+protected:
+    virtual WP::err writeConfidentData(QDataStream &stream);
+    virtual WP::err readConfidentData(QBuffer &mainData);
+
+private:
+    qint8 typeId;
+};
+
+class SecureChannelParcel : public AbstractSecureDataParcel {
+public:
+    // outgoing
+    SecureChannelParcel(qint8 type, SecureChannel *channel = NULL);
+
+    void setChannel(SecureChannel *channel);
+    SecureChannel *getChannel() const;
+
+    time_t getTimestamp() const;
+
+protected:
+    virtual WP::err writeMainData(QDataStream &stream);
+    virtual WP::err readMainData(QBuffer &mainData);
+
+    virtual WP::err writeConfidentData(QDataStream &stream);
+    virtual WP::err readConfidentData(QBuffer &mainData);
+
+    virtual SecureChannel *findChannel(const QString &channelUid) = 0;
+
+protected:
+    SecureChannel *channel;
+
+private:
+    time_t timestamp;
+};
+
+
+class SecureChannel : public AbstractSecureDataParcel {
 public:
     // incoming
-    SecureChannel(Contact *receiver);
+    SecureChannel(qint8 type, Contact *receiver);
     // outgoing
-    SecureChannel(Contact *receiver, const QString &asymKeyId);
+    SecureChannel(qint8 type, Contact *receiver, const QString &asymKeyId);
     virtual ~SecureChannel();
 
     /*! The id should be the same for all users. Thus the asym part can't be part of the hash.
@@ -84,33 +129,61 @@ private:
 };
 
 
-class ChannelParcel : public DataParcel {
-public:
-    // outgoing
-    ChannelParcel(SecureChannel *channel = NULL);
-
-    SecureChannel *getChannel() const;
-
-protected:
-    virtual WP::err writeMainData(QDataStream &stream);
-    virtual WP::err readMainData(QBuffer &mainData);
-
-    virtual WP::err writeConfidentData(QDataStream &stream) = 0;
-    virtual WP::err readConfidentData(QBuffer &mainData) = 0;
-
-    virtual SecureChannel *findChannel(const QString &channelUid) = 0;
-
-protected:
-    SecureChannel *channel;
+enum parcel_identifiers {
+    kMessageChannelId = 1,
+    kMessageId,
+    kMessageChannelInfoId
 };
 
 
 class MessageChannel;
+class MessageParcel;
 
 class MessageChannelFinder {
 public:
     virtual ~MessageChannelFinder() {}
-    virtual MessageChannel *find(const QString &channelUid) = 0;
+    virtual MessageChannel *findChannel(const QString &channelUid) = 0;
+    virtual MessageParcel *findParcel(const QString &channelUid, const QString &parcelUid) = 0;
+};
+
+
+class MessageChannelInfo : public SecureChannelParcel {
+public:
+    MessageChannelInfo(MessageChannelFinder *channelFinder);
+    MessageChannelInfo(SecureChannel *channel);
+
+    void setSubject(const QString &subject);
+    void addParticipant(const QString &address, const QString &uid);
+
+    bool isNewLocale() const;
+
+    class Participant {
+    public:
+        QString address;
+        QString uid;
+    };
+
+    QVector<Participant> &getParticipants();
+
+protected:
+    virtual WP::err writeConfidentData(QDataStream &stream);
+    virtual WP::err readConfidentData(QBuffer &mainData);
+
+    virtual SecureChannel *findChannel(const QString &channelUid);
+
+private:
+    WP::err readParticipants(QDataStream &stream);
+
+private:
+    enum {
+        kSubject = 1,
+        kParticipants
+    };
+
+    MessageChannelFinder *channelFinder;
+    QString subject;
+    QVector<Participant> participants;
+    bool newLocaleInfo;
 };
 
 
@@ -134,10 +207,13 @@ private:
     QString parentChannelUid;
 };
 
-class Message : public ChannelParcel {
+
+class Message : public SecureChannelParcel {
 public:
     Message(MessageChannelFinder *channelFinder);
-    Message(MessageChannel *channel);
+    Message(MessageChannelInfo *info);
+
+    MessageChannelInfo *getChannelInfo() const;
 
     const QByteArray& getBody() const;
     void setBody(const QByteArray &body);
@@ -150,8 +226,10 @@ protected:
 
 private:
     QByteArray body;
+    MessageChannelInfo *channelInfo;
     MessageChannelFinder *channelFinder;
 };
+
 
 class XMLSecureParcel {
 public:

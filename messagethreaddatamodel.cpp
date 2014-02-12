@@ -4,25 +4,33 @@
 
 
 MessageThread::MessageThread(MessageChannel *channel) :
-    fChannel(channel)
+    channel(channel)
 {
-    fMessages = new MessageListModel();
+    messages = new MessageListModel();
 }
 
 MessageThread::~MessageThread()
 {
-    delete fChannel;
-    delete fMessages;
+    delete messages;
+    delete channel;
+
+    foreach (MessageChannelInfo *info, channelInfoList)
+        delete info;
 }
 
 MessageChannel *MessageThread::getMessageChannel() const
 {
-    return fChannel;
+    return channel;
 }
 
-MessageListModel *MessageThread::getMessages() const
+MessageListModel &MessageThread::getMessages() const
 {
-    return fMessages;
+    return *messages;
+}
+
+QList<MessageChannelInfo*> &MessageThread::getChannelInfos()
+{
+    return channelInfoList;
 }
 
 MessageThreadDataModel::MessageThreadDataModel(QObject *parent) :

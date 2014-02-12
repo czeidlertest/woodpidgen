@@ -9,18 +9,13 @@
 class Profile;
 class UserIdentity;
 
-class RawMessage {
-public:
-    QByteArray body;
-};
-
-class MailMessenger : QObject {
+class MailMessenger : public QObject {
 Q_OBJECT
 public:
-    MailMessenger(Mailbox *mailbox, const QString &targetAddress, Profile *profile, UserIdentity *identity);
+    MailMessenger(Mailbox *mailbox, const MessageChannelInfo::Participant *receiver, Profile *profile);
     ~MailMessenger();
 
-    WP::err postMessage(const RawMessage *rawMessage, const QString channelId = "");
+    WP::err postMessage(Message *message);
 
 signals:
     void sendResult(WP::err error);
@@ -37,22 +32,45 @@ private:
     Mailbox *mailbox;
 
     UserIdentity *userIdentity;
-    QString address;
+    const MessageChannelInfo::Participant *receiver;
     QString targetServer;
     QString targetUser;
-    QString channelId;
 
     Contact *targetContact;
 
-    MessageChannel *messageChannel;
     ContactRequest* contactRequest;
 
-    const RawMessage *rawMessage;
+    Message *message;
 
     RemoteConnection *remoteConnection;
     RemoteConnectionReply *serverReply;
     RemoteAuthentication *authentication;
 };
 
+
+class MultiMailMessenger : public QObject {
+Q_OBJECT
+public:
+    MultiMailMessenger(Mailbox *mailbox, Profile *profile);
+    ~MultiMailMessenger();
+
+    WP::err postMessage(Message *message);
+
+signals:
+    void messagesSent();
+
+private slots:
+    void onSendResult(WP::err error);
+
+private:
+    MailMessenger *mailMessenger;
+    Message *message;
+
+    Mailbox *mailbox;
+    MessageChannelInfo *messageChannelInfo;
+    Profile *profile;
+
+    int lastParticipantIndex;
+};
 
 #endif // MAILMESSENGER_H

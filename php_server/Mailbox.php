@@ -20,25 +20,20 @@ class Mailbox extends UserData {
 
 	}
 
-	public function addMessage($messageChannel, $message) {
-		if (!$this->isValid($messageChannel, $message))
+	public function addChannel($messageChannel) {
+		if (!$this->verifyPackage($messageChannel))
+			return false;
+		
+		$path = $this->pathForChannelId($messageChannel->uid);
+		return $this->writePackage($messageChannel, $path);
+	}
+
+	public function addMessage($channelId, $message) {
+		if (!$this->isValid($channelId, $message))
 			return false;
 
-		if ($messageChannel != null) {
-			$uid = $messageChannel->uid;
-			$path = $this->pathForChannelId($uid);
-			$ok = $this->writePackage($messageChannel, $path);
-			if (!$ok)
-				return false;
-		}
-
-		$path = $this->pathForMessageId($uid);
-		$ok= $this->writePackage($message, $path."/message");
-		if (!$ok)
-			return false;
-
-		return $this->commit() !== null;
-
+		$path = $this->pathForMessageId($channelId, $message->uid);
+		return $this->writePackage($message, $path."/message");
 	}
 
 	public function getLastErrorMessage() {
@@ -54,8 +49,8 @@ class Mailbox extends UserData {
 		return true;
 	}
 
-	public function hasMessage($messageUid) {
-		$path = $this->pathForMessageId($messageUid);
+	public function hasMessage($channelId, $messageUid) {
+		$path = $this->pathForMessageId($channelId, $messageUid);
 		$data;
 		$ok = $this->read($path, $data);
 		if (!$ok)
@@ -63,25 +58,32 @@ class Mailbox extends UserData {
 		return true;
 	}
 
-	private function pathForMessageId($messageId) {
+	private function pathForMessageId($channelId, $messageId) {
+		$channelPath = $this->dirForChannelId($channelId);
 		$path = sprintf('%s/%s', substr($messageId, 0, 2), substr($messageId, 2));
+		return $channelPath."/".$path;
+	}
+
+	private function pathForChannelId($channelId) {
+		return $this->dirForChannelId($channelId)."/r";
+	}
+	
+	private function dirForChannelId($channelId) {
+		$path = sprintf('%s/%s', substr($channelId, 0, 2), substr($channelId, 2));
 		return $path;
 	}
 
-	private function pathForChannelId($messageId) {
-		$path = sprintf('%s/%s', substr($messageId, 0, 2), substr($messageId, 2));
-		return "channels/".$path;
-	}
-
-	private function isValid($messageChannel, $message) {
+	private function isValid($channelUid, $message) {
 		if ($this->hasMessage($message->uid)) {
 			$this->lastErrorMessage = "message with same uid exist";
 			return false;
 		}
 
-		if (!$this->verifyPackage($messageChannel) || !$this->verifyPackage($message)) {
+		if (!$this->hasChannel($channelUid))
 			return false;
-		}
+
+		if (!$this->verifyPackage($message))
+			return false;
 
 		return true;
 	}

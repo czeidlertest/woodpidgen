@@ -23,7 +23,7 @@ MessageView::MessageView(Profile *_profile, QWidget *parent) :
     stackedWidget = new QStackedWidget(this);
 
     threadView = new ThreadView(profile);
-    newMessageView = new NewMessageView();
+    newMessageView = new NewMessageView(profile);
 
     stackedWidget->addWidget(threadView);
     stackedWidget->addWidget(newMessageView);
@@ -41,6 +41,7 @@ void MessageView::setMailbox(Mailbox *_mailbox)
     mailbox = _mailbox;
 
     threadView->setMailbox(mailbox);
+    newMessageView->setMailbox(mailbox);
     threadListView->setModel(&mailbox->getThreads());
 }
 
@@ -54,5 +55,7 @@ void MessageView::onThreadSelected(QModelIndex index)
 
 void MessageView::onSendButtonClicked() {
     stackedWidget->setCurrentWidget(newMessageView);
+    threadListView->clearSelection();
+    threadListView->clearFocus();
 }
 

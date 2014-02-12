@@ -65,11 +65,14 @@ class MessageStanzaHandler extends InStanzaHandler {
 		if ($mailbox === null)
 			throw new exception("unable to get mailbox");
 
-		$messageChannel = null;
+		$ok = false;
 		if ($this->channelStanzaHandler->hasBeenHandled())
-			$messageChannel = $this->messageChannel;
-		$ok = $mailbox->addMessage($messageChannel, $this->message);
-
+			$ok = $mailbox->addChannel($this->messageChannel);
+		if ($ok)
+			$ok = $mailbox->addMessage($this->messageChannel->uid, $this->message);
+		if ($ok)
+			$ok = $mailbox->commit() !== null;
+			
 		// produce output
 		$outStream = new ProtocolOutStream();
 		$outStream->pushStanza(new IqOutStanza(IqType::$kResult));

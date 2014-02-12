@@ -45,11 +45,6 @@ public:
     MessageListModel &getMessages();
     MessageThreadDataModel &getThreads();
 
-    QStringList getMailIds();
-    WP::err readMessage(const QString &messageId, QByteArray &body);
-
-    QStringList getChannelIds();
-    Message *findMessage(const QString &uid);
     MessageThread *findMessageThread(const QString &channelId);
 
 signals:
@@ -63,22 +58,27 @@ private:
     class MailboxMessageChannelFinder : public MessageChannelFinder {
     public:
         MailboxMessageChannelFinder(MessageThreadDataModel *threads);
-        virtual MessageChannel *find(const QString &channelUid);
+        virtual MessageChannel *findChannel(const QString &channelUid);
+        virtual MessageParcel *findParcel(const QString &channelUid, const QString &parcelUid);
     private:
         MessageThreadDataModel *threads;
     };
 
-    QString pathForMessageId(const QString &messageId);
+    QStringList getParcelIds(QString path);
+    QStringList getChannelIds();
+
+    QString pathForChannelId(const QString &threadId);
+    QString pathForThreadParcelId(const QString &threadId, const QString &messageId);
+
     MessageChannel* readChannel(const QString &channelId);
 
     WP::err readMailDatabase();
-    WP::err readMessageChannels();
 
     UserIdentity *fUserIdentity;
 
-    MessageListModel fMessageList;
     MessageThreadDataModel fThreadList;
     MailboxMessageChannelFinder channelFinder;
+    WP::err readThreadContent(const QString &threadUid, MessageThread *thread);
 };
 
 

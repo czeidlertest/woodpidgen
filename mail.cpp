@@ -604,7 +604,7 @@ Message::Message(MessageChannelInfo *info) :
     SecureChannelParcel(kMessageChannelId, info->getChannel()),
     channelInfo(info)
 {
-
+    setChannel(info->getChannel());
 }
 
 MessageChannelInfo *Message::getChannelInfo() const

@@ -22,7 +22,7 @@ class SignedPackageStanzaHandler extends InStanzaHandler {
 	
 	public function handleStanza($xml) {
 		$this->signedPackage->uid = $xml->getAttribute("uid");
-		$this->signedPackage->sender =$xml->getAttribute("sender");
+		$this->signedPackage->sender = $xml->getAttribute("sender");
 		$this->signedPackage->signatureKey = $xml->getAttribute("signatureKey");
 		$this->signedPackage->signature = base64_decode($xml->getAttribute("signature"));
 		$this->signedPackage->data = base64_decode($xml->readString());
@@ -34,6 +34,7 @@ class SignedPackageStanzaHandler extends InStanzaHandler {
 class MessageStanzaHandler extends InStanzaHandler {
 	private $inStreamReader;
 
+	private $channelUid;
 	private $messageChannel;
 	private $channelInfo;
 	private $message;
@@ -60,6 +61,7 @@ class MessageStanzaHandler extends InStanzaHandler {
 	}
 
 	public function handleStanza($xml) {
+		$this->channelUid = $xml->getAttribute("channel");
 		return true;
 	}
 
@@ -72,13 +74,13 @@ class MessageStanzaHandler extends InStanzaHandler {
 		if ($mailbox === null)
 			throw new exception("unable to get mailbox");
 
-		$ok = false;
+		$ok = true;
 		if ($this->channelStanzaHandler->hasBeenHandled())
-			$ok = $mailbox->addChannel($this->messageChannel);
-		if ($this->channelInfoStanzaHandler->hasBeenHandled())
-			$ok = $mailbox->addChannelInfo($this->messageChannel->uid, $this->channelInfo);		
+			$ok = $mailbox->addChannel($this->channelUid, $this->messageChannel);
+		if ($ok && $this->channelInfoStanzaHandler->hasBeenHandled())
+			$ok = $mailbox->addChannelInfo($this->channelUid, $this->channelInfo);
 		if ($ok)
-			$ok = $mailbox->addMessage($this->messageChannel->uid, $this->message);
+			$ok = $mailbox->addMessage($this->channelUid, $this->message);
 		if ($ok)
 			$ok = $mailbox->commit() !== null;
 	

@@ -78,6 +78,7 @@ void MailMessenger::authConnected(WP::err error)
 
     Contact *myself = userIdentity->getMyself();
     OutStanza *messageStanza =  new OutStanza("put_message");
+    messageStanza->addAttribute("channel", message->getChannel()->getUid());
     outStream.pushChildStanza(messageStanza);
 
     QString signatureKeyId = myself->getKeys()->getMainKeyId();

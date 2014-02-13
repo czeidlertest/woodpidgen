@@ -20,9 +20,14 @@ class Mailbox extends UserData {
 
 	}
 
-	public function addChannel($messageChannel) {
+	public function addChannel($channelId, $messageChannel) {
 		if (!$this->verifyPackage($messageChannel))
 			return false;
+		
+		if ($channelId != $messageChannel->uid) {
+			$this->lastErrorMessage = "bad channel uid";
+			return false;
+		}
 
 		$path = $this->pathForChannelId($messageChannel->uid);
 		return $this->writePackage($messageChannel, $path);
@@ -84,6 +89,10 @@ class Mailbox extends UserData {
 	}
 
 	private function isValid($channelUid, $message) {
+		if ($channelUid === null || $channelUid == "") {
+			$this->lastErrorMessage = "no message channel given";
+			return false;
+		}
 		/*if ($this->hasMessage($channelUid, $message->uid)) {
 			$this->lastErrorMessage = "message with same uid exist";
 			return false;

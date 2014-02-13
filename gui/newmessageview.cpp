@@ -12,11 +12,13 @@ NewMessageView::NewMessageView(Profile *_profile, QWidget *parent) :
     QVBoxLayout* composerLayout = new QVBoxLayout();
     setLayout(composerLayout);
 
-    receiver = new QLineEdit();
-receiver->setText("lec@localhost");
+    receiverEdit = new QLineEdit();
+receiverEdit->setText("lec@localhost");
+    subjectEdit = new QLineEdit();
     messageComposer = new QTextEdit();
     sendButton = new QPushButton("Send");
-    composerLayout->addWidget(receiver);
+    composerLayout->addWidget(subjectEdit);
+    composerLayout->addWidget(receiverEdit);
     composerLayout->addWidget(messageComposer);
     composerLayout->addWidget(sendButton);
 
@@ -30,12 +32,14 @@ void NewMessageView::setMailbox(Mailbox *box)
 
 void NewMessageView::onSendButtonClicked()
 {
-    QString address = receiver->text();
+    QString address = receiverEdit->text();
     if (address == "")
         return;
 
+    QString subject = subjectEdit->text();
     MessageChannelInfo *channelInfo = new MessageChannelInfo((SecureChannel*)NULL);
     channelInfo->addParticipant(address, "");
+    channelInfo->setSubject(subject);
 
     QString body = messageComposer->toPlainText();
     MultiMailMessenger *messenger = new MultiMailMessenger(mailbox, profile);

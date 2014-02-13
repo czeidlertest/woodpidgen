@@ -23,7 +23,8 @@ public slots:
 private slots:
     void onSendButtonClicked();
 private:
-    QLineEdit *receiver;
+    QLineEdit *receiverEdit;
+    QLineEdit *subjectEdit;
     QTextEdit *messageComposer;
     QPushButton *sendButton;
 

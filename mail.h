@@ -137,12 +137,15 @@ enum parcel_identifiers {
 
 
 class MessageChannel;
+class MessageChannelInfo;
 class MessageParcel;
 
 class MessageChannelFinder {
 public:
     virtual ~MessageChannelFinder() {}
     virtual MessageChannel *findChannel(const QString &channelUid) = 0;
+    virtual MessageChannelInfo *findChannelInfo(const QString &channelUid,
+                                            const QString &channelInfoUid) = 0;
 };
 
 
@@ -152,6 +155,8 @@ public:
     MessageChannelInfo(SecureChannel *channel);
 
     void setSubject(const QString &subject);
+    const QString &getSubject() const;
+
     void addParticipant(const QString &address, const QString &uid);
     bool setParticipantUid(const QString &address, const QString &uid);
 

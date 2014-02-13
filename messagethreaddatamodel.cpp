@@ -41,10 +41,34 @@ MessageThreadDataModel::MessageThreadDataModel(QObject *parent) :
 
 QVariant MessageThreadDataModel::data(const QModelIndex &index, int role) const
 {
-    if (role == Qt::DisplayRole)
-        return channelMessages.at(index.row())->getMessageChannel()->getUid();
+    if (role != Qt::DisplayRole)
+        return QVariant();
 
-    return QVariant();
+    QString text;
+
+    MessageThread* thread = channelMessages.at(index.row());
+    if (thread->getChannelInfos().size() > 0) {
+        MessageChannelInfo *info = thread->getChannelInfos().at(0);
+        text += info->getSubject();
+        if (text == "")
+            text += " ";
+        if (info->getParticipants().size() > 0) {
+            text += "(";
+            QVector<MessageChannelInfo::Participant> &participants = info->getParticipants();
+            for (int i = 0; i < participants.size(); i++) {
+                text += participants.at(i).address;
+                if (i < participants.size() - 1)
+                    text += ",";
+            }
+            text += ")";
+        }
+
+    }
+
+    if (text == "")
+        text += thread->getMessageChannel()->getUid();
+
+    return text;
 }
 
 int MessageThreadDataModel::rowCount(const QModelIndex &parent) const

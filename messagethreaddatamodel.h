@@ -38,6 +38,7 @@ public:
     bool removeChannel(MessageThread *channel);
     MessageThread *channelAt(int index) const;
     MessageThread *findChannel(const QString &channelId) const;
+
     void clear();
 
 private:

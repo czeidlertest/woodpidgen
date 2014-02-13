@@ -25,7 +25,7 @@ public:
 
     void clear();
 private:
-    QList<Message*> fMessages;
+    QList<Message*> messages;
 };
 
 class Mailbox : public EncryptedUserData
@@ -59,6 +59,8 @@ private:
     public:
         MailboxMessageChannelFinder(MessageThreadDataModel *threads);
         virtual MessageChannel *findChannel(const QString &channelUid);
+        virtual MessageChannelInfo *findChannelInfo(const QString &channelUid,
+                                                    const QString &channelInfoUid);
 
     private:
         MessageThreadDataModel *threads;

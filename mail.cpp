@@ -486,6 +486,11 @@ void MessageChannelInfo::setSubject(const QString &subject)
     this->subject = subject;
 }
 
+const QString &MessageChannelInfo::getSubject() const
+{
+    return subject;
+}
+
 void MessageChannelInfo::addParticipant(const QString &address, const QString &uid)
 {
     Participant participant;
@@ -623,6 +628,9 @@ WP::err Message::writeConfidentData(QDataStream &stream)
     if (error != WP::kOk)
         return error;
 
+    stream.device()->write(channelInfo->getUid().toLatin1());
+    stream << (qint8)0;
+
     stream.device()->write(body);
     return WP::kOk;
 }
@@ -632,6 +640,11 @@ WP::err Message::readConfidentData(QBuffer &mainData)
     WP::err error = SecureChannelParcel::readConfidentData(mainData);
     if (error != WP::kOk)
         return error;
+
+    QString channelInfoUid = readString(mainData);
+    channelInfo = channelFinder->findChannelInfo(getChannel()->getUid(), channelInfoUid);
+    if (channelInfo == NULL)
+        return WP::kBadValue;
 
     body = readString(mainData).toLatin1();
     return WP::kOk;

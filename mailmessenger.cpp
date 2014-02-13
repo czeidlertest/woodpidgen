@@ -82,13 +82,6 @@ void MailMessenger::authConnected(WP::err error)
 
     QString signatureKeyId = myself->getKeys()->getMainKeyId();
 
-    // write message
-    error = XMLSecureParcel::write(&outStream, myself, signatureKeyId, message, "message");
-    if (error != WP::kOk) {
-        emit sendResult(error);
-        return;
-    }
-
     // write new channel
     if (newMessageChannel != NULL) {
         error = XMLSecureParcel::write(&outStream, myself, signatureKeyId, message->getChannel(), "channel");
@@ -107,6 +100,13 @@ void MailMessenger::authConnected(WP::err error)
             emit sendResult(error);
             return;
         }
+    }
+
+    // write message
+    error = XMLSecureParcel::write(&outStream, myself, signatureKeyId, message, "message");
+    if (error != WP::kOk) {
+        emit sendResult(error);
+        return;
     }
 
     outStream.flush();

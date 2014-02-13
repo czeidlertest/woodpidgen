@@ -2,6 +2,7 @@
 
 #include <exception>
 
+#include <QDateTime>
 #include <QStringList>
 
 #include "protocolparser.h"
@@ -27,10 +28,21 @@ MessageListModel::MessageListModel(QObject *parent) :
 QVariant
 MessageListModel::data(const QModelIndex &index, int role) const
 {
-    if (role == Qt::DisplayRole)
-        return fMessages.at(index.row())->getBody();
+    if (role != Qt::DisplayRole)
+        return QVariant();
 
-    return QVariant();
+    Message *message = messages.at(index.row());
+    QDateTime time;
+    time.setTime_t(message->getTimestamp());
+
+    QString text;
+    text += time.toString("dd.MM.yy hh:mm:ss");
+    text += " (";
+    text += message->getSender()->getAddress();
+    text += "): ";
+    text += message->getBody();
+
+    return text;
 }
 
 int MessageListModel::rowCount(const QModelIndex &parent) const
@@ -40,20 +52,20 @@ int MessageListModel::rowCount(const QModelIndex &parent) const
 
 int MessageListModel::getMessageCount() const
 {
-    return fMessages.count();
+    return messages.count();
 }
 
 void MessageListModel::addMessage(Message *messageRef)
 {
-    int count = fMessages.count();
+    int count = messages.count();
     beginInsertRows(QModelIndex(), count, count);
-    fMessages.append(messageRef);
+    messages.append(messageRef);
     endInsertRows();
 }
 
 bool MessageListModel::removeMessage(Message *message)
 {
-    int index = fMessages.indexOf(message);
+    int index = messages.indexOf(message);
     if (index < 0)
         return false;
     removeMessageAt(index);
@@ -62,24 +74,24 @@ bool MessageListModel::removeMessage(Message *message)
 
 Message *MessageListModel::removeMessageAt(int index)
 {
-    Message *entry = fMessages.at(index);
+    Message *entry = messages.at(index);
     beginRemoveRows(QModelIndex(), index, index);
-    fMessages.removeAt(index);
+    messages.removeAt(index);
     endRemoveRows();
     return entry;
 }
 
 Message *MessageListModel::messageAt(int index)
 {
-    return fMessages.at(index);
+    return messages.at(index);
 }
 
 void MessageListModel::clear()
 {
-    beginRemoveRows(QModelIndex(), 0, fMessages.count() - 1);
-    foreach (Message *ref, fMessages)
+    beginRemoveRows(QModelIndex(), 0, messages.count() - 1);
+    foreach (Message *ref, messages)
         delete ref;
-    fMessages.clear();
+    messages.clear();
     endRemoveRows();
 }
 
@@ -317,4 +329,26 @@ MessageChannel *Mailbox::MailboxMessageChannelFinder::findChannel(const QString 
     if (thread == NULL)
         return NULL;
     return thread->getMessageChannel();
+}
+
+MessageChannelInfo *Mailbox::MailboxMessageChannelFinder::findChannelInfo(const QString &channelUid,
+                                                                          const QString &channelInfoUid)
+{
+    MessageThread *messageThread = NULL;
+    for (int i = 0; i < threads->getChannelCount(); i++) {
+        MessageThread *thread = threads->channelAt(i);
+        if (thread->getMessageChannel()->getUid() == channelUid) {
+            messageThread = thread;
+            break;
+        }
+    }
+    if (messageThread == NULL)
+        return NULL;
+
+    QList<MessageChannelInfo*>& channelInfos = messageThread->getChannelInfos();
+    foreach (MessageChannelInfo* channelInfo, channelInfos) {
+        if (channelInfo->getUid() == channelInfoUid)
+            return channelInfo;
+    }
+    return NULL;
 }

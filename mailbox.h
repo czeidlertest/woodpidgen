@@ -59,18 +59,18 @@ private:
     public:
         MailboxMessageChannelFinder(MessageThreadDataModel *threads);
         virtual MessageChannel *findChannel(const QString &channelUid);
-        virtual MessageParcel *findParcel(const QString &channelUid, const QString &parcelUid);
+
     private:
         MessageThreadDataModel *threads;
     };
 
-    QStringList getUids(QString path);
-    QStringList getChannelPaths();
+    QStringList getChannelUids(QString path);
+    QStringList getChannelUids();
 
     QString pathForChannelId(const QString &threadId);
     QString pathForMessagelId(const QString &threadPath, const QString &messageId);
 
-    MessageChannel* readChannel(const QString &channelId);
+    MessageChannel* readChannel(const QString &channelPath);
 
     WP::err readMailDatabase();
 
@@ -78,7 +78,9 @@ private:
 
     MessageThreadDataModel fThreadList;
     MailboxMessageChannelFinder channelFinder;
-    WP::err readThreadContent(const QString &threadPath, MessageThread *thread);
+    WP::err readThreadContent(const QString &channelPath, MessageThread *thread);
+    QStringList getUidFilePaths(QString path);
+    QStringList getUidDirPaths(QString path);
 };
 
 

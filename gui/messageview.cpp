@@ -27,7 +27,7 @@ MessageView::MessageView(Profile *_profile, QWidget *parent) :
 
     stackedWidget->addWidget(threadView);
     stackedWidget->addWidget(newMessageView);
-    stackedWidget->setCurrentWidget(threadView);
+    stackedWidget->setCurrentWidget(newMessageView);
 
     setStretchFactor(0, 2);
     setStretchFactor(1, 5);

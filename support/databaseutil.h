@@ -87,6 +87,7 @@ public:
     WP::err remove(const QString& path);
 
     QStringList listDirectories(const QString &path) const;
+    QStringList listFiles(const QString &path) const;
 
     DatabaseBranch *getDatabaseBranch() const;
     QString getDatabaseBaseDir() const;

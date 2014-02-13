@@ -31,6 +31,8 @@ MailMessenger::~MailMessenger()
 
 WP::err MailMessenger::postMessage(Message *message)
 {
+    this->message = message;
+
     if (targetServer == "")
         return WP::kNotInit;
     if (remoteConnection == NULL)
@@ -38,13 +40,13 @@ WP::err MailMessenger::postMessage(Message *message)
     if (authentication == NULL)
         return WP::kNotInit;
 
-    targetContact = userIdentity->findContact(receiver->address);
-    if (targetContact != NULL) {
+    Contact *contact = userIdentity->findContact(receiver->address);
+    if (contact != NULL) {
         onContactFound(WP::kOk);
         return WP::kOk;
     } else if (receiver->uid != "") {
-        targetContact = userIdentity->findContactByUid(receiver->uid);
-        if (targetContact != NULL) {
+        contact = userIdentity->findContactByUid(receiver->uid);
+        if (contact != NULL) {
             onContactFound(WP::kOk);
             return WP::kOk;
         }
@@ -97,8 +99,10 @@ void MailMessenger::authConnected(WP::err error)
     }
 
     // write new channel info
-    if (message->getChannelInfo()->isNewLocale()) {
-        error = XMLSecureParcel::write(&outStream, myself, signatureKeyId, message->getChannelInfo(), "channel_info");
+    MessageChannelInfo *info = message->getChannelInfo();
+    if (info->isNewLocale()) {
+        info->setParticipantUid(targetContact->getAddress(), targetContact->getUid());
+        error = XMLSecureParcel::write(&outStream, myself, signatureKeyId, info, "channel_info");
         if (error != WP::kOk) {
             emit sendResult(error);
             return;
@@ -121,6 +125,10 @@ void MailMessenger::onContactFound(WP::err error)
     contactRequest = NULL;
 
     if (error != WP::kOk)
+        return;
+
+    targetContact = userIdentity->findContact(receiver->address);
+    if (targetContact == NULL)
         return;
 
     if (authentication->verified())

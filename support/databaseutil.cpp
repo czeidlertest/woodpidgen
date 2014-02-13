@@ -84,6 +84,11 @@ QStringList UserData::listDirectories(const QString &path) const
     return fDatabase->listDirectories(prependBaseDir(path));
 }
 
+QStringList UserData::listFiles(const QString &path) const
+{
+    return fDatabase->listFiles(prependBaseDir(path));
+}
+
 DatabaseBranch *UserData::getDatabaseBranch() const
 {
     return fDatabaseBranch;

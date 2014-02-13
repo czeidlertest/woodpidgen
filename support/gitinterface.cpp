@@ -431,10 +431,10 @@ WP::err PackManager::mergeBranches(const QString &baseCommit, const QString &our
             return WP::kError;
         }
         // solve conflict
-        const git_index_entry *selected = (theirOut != NULL) ? theirOut : ourOut;
+        const git_index_entry *selected = (ourOut != NULL) ? ourOut : theirOut;
         if (ourOut != NULL && theirOut != NULL
                 && ourOut->mtime.nanoseconds > theirOut->mtime.nanoseconds)
-            selected = ourOut;
+            selected = theirOut;
 
         resolvedEntries.append(selected);
     }

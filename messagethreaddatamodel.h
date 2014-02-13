@@ -35,6 +35,7 @@ public:
     int getChannelCount() const;
     void addChannel(MessageThread *channel);
     MessageThread *removeChannelAt(int index);
+    bool removeChannel(MessageThread *channel);
     MessageThread *channelAt(int index) const;
     MessageThread *findChannel(const QString &channelId) const;
     void clear();

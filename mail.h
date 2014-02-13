@@ -143,7 +143,6 @@ class MessageChannelFinder {
 public:
     virtual ~MessageChannelFinder() {}
     virtual MessageChannel *findChannel(const QString &channelUid) = 0;
-    virtual MessageParcel *findParcel(const QString &channelUid, const QString &parcelUid) = 0;
 };
 
 
@@ -154,6 +153,7 @@ public:
 
     void setSubject(const QString &subject);
     void addParticipant(const QString &address, const QString &uid);
+    bool setParticipantUid(const QString &address, const QString &uid);
 
     bool isNewLocale() const;
 

@@ -23,15 +23,15 @@ class Mailbox extends UserData {
 	public function addChannel($messageChannel) {
 		if (!$this->verifyPackage($messageChannel))
 			return false;
-		
+
 		$path = $this->pathForChannelId($messageChannel->uid);
 		return $this->writePackage($messageChannel, $path);
 	}
 
 	public function addChannelInfo($channelId, $channelInfo) {
 		$path = $this->dirForChannelId($channelId);
-		$path = $path."/i/".makeUidPath($channelInfo->uid);
-		return $this->writePackage($message, $path);
+		$path = $path."/i/".$this->makeUidPath($channelInfo->uid);
+		return $this->writePackage($channelInfo, $path);
 	}
 
 	public function addMessage($channelId, $message) {
@@ -40,7 +40,7 @@ class Mailbox extends UserData {
 
 		$path = $this->pathForMessageId($channelId, $message->uid);
 		$path = $path."/m";
-		return $this->writePackage($message, $path."/m");
+		return $this->writePackage($message, $path);
 	}
 
 	public function getLastErrorMessage() {
@@ -66,7 +66,7 @@ class Mailbox extends UserData {
 	}
 
 	private function pathForMessageId($channelId, $messageId) {
-		$path = $this->dirForChannelId($channelId)."/".makeUidPath($messageId);
+		$path = $this->dirForChannelId($channelId)."/".$this->makeUidPath($messageId);
 		return $path;
 	}
 
@@ -75,7 +75,7 @@ class Mailbox extends UserData {
 	}
 	
 	private function dirForChannelId($channelId) {
-		return makeUidPath($channelId);
+		return $this->makeUidPath($channelId);
 	}
 	
 	private function makeUidPath($uid) {
@@ -84,13 +84,15 @@ class Mailbox extends UserData {
 	}
 
 	private function isValid($channelUid, $message) {
-		if ($this->hasMessage($message->uid)) {
+		/*if ($this->hasMessage($channelUid, $message->uid)) {
 			$this->lastErrorMessage = "message with same uid exist";
 			return false;
 		}
 
-		if (!$this->hasChannel($channelUid))
+		if (!$this->hasChannel($channelUid)) {
+			$this->lastErrorMessage = "channel not found";
 			return false;
+		}*/
 
 		if (!$this->verifyPackage($message))
 			return false;

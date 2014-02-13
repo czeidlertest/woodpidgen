@@ -85,7 +85,7 @@ WP::err DataParcel::fromRawData(ContactFinder *contactFinder, QByteArray &rawDat
     QDataStream stream(&rawData, QIODevice::ReadOnly);
     quint32 signatureLength;
     stream >> signatureLength;
-    if (signatureLength <= 0 || signatureLength >= rawData.size())
+    if (signatureLength <= 0 || signatureLength >= (quint32)rawData.size())
         return WP::kBadValue;
 
     char *buffer = new char[signatureLength];
@@ -210,8 +210,8 @@ SecureChannel::SecureChannel(qint8 type, Contact *_receiver) :
 
 SecureChannel::SecureChannel(qint8 type, Contact *_receiver, const QString &asymKeyId) :
     AbstractSecureDataParcel(type),
-    asymmetricKeyId(asymKeyId),
-    receiver(_receiver)
+    receiver(_receiver),
+    asymmetricKeyId(asymKeyId)
 {
     parcelCrypto.initNew();
 }
@@ -494,6 +494,18 @@ void MessageChannelInfo::addParticipant(const QString &address, const QString &u
     participants.append(participant);
 }
 
+bool MessageChannelInfo::setParticipantUid(const QString &address, const QString &uid)
+{
+    for (int i = 0; i < participants.size(); i++) {
+        Participant &participant = participants[i];
+        if (participant.address == address) {
+            participant.uid = uid;
+            return true;
+        }
+    }
+    return false;
+}
+
 bool MessageChannelInfo::isNewLocale() const
 {
     return newLocaleInfo;
@@ -538,7 +550,7 @@ WP::err MessageChannelInfo::readConfidentData(QBuffer &mainData)
     QDataStream stream(&mainData);
 
     while (!stream.atEnd()) {
-        qint32 partId;
+        qint8 partId;
         stream >> partId;
         if (partId == kSubject) {
             subject = readString(mainData);
@@ -577,8 +589,8 @@ WP::err MessageChannelInfo::readParticipants(QDataStream &stream) {
 
 Message::Message(MessageChannelFinder *_channelFinder) :
     SecureChannelParcel(kMessageChannelId),
-    channelFinder(_channelFinder),
-    channelInfo(NULL)
+    channelInfo(NULL),
+    channelFinder(_channelFinder)
 {
 
 }

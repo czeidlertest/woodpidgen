@@ -74,6 +74,15 @@ MessageThread *MessageThreadDataModel::removeChannelAt(int index)
     return channel;
 }
 
+bool MessageThreadDataModel::removeChannel(MessageThread *channel)
+{
+    int index = channelMessages.indexOf(channel);
+    if (index < 0)
+        return false;
+    removeChannelAt(index);
+    return true;
+}
+
 MessageThread *MessageThreadDataModel::channelAt(int index) const
 {
     return channelMessages.at(index);

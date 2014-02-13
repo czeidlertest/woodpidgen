@@ -49,6 +49,9 @@ void ThreadView::onSendButtonClicked()
     if (address == "")
         return;
 
+    if (messageThread->getChannelInfos().size() == 0)
+        return;
+
     MessageChannelInfo *info = messageThread->getChannelInfos().at(0);
     Message *message = new Message(info);
     QString body = messageComposer->toPlainText();

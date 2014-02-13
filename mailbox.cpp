@@ -57,9 +57,15 @@ int MessageListModel::getMessageCount() const
 
 void MessageListModel::addMessage(Message *messageRef)
 {
-    int count = messages.count();
-    beginInsertRows(QModelIndex(), count, count);
-    messages.append(messageRef);
+    int index = 0;
+    for (index; index < messages.count(); index++) {
+        Message *current = messages.at(index);
+        if (current->getTimestamp() > messageRef->getTimestamp())
+            break;
+    }
+
+    beginInsertRows(QModelIndex(), index, index);
+    messages.insert(index, messageRef);
     endInsertRows();
 }
 

@@ -8,6 +8,7 @@ class MessageConst {
 	static public $kPutMessageStanza = "put_message";
 	static public $kMessageStanza = "message";
 	static public $kChannelStanza = "channel";
+	static public $kChannelInfoStanza = "channel_info";
 };
 
 
@@ -34,22 +35,28 @@ class MessageStanzaHandler extends InStanzaHandler {
 	private $inStreamReader;
 
 	private $messageChannel;
+	private $channelInfo;
 	private $message;
 	private $messageStanzaHandler;
 	private $channelStanzaHandler;
+	private $channelInfoStanzaHandler;
 	
 	public function __construct($inStreamReader) {
 		InStanzaHandler::__construct(MessageConst::$kPutMessageStanza);
 		$this->inStreamReader = $inStreamReader;
 
-		$this->messageChannel = new SignedPackage();
 		$this->message = new SignedPackage();
-
-		$this->channelStanzaHandler = new SignedPackageStanzaHandler($this->messageChannel, MessageConst::$kChannelStanza);
+		$this->messageChannel = new SignedPackage();
+		$this->channelInfo = new SignedPackage();
+		
 		$this->messageStanzaHandler = new SignedPackageStanzaHandler($this->message, MessageConst::$kMessageStanza);
+		$this->channelStanzaHandler = new SignedPackageStanzaHandler($this->messageChannel, MessageConst::$kChannelStanza);
+		$this->channelInfoStanzaHandler = new SignedPackageStanzaHandler($this->channelInfo, MessageConst::$kChannelInfoStanza);
 
-		$this->addChild($this->channelStanzaHandler, true);
 		$this->addChild($this->messageStanzaHandler, false);
+		// optional
+		$this->addChild($this->channelStanzaHandler, true);
+		$this->addChild($this->channelInfoStanzaHandler, true);
 	}
 
 	public function handleStanza($xml) {
@@ -65,11 +72,11 @@ class MessageStanzaHandler extends InStanzaHandler {
 		if ($mailbox === null)
 			throw new exception("unable to get mailbox");
 
-		$ok = false;
-		if ($this->channelStanzaHandler->hasBeenHandled())
+		$ok = $mailbox->addMessage($this->messageChannel->uid, $this->message);
+		if ($ok && $this->channelStanzaHandler->hasBeenHandled())
 			$ok = $mailbox->addChannel($this->messageChannel);
-		if ($ok)
-			$ok = $mailbox->addMessage($this->messageChannel->uid, $this->message);
+		if ($ok && $this->channelInfoStanzaHandler->hasBeenHandled())
+			$ok = $mailbox->addMessage($this->messageChannel->uid, $this->channelInfo);
 		if ($ok)
 			$ok = $mailbox->commit() !== null;
 			

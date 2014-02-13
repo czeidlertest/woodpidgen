@@ -28,12 +28,19 @@ class Mailbox extends UserData {
 		return $this->writePackage($messageChannel, $path);
 	}
 
+	public function addChannelInfo($channelId, $channelInfo) {
+		$path = $this->dirForChannelId($channelId);
+		$path = $path."/i/".makeUidPath($channelInfo->uid);
+		return $this->writePackage($message, $path);
+	}
+
 	public function addMessage($channelId, $message) {
 		if (!$this->isValid($channelId, $message))
 			return false;
 
 		$path = $this->pathForMessageId($channelId, $message->uid);
-		return $this->writePackage($message, $path."/message");
+		$path = $path."/m";
+		return $this->writePackage($message, $path."/m");
 	}
 
 	public function getLastErrorMessage() {
@@ -59,9 +66,8 @@ class Mailbox extends UserData {
 	}
 
 	private function pathForMessageId($channelId, $messageId) {
-		$channelPath = $this->dirForChannelId($channelId);
-		$path = sprintf('%s/%s', substr($messageId, 0, 2), substr($messageId, 2));
-		return $channelPath."/".$path;
+		$path = $this->dirForChannelId($channelId)."/".makeUidPath($messageId);
+		return $path;
 	}
 
 	private function pathForChannelId($channelId) {
@@ -69,7 +75,11 @@ class Mailbox extends UserData {
 	}
 	
 	private function dirForChannelId($channelId) {
-		$path = sprintf('%s/%s', substr($channelId, 0, 2), substr($channelId, 2));
+		return makeUidPath($channelId);
+	}
+	
+	private function makeUidPath($uid) {
+		$path = sprintf('%s/%s', substr($uid, 0, 2), substr($uid, 2));
 		return $path;
 	}
 

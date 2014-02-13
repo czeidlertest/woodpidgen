@@ -98,7 +98,7 @@ void MailMessenger::authConnected(WP::err error)
 
     // write new channel info
     if (message->getChannelInfo()->isNewLocale()) {
-        error = XMLSecureParcel::write(&outStream, myself, signatureKeyId, message->getChannelInfo(), "info");
+        error = XMLSecureParcel::write(&outStream, myself, signatureKeyId, message->getChannelInfo(), "channel_info");
         if (error != WP::kOk) {
             emit sendResult(error);
             return;

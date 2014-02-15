@@ -4,6 +4,7 @@
 #include <QAbstractListModel>
 #include <QList>
 
+class Message;
 class MessageChannel;
 class MessageChannelInfo;
 class MessageListModel;
@@ -18,10 +19,14 @@ public:
     MessageListModel &getMessages() const;
     QList<MessageChannelInfo *> &getChannelInfos();
 
+    Message *getLastMessage() const;
+    void setLastMessage(Message *message);
+
 private:
     MessageChannel *channel;
     MessageListModel *messages;
     QList<MessageChannelInfo*> channelInfoList;
+    Message *lastMessage;
 };
 
 class MessageThreadDataModel : public QAbstractListModel {
@@ -41,8 +46,10 @@ public:
 
     void clear();
 
+    void sort();
+
 private:
-    QList<MessageThread*> channelMessages;
+    QList<MessageThread*> channels;
 };
 
 #endif // MESSAGETHREADDATAMODEL_H

@@ -33,6 +33,16 @@ QList<MessageChannelInfo*> &MessageThread::getChannelInfos()
     return channelInfoList;
 }
 
+Message *MessageThread::getLastMessage() const
+{
+    return lastMessage;
+}
+
+void MessageThread::setLastMessage(Message *message)
+{
+    lastMessage = message;
+}
+
 MessageThreadDataModel::MessageThreadDataModel(QObject *parent) :
     QAbstractListModel(parent)
 {
@@ -46,7 +56,7 @@ QVariant MessageThreadDataModel::data(const QModelIndex &index, int role) const
 
     QString text;
 
-    MessageThread* thread = channelMessages.at(index.row());
+    MessageThread* thread = channels.at(index.row());
     if (thread->getChannelInfos().size() > 0) {
         MessageChannelInfo *info = thread->getChannelInfos().at(0);
         text += info->getSubject();
@@ -78,29 +88,29 @@ int MessageThreadDataModel::rowCount(const QModelIndex &parent) const
 
 int MessageThreadDataModel::getChannelCount() const
 {
-    return channelMessages.count();
+    return channels.count();
 }
 
 void MessageThreadDataModel::addChannel(MessageThread *channel)
 {
-    int count = channelMessages.count();
-    beginInsertRows(QModelIndex(), count, count);
-    channelMessages.append(channel);
+    int index = channels.size();
+    beginInsertRows(QModelIndex(), index, index);
+    channels.append(channel);
     endInsertRows();
 }
 
 MessageThread *MessageThreadDataModel::removeChannelAt(int index)
 {
-    MessageThread *channel = channelMessages.at(index);
+    MessageThread *channel = channels.at(index);
     beginRemoveRows(QModelIndex(), index, index);
-    channelMessages.removeAt(index);
+    channels.removeAt(index);
     endRemoveRows();
     return channel;
 }
 
 bool MessageThreadDataModel::removeChannel(MessageThread *channel)
 {
-    int index = channelMessages.indexOf(channel);
+    int index = channels.indexOf(channel);
     if (index < 0)
         return false;
     removeChannelAt(index);
@@ -109,12 +119,12 @@ bool MessageThreadDataModel::removeChannel(MessageThread *channel)
 
 MessageThread *MessageThreadDataModel::channelAt(int index) const
 {
-    return channelMessages.at(index);
+    return channels.at(index);
 }
 
 MessageThread *MessageThreadDataModel::findChannel(const QString &channelId) const
 {
-    foreach (MessageThread *thread, channelMessages) {
+    foreach (MessageThread *thread, channels) {
         if (thread->getMessageChannel()->getUid() == channelId)
             return thread;
     }
@@ -123,14 +133,28 @@ MessageThread *MessageThreadDataModel::findChannel(const QString &channelId) con
 
 void MessageThreadDataModel::clear()
 {
-    beginRemoveRows(QModelIndex(), 0, channelMessages.count() - 1);
-    foreach (MessageThread *ref, channelMessages)
+    beginRemoveRows(QModelIndex(), 0, channels.count() - 1);
+    foreach (MessageThread *ref, channels)
         delete ref;
-    channelMessages.clear();
+    channels.clear();
     endRemoveRows();
 }
 
+bool messageThreadComparator(const MessageThread *a, const MessageThread *b)
+{
+    if (a->getLastMessage() == NULL)
+        return false;
+    if (b->getLastMessage() == NULL)
+        return true;
+    return a->getLastMessage()->getTimestamp() > b->getLastMessage()->getTimestamp();
+}
 
+void MessageThreadDataModel::sort()
+{
+    beginResetModel();
+    qSort(channels.begin(), channels.end(), messageThreadComparator);
+    endResetModel();
+}
 
 MessageThreadDataModel::~MessageThreadDataModel()
 {

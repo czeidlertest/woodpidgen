@@ -139,6 +139,7 @@ void Mailbox::setOwner(UserIdentity *userIdentity)
 {
     fUserIdentity = userIdentity;
     readMailDatabase();
+    fThreadList.sort();
 }
 
 UserIdentity *Mailbox::getOwner() const
@@ -281,6 +282,8 @@ WP::err Mailbox::readThreadContent(const QString &channelPath, MessageThread *th
         delete info;
     }
 
+    Message *lastMessage = NULL;
+
     QStringList messageUidPaths = getUidDirPaths(channelPath);
     for (int i = 0; i < messageUidPaths.count(); i++) {
         QString path = messageUidPaths.at(i);
@@ -295,10 +298,14 @@ WP::err Mailbox::readThreadContent(const QString &channelPath, MessageThread *th
         error = message->fromRawData(fUserIdentity->getContactFinder(), data);
         if (error == WP::kOk) {
             messages.addMessage(message);
+            if (lastMessage == NULL || lastMessage->getTimestamp() < message->getTimestamp())
+                lastMessage = message;
             continue;
         }
         delete message;
     }
+
+    thread->setLastMessage(lastMessage);
 
     emit databaseRead();
     return WP::kOk;

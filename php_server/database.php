@@ -564,7 +564,7 @@ class PackManager {
 
 			$parents = $commitObject->parents;
             if (!$stopAncestorsCalculated && count($parents) > 1) {
-                $stopAncestorCommits = collectAncestorCommits($commitStop);
+                $stopAncestorCommits = $this->collectAncestorCommits($commitStop);
                 $stopAncestorsCalculated = true;
             }
 			foreach ($parents as $parent) {

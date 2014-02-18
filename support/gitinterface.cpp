@@ -378,6 +378,24 @@ done:
     return error;
 }
 
+static git_index_entry *index_entry_dup(const git_index_entry *source_entry)
+{
+    git_index_entry *entry;
+
+    entry = (git_index_entry*)malloc(sizeof(git_index_entry));
+    if (!entry)
+        return NULL;
+
+    memcpy(entry, source_entry, sizeof(git_index_entry));
+
+    /* duplicate the path string so we own it */
+    entry->path = strdup(source_entry->path);
+    if (!entry->path)
+        return NULL;
+
+    return entry;
+}
+
 WP::err PackManager::mergeBranches(const QString &baseCommit, const QString &ours, const QString &theirs, QString &merge)
 {
     git_oid oursOid;
@@ -415,7 +433,7 @@ WP::err PackManager::mergeBranches(const QString &baseCommit, const QString &our
         git_index_free(mergeIndex);
         return WP::kError;
     }
-    QList<const git_index_entry*> resolvedEntries;
+    QList<git_index_entry*> resolvedEntries;
     while (true) {
         const git_index_entry *ancestorOut;
         const git_index_entry *ourOut;
@@ -436,12 +454,19 @@ WP::err PackManager::mergeBranches(const QString &baseCommit, const QString &our
                 && ourOut->mtime.nanoseconds > theirOut->mtime.nanoseconds)
             selected = theirOut;
 
-        resolvedEntries.append(selected);
+        // duplicate the entry and remove the stage flag
+        git_index_entry *editEntry = index_entry_dup(selected);
+        editEntry->flags = (editEntry->flags & ~GIT_IDXENTRY_STAGEMASK) |
+            ((0) << GIT_IDXENTRY_STAGESHIFT);
+
+        resolvedEntries.append(editEntry);
     }
     git_index_conflict_iterator_free(iterator);
 
+    git_index_conflict_cleanup(mergeIndex);
+
     // resolve index
-    foreach (const git_index_entry *entry, resolvedEntries) {
+    foreach (git_index_entry *entry, resolvedEntries) {
         error = git_index_add(mergeIndex, entry);
         if (error != 0) {
             git_commit_free(oursCommit);
@@ -449,13 +474,9 @@ WP::err PackManager::mergeBranches(const QString &baseCommit, const QString &our
             git_index_free(mergeIndex);
             return WP::kError;
         }
-        error = git_index_conflict_remove(mergeIndex, entry->path);
-        if (error != 0) {
-            git_commit_free(oursCommit);
-            git_commit_free(theirsCommit);
-            git_index_free(mergeIndex);
-            return WP::kError;
-        }
+
+        free(entry->path);
+        free(entry);
     }
 
     // write new root tree

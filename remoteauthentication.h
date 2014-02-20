@@ -19,7 +19,7 @@ public:
     //! Establish a connection and login afterwards.
     WP::err login();
     void logout();
-    bool verified();
+    bool isVerified();
 
 protected slots:
     virtual void handleConnectionAttempt(WP::err code) = 0;
@@ -33,11 +33,11 @@ protected:
 
     virtual void getLogoutData(QByteArray &data) = 0;
 
-    RemoteConnection *fConnection;
-    RemoteConnectionReply *fAuthenticationReply;
+    RemoteConnection *connection;
+    RemoteConnectionReply *authenticationReply;
 
-    bool fAuthenticationInProgress;
-    bool fVerified;
+    bool authenticationInProgress;
+    bool verified;
 };
 
 
@@ -60,13 +60,13 @@ protected:
     void getLogoutData(QByteArray &data);
 
 private:
-    Profile *fProfile;
-    QString fUserName;
-    QString fServerUser;
-    QString fKeyStoreId;
-    QString fKeyId;
+    Profile *profile;
+    QString userName;
+    QString serverUser;
+    QString keyStoreId;
+    QString keyId;
 
-    QStringList fRoles;
+    QStringList roles;
 };
 
 

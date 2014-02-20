@@ -12,6 +12,7 @@ MailMessenger::MailMessenger(Mailbox *mailbox, const MessageChannelInfo::Partici
     targetContact(NULL),
     contactRequest(NULL),
     message(NULL),
+    deleteMessageWhenDone(false),
     remoteConnection(NULL)
 {
     parseAddress(receiver->address);
@@ -29,9 +30,12 @@ MailMessenger::~MailMessenger()
     delete remoteConnection;
 }
 
-WP::err MailMessenger::postMessage(Message *message)
+WP::err MailMessenger::postMessage(Message *message, bool deleteWhenDone)
 {
+    if (this->message != NULL)
+        return WP::kError;
     this->message = message;
+    this->deleteMessageWhenDone = deleteWhenDone;
 
     if (targetServer == "")
         return WP::kNotInit;
@@ -112,9 +116,13 @@ void MailMessenger::authConnected(WP::err error)
 
     outStream.flush();
 
-    delete message;
-    message = NULL;
+    if (newMessageChannel != NULL)
+        message->setChannel(NULL);
     delete newMessageChannel;
+
+    if (deleteMessageWhenDone)
+        delete message;
+    message = NULL;
 
     serverReply = remoteConnection->send(data);
     connect(serverReply, SIGNAL(finished(WP::err)), this, SLOT(handleReply(WP::err)));
@@ -132,9 +140,10 @@ void MailMessenger::onContactFound(WP::err error)
     if (targetContact == NULL)
         return;
 
-    if (authentication->verified())
+    if (authentication->isVerified())
         authConnected(WP::kOk);
     else {
+        authentication->disconnect(this);
         connect(authentication, SIGNAL(authenticationAttemptFinished(WP::err)),
                 this, SLOT(authConnected(WP::err)));
         authentication->login();
@@ -144,6 +153,7 @@ void MailMessenger::onContactFound(WP::err error)
 void MailMessenger::handleReply(WP::err error)
 {
     QByteArray data = serverReply->readAll();
+    emit sendResult(error);
 }
 
 void MailMessenger::parseAddress(const QString &targetAddress)
@@ -185,6 +195,8 @@ MultiMailMessenger::~MultiMailMessenger()
 
 WP::err MultiMailMessenger::postMessage(Message *message)
 {
+    lastParticipantIndex = -1;
+
     delete this->message;
     this->message = message;
 
@@ -204,13 +216,14 @@ void MultiMailMessenger::onSendResult(WP::err error)
     lastParticipantIndex++;
     if (lastParticipantIndex == messageChannelInfo->getParticipants().size()) {
         emit messagesSent();
+        delete message;
         return;
     }
     const MessageChannelInfo::Participant *participant = &messageChannelInfo->getParticipants().at(lastParticipantIndex);
 
-    delete mailMessenger;
+    //mailMessenger->deleteLater();
     mailMessenger = new MailMessenger(mailbox, participant, profile);
-    mailMessenger->postMessage(message);
+    mailMessenger->postMessage(message, false);
 
     connect(mailMessenger, SIGNAL(sendResult(WP::err)), this, SLOT(onSendResult(WP::err)));
 }

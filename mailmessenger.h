@@ -15,7 +15,7 @@ public:
     MailMessenger(Mailbox *mailbox, const MessageChannelInfo::Participant *receiver, Profile *profile);
     ~MailMessenger();
 
-    WP::err postMessage(Message *message);
+    WP::err postMessage(Message *message, bool deleteWhenDone = true);
 
 signals:
     void sendResult(WP::err error);
@@ -41,6 +41,7 @@ private:
     ContactRequest* contactRequest;
 
     Message *message;
+    bool deleteMessageWhenDone;
 
     RemoteConnection *remoteConnection;
     RemoteConnectionReply *serverReply;

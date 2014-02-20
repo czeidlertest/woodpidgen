@@ -47,7 +47,7 @@ WP::err SyncManager::keepSynced(DatabaseInterface *branch)
 
 void SyncManager::startWatching()
 {
-    if (fAuthentication->verified())
+    if (fAuthentication->isVerified())
         remoteAuthenticated(WP::kOk);
     else {
         connect(fAuthentication, SIGNAL(authenticationAttemptFinished(WP::err)),

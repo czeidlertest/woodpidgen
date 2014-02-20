@@ -135,7 +135,7 @@ WP::err HTTPConnection::connectToServer()
     return WP::kOk;
 }
 
-WP::err HTTPConnection::disconnect()
+WP::err HTTPConnection::disconnectFromServer()
 {
     setDisconnected();
     return WP::kOk;
@@ -176,6 +176,7 @@ RemoteConnectionReply *HTTPConnection::send(const QByteArray &data)
     if (reply == NULL)
         return NULL;
 
+    manager->disconnect(this);
     connect(manager, SIGNAL(finished(QNetworkReply*)), this, SLOT(replyFinished(QNetworkReply*)));
     //connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(replyError(QNetworkReply::NetworkError)));
 
@@ -241,7 +242,7 @@ WP::err EncryptedPHPConnection::connectToServer()
     return WP::kOk;
 }
 
-WP::err EncryptedPHPConnection::disconnect()
+WP::err EncryptedPHPConnection::disconnectFromServer()
 {
     // TODO notify the server
     setDisconnected();

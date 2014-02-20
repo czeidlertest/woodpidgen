@@ -4,6 +4,7 @@
 
 #include "mailmessenger.h"
 #include "profile.h"
+#include "useridentity.h"
 
 NewMessageView::NewMessageView(Profile *_profile, QWidget *parent) :
     QWidget(parent),
@@ -38,7 +39,12 @@ void NewMessageView::onSendButtonClicked()
 
     QString subject = subjectEdit->text();
     MessageChannelInfo *channelInfo = new MessageChannelInfo((SecureChannel*)NULL);
-    channelInfo->addParticipant(address, "");
+    Contact *mySelf = mailbox->getOwner()->getMyself();
+
+    channelInfo->addParticipant(mySelf->getAddress(), mySelf->getUid());
+    if (mySelf->getAddress() != address)
+        channelInfo->addParticipant(address, "");
+
     channelInfo->setSubject(subject);
 
     QString body = messageComposer->toPlainText();

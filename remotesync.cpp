@@ -21,7 +21,7 @@ RemoteSync::~RemoteSync()
 
 WP::err RemoteSync::sync()
 {
-    if (fAuthentication->verified())
+    if (fAuthentication->isVerified())
         syncConnected(WP::kOk);
     else {
         connect(fAuthentication, SIGNAL(authenticationAttemptFinished(WP::err)),

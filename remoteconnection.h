@@ -37,7 +37,7 @@ public:
     virtual ~RemoteConnection();
 
     virtual WP::err connectToServer() = 0;
-    virtual WP::err disconnect() = 0;
+    virtual WP::err disconnectFromServer() = 0;
     virtual RemoteConnectionReply *send(const QByteArray& data) = 0;
 
     bool isConnected();
@@ -84,7 +84,7 @@ public:
     static QNetworkAccessManager *getNetworkAccessManager();
 
     WP::err connectToServer();
-    WP::err disconnect();
+    WP::err disconnectFromServer();
     virtual RemoteConnectionReply *send(const QByteArray& data);
 
 protected slots:
@@ -130,7 +130,7 @@ public:
     EncryptedPHPConnection(QUrl url, QObject *parent = NULL);
 
     WP::err connectToServer();
-    WP::err disconnect();
+    WP::err disconnectFromServer();
 
     virtual RemoteConnectionReply *send(const QByteArray& data);
 
